@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 import polars as pl
 import pytest
 import respx
@@ -6,26 +8,19 @@ from ipolitico.extractors.proposicoes import ProposicoesExtractor
 
 
 @pytest.mark.asyncio
-async def test_extract_proposicoes_atuais_success():
-    """
-    Valida se o extrator de proposições organiza os dados corretamente.
-    """
+async def test_proposicoes_incremental_flow():
     client = CamaraClient()
-    extractor = ProposicoesExtractor(client)
+    extractor = ProposicoesExtractor(client, db_path="fake.db")
 
-    fake_payload = [
-        {"id": 1001, "siglaTipo": "PL", "ementa": "Marco Legal da IA", "ano": 2024},
-        {"id": 1002, "siglaTipo": "PEC", "ementa": "Reforma do Estado", "ano": 2024},
-    ]
+    extractor._get_last_watermark = MagicMock(return_value="2023-12-25")
 
     with respx.mock:
-        respx.get("https://dadosabertos.camara.leg.br/api/v2/proposicoes").respond(
-            status_code=200, json={"dados": fake_payload}
+        route = respx.get(url__contains="dataInicio=2023-12-25").respond(
+            status_code=200, json={"dados": [{"id": 1, "ementa": "Teste"}]}
         )
 
-        df = await extractor.extract_atuais()
+        df = await extractor.extract()
 
+        assert route.called
         assert isinstance(df, pl.DataFrame)
-        assert df.height == 2
-        assert df["siglaTipo"][0] == "PL"
-        assert df["ementa"][1] == "Reforma do Estado"
+        assert df.height == 1

@@ -5,9 +5,9 @@ from ipolitico.core.client import CamaraClient
 from ipolitico.core.config import SQLITE_DB_PATH
 from ipolitico.extractors.deputados import DeputadosExtractor
 from ipolitico.extractors.proposicoes import ProposicoesExtractor
+from ipolitico.extractors.votacoes import VotacoesExtractor
 from ipolitico.sinks.sqlite_sink import SQLiteSink
 
-# Configuração de logs para acompanhamento da extração
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -19,22 +19,47 @@ async def run_pipeline():
     """
     logger.info("Iniciando Pipeline de Auditoria Cidadã iPolitico...")
 
-    # 1. Instanciação dos componentes (Desacoplados)
+    # Instanciação dos componentes (Desacoplados)
     client = CamaraClient()
     sink = SQLiteSink(db_path=SQLITE_DB_PATH)
 
     deputados_ext = DeputadosExtractor(client)
     proposicoes_ext = ProposicoesExtractor(client)
+    votacoes_ext = VotacoesExtractor(client, db_path=SQLITE_DB_PATH)
+
     try:
-        # 2. Extração: Busca os dados da 57ª Legislatura
+        # 1. Deputados
         logger.info("Extraindo lista de deputados federais da legislatura atual...")
-        df_deputados = await deputados_ext.extract_atuaies()
+        df_deputados = await deputados_ext.extract()
         await sink.save(df_deputados, table_name="deputados")
 
-        # 3. Fluxo de Proposições
-        logger.info("📄 Extraindo proposições legislativas recentes...")
-        df_proposicoes = await proposicoes_ext.extract_atuais()
-        await sink.save(df_proposicoes, table_name="proposicoes")
+        # 2. Proposições
+        logger.info("Extraindo proposições legislativas recentes...")
+        logger.info("📄 Sincronizando Proposições...")
+        df_prop = await proposicoes_ext.extract()
+        if not df_prop.is_empty():
+            await sink.save(df_prop, table_name="proposicoes")
+
+        # 3. otações
+        logger.info("Extraindo votações legislativas recentes...")
+        df_votacoes = await votacoes_ext.extract_atuais()
+        await sink.save(df_votacoes, table_name="votacoes")
+        logger.info("Verificando novas votações desde a última extração...")
+        df_novas_votacoes = await votacoes_ext.extract_votacoes(incremental=True)
+
+        if not df_novas_votacoes.is_empty():
+            logger.info(f"{df_novas_votacoes.height} novas votações encontradas. Salvando...")
+            await sink.save(df_novas_votacoes, table_name="votacoes")
+
+            # Para cada nova votação, buscamos os votos nominais
+            for votacao_id in df_novas_votacoes["id"].to_list():
+                logger.info(f"   ∟ Extraindo votos nominais da votação {votacao_id}...")
+                df_votos = await votacoes_ext.extract_votos_por_votacao(votacao_id)
+                if not df_votos.is_empty():
+                    await sink.save(df_votos, table_name="votos")
+
+        else:
+            logger.info("ℹNenhuma votação nova detectada pelo marcador incremental.")
 
         logger.info("Pipeline finalizado com sucesso! Dados prontos para análise.")
 

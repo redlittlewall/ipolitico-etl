@@ -1,27 +1,31 @@
 import polars as pl
 
-from ipolitico.core.client import CamaraClient
 from ipolitico.core.config import LEGISLATURA_ATUAL
+from ipolitico.extractors.base import BaseExtractor
 
 
-class ProposicoesExtractor:
+class ProposicoesExtractor(BaseExtractor):
     """
-    Extrator responsável por buscar metadados de propostas legislativas.
-    Focado em transparência de tramitação, evitando contagens de volume simples.
+    Extrator de proposições legislativas com suporte a carga incremental.
     """
 
-    def __init__(self, client: CamaraClient):
-        self.client = client
-
-    async def extract_atuais(self) -> pl.DataFrame:
+    async def extract(self, data_inicio: str = None) -> pl.DataFrame:
         """
-        Extrai proposições da legislatura atual.
+        Extrai proposições. Se data_inicio for omitida, busca no banco o
+        último registro de 'dataApresentacao'.
         """
-        endpoint = "proposicoes"
-        # Buscamos as mais recentes primeiro para garantir dados novos no banco
-        params = {"idLegislatura": LEGISLATURA_ATUAL, "ordem": "DESC", "ordenarPor": "id"}
+        if not data_inicio:
+            # O método _get_last_watermark vem da BaseExtractor
+            data_inicio = (
+                self._get_last_watermark("proposicoes", "dataApresentacao") or "2023-02-01"
+            )
 
-        # O cliente já gerencia retentativas e erros da API
-        dados_brutos = await self.client.fetch(endpoint, params=params)
+        params = {
+            "idLegislatura": LEGISLATURA_ATUAL,
+            "dataInicio": data_inicio,
+            "ordem": "ASC",
+            "ordenarPor": "id",
+        }
 
-        return pl.DataFrame(dados_brutos)
+        dados = await self.client.fetch("proposicoes", params=params)
+        return pl.DataFrame(dados)
