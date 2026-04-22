@@ -1,45 +1,31 @@
 import polars as pl
 
-from ipolitico.core.client import CamaraClient
 from ipolitico.core.config import LEGISLATURA_ATUAL
+from ipolitico.extractors.base import BaseExtractor
 
 
-class VotacoesExtractor:
-    """
-    Extrator de Votações e Votos Nominais.
-    Essencial para o mapeamento de posicionamento político.
-    """
-
-    def __init__(self, client: CamaraClient):
-        self.client = client
-
-    async def extract_votacoes_recentes(self) -> pl.DataFrame:
+class VotacoesExtractor(BaseExtractor):
+    async def extract(self, data_inicio: str = None) -> pl.DataFrame:
         """
-        Busca a lista de votações ocorridas na legislatura atual.
+        Implementa a extração incremental de votações.
         """
-        endpoint = "votacoes"
+        if not data_inicio:
+            data_inicio = self._get_last_watermark("votacoes", "dataHoraRegistro") or "2023-02-01"
+
         params = {
             "idLegislatura": LEGISLATURA_ATUAL,
-            "ordem": "DESC",
+            "dataInicio": data_inicio,
+            "ordem": "ASC",
             "ordenarPor": "dataHoraRegistro",
         }
 
-        dados = await self.client.fetch(endpoint, params=params)
+        dados = await self.client.fetch("votacoes", params=params)
         return pl.DataFrame(dados)
 
-    async def extract_votos_por_votacao(self, votacao_id: str) -> pl.DataFrame:
-        """
-        Busca o voto de cada deputado para uma votação específica.
-        """
+    async def extract_votos(self, votacao_id: str) -> pl.DataFrame:
+        """: Votos nominais são uma sub-rota."""
         endpoint = f"votacoes/{votacao_id}/votos"
-
-        try:
-            dados = await self.client.fetch(endpoint)
-            if not dados:
-                return pl.DataFrame()
-
-            df = pl.DataFrame(dados)
-            # Adicionamos o ID da votação para permitir o JOIN no banco de dados
-            return df.with_columns(pl.lit(votacao_id).alias("id_votacao"))
-        except Exception:
+        dados = await self.client.fetch(endpoint)
+        if not dados:
             return pl.DataFrame()
+        return pl.DataFrame(dados).with_columns(pl.lit(votacao_id).alias("id_votacao"))
