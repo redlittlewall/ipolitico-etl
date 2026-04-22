@@ -23,3 +23,9 @@ skip-magic-trailing-comma = false
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}

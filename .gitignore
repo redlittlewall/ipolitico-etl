@@ -1,8 +1,28 @@
+# --- Python ---
 __pycache__/
-*.pyc
-.env
+*.py[cod]
+*$py.class
 .venv/
 env/
-*.parquet
+venv/
+*.egg-info/
+.installed.cfg
+.eggs/
+
+# --- Banco de Dados (Dados locais gerados) ---
+# Ignoramos o arquivo .db para que o repositório fique neutro
 *.db
 *.sqlite3
+
+# --- Configurações Sensíveis ---
+# O .env pode conter caminhos locais ou chaves futuras
+.env
+
+# --- IDEs ---
+.vscode/
+.idea/
+
+# --- Testes e Cobertura ---
+.pytest_cache/
+.coverage
+htmlcov/
