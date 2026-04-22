@@ -1,0 +1,9 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.5
+    hooks:
+      # Roda o linter e tenta consertar erros óbvios (como imports não usados)
+      - id: ruff
+        args: [ --fix ]
+      # Formata o código (aspas, espaçamento) padronizando tudo
+      - id: ruff-format
