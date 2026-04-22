@@ -1,5 +1,6 @@
 import polars as pl
 from ipolitico.core.client import CamaraClient
+from ipolitico.core.config import LEGISLATURA_ATUAL
 
 
 class DeputadosExtractor:
@@ -16,7 +17,7 @@ class DeputadosExtractor:
         Extrai os deputados da legislatura atual (57).
         """
         # Parâmetros conforme documentação da API para a 57ª legislatura
-        params = {"idLegislatura": 57, "ordem": "ASC", "ordenarPor": "nome"}
+        params = {"idLegislatura": LEGISLATURA_ATUAL, "ordem": "ASC", "ordenarPor": "nome"}
 
         # O fetch já trata throttling e erros silenciosos internamente
         dados_brutos = await self.client.fetch("deputados", params=params)

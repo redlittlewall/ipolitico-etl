@@ -3,6 +3,7 @@ import logging
 from typing import Any
 
 import httpx
+from ipolitico.core.config import CAMARA_API_BASE_URL
 
 # Configuração de log para visibilidade da orquestração no terminal
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -22,7 +23,7 @@ class SilentEmptyDataError(CamaraAPIError):
 
 
 class CamaraClient:
-    BASE_URL = "https://dadosabertos.camara.leg.br/api/v2"
+    BASE_URL = CAMARA_API_BASE_URL
 
     def __init__(self, max_retries: int = 5):
         self.max_retries = max_retries
