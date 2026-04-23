@@ -66,3 +66,20 @@ class VotacoesExtractor(CamaraBaseExtractor):
             logger.info("ℹNenhuma votação nova no período.")
 
         return df_final
+
+    async def extract_votos(self, votacoes_ids: list[str]) -> pl.DataFrame:
+        """Extrai os votos nominais de uma lista de votações usando concorrência máxima."""
+
+        async def fetch_votos(votacao_id: str) -> pl.DataFrame:
+            endpoint = f"{ApiRoutes.VOTACOES}/{votacao_id}/votos"
+            try:
+                dados = await self.client.fetch(endpoint)
+                return (
+                    pl.DataFrame(dados).with_columns(pl.lit(votacao_id).alias("idVotacao"))
+                    if dados
+                    else pl.DataFrame()
+                )
+            except Exception:
+                return pl.DataFrame()
+
+        return await self.execute_concurrently(votacoes_ids, fetch_votos)

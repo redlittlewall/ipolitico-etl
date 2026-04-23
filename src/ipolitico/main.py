@@ -64,13 +64,12 @@ async def run_pipeline():
 
         if not df_votacoes.is_empty():
             await sink.save(df_votacoes, "votacoes", unique_keys="id")
-            # Para cada nova votação, buscamos os votos nominais
-            for votacao_id in df_votacoes["id"].to_list():
-                logger.info(f"   ∟ Extraindo votos nominais da votação {votacao_id}...")
-                df_votos = await votacoes_ext.extract_votos(votacao_id)
-                if not df_votos.is_empty():
-                    await sink.save(df_votos, table_name="votos", unique_keys="id")
+            votacoes_ids = df_votacoes["id"].to_list()
+            logger.info(f"Extraindo votos nominais de {len(votacoes_ids)} votações...")
 
+            df_votos = await votacoes_ext.extract_votos(votacoes_ids)
+            if not df_votos.is_empty():
+                await sink.save(df_votos, "votos", unique_keys=["idVotacao", "deputado_id"])
         else:
             logger.info("ℹNenhuma votação nova detectada pelo marcador incremental.")
 
