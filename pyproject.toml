@@ -8,7 +8,7 @@ license = { text = "MIT" }
 dependencies = [
     "httpx",
     "polars",
-    "pydantic",  # Adicione esta linha
+    "pydantic",
     "respx",
 ]
 

@@ -6,7 +6,6 @@ import httpx
 
 from ipolitico.core.config import CAMARA_API_BASE_URL
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 

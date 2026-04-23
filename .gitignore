@@ -25,4 +25,4 @@ venv/
 # --- Testes e Cobertura ---
 .pytest_cache/
 .coverage
-htmlcov/
+htmlcov/ipolitico_etl.log

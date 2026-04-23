@@ -1,16 +1,15 @@
 import asyncio
-import logging
 
 from ipolitico.core.client import CamaraClient
 from ipolitico.core.config import SQLITE_DB_PATH
+from ipolitico.core.logger import setup_logger
 from ipolitico.extractors.camara.deputados import DeputadosExtractor
 from ipolitico.extractors.camara.despesas import DespesasExtractor
 from ipolitico.extractors.camara.proposicoes import ProposicoesExtractor
 from ipolitico.extractors.camara.votacoes import VotacoesExtractor
 from ipolitico.sinks.sqlite_sink import SQLiteSink
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
+logger = setup_logger()
 
 
 async def run_pipeline():
