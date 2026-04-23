@@ -1,7 +1,9 @@
 import sqlite3
 from abc import ABC, abstractmethod
+from asyncio.log import logger
 
 import polars as pl
+from pydantic import ValidationError
 
 from ipolitico.core.client import CamaraClient
 
@@ -26,3 +28,11 @@ class BaseExtractor(ABC):
     async def extract(self, **kwargs) -> pl.DataFrame:
         """Método que as subclasses devem implementar."""
         pass
+
+    def validate_data(self, schema, data: list):
+        """Valida a lista de dicionários contra um Schema Pydantic."""
+        try:
+            return [schema(**item).dict() for item in data]
+        except ValidationError as e:
+            logger.error(f"❌ Erro de contrato na API: {e.json()}")
+            raise

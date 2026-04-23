@@ -3,7 +3,6 @@ from asyncio.log import logger
 
 import polars as pl
 
-from ipolitico.core.config import LEGISLATURA_ATUAL
 from ipolitico.extractors.base import BaseExtractor
 
 
@@ -39,13 +38,20 @@ class DespesasExtractor(BaseExtractor):
 
             endpoint = f"deputados/{deputado_id}/despesas"
             params = {
-                "idLegislatura": LEGISLATURA_ATUAL,
+                # "idLegislatura": LEGISLATURA_ATUAL,
                 "ordem": "ASC",
                 "ordenarPor": "dataEmissao",
                 "dataInicio": data_inicio.split("T")[0],
             }
 
-            dados = await self.client.fetch(endpoint, params=params)
+            try:
+                dados = await self.client.fetch(endpoint, params=params)
 
-            if not dados:
+                if not dados:
+                    return pl.DataFrame()
+
+                return pl.DataFrame(dados).with_columns(pl.lit(deputado_id).alias("id_deputado"))
+            except Exception as e:
+                # Logamos o erro mas não travamos o pipeline inteiro por causa de um deputado
+                logger.error(f"Erro ao extrair despesas do deputado {deputado_id}: {e}")
                 return pl.DataFrame()

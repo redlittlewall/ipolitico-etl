@@ -24,9 +24,9 @@ async def run_pipeline():
     client = CamaraClient()
     sink = SQLiteSink(db_path=SQLITE_DB_PATH)
 
-    deputados_ext = DeputadosExtractor(client)
+    deputados_ext = DeputadosExtractor(client, db_path=SQLITE_DB_PATH)
     despesas_ext = DespesasExtractor(client, db_path=SQLITE_DB_PATH)
-    proposicoes_ext = ProposicoesExtractor(client)
+    proposicoes_ext = ProposicoesExtractor(client, db_path=SQLITE_DB_PATH)
     votacoes_ext = VotacoesExtractor(client, db_path=SQLITE_DB_PATH)
 
     try:
@@ -36,8 +36,8 @@ async def run_pipeline():
         await sink.save(df_deputados, table_name="deputados")
 
         # Despesas (por deputado)
-        ids = deputados_ext["id"].to_list()
-        df_despesas = await despesas_ext.extract_all(ids)
+        ids = df_deputados["id"].to_list()
+        df_despesas = await despesas_ext.extract(ids)
         await sink.save(df_despesas, "despesas")
 
         # Proposições
@@ -49,19 +49,16 @@ async def run_pipeline():
 
         # Votações
         logger.info("Extraindo votações legislativas recentes...")
-        df_votacoes = await votacoes_ext.extract_atuais()
-        await sink.save(df_votacoes, table_name="votacoes")
-        logger.info("Verificando novas votações desde a última extração...")
-        df_novas_votacoes = await votacoes_ext.extract_votacoes(incremental=True)
+        df_votacoes = await votacoes_ext.extract()
 
-        if not df_novas_votacoes.is_empty():
-            logger.info(f"{df_novas_votacoes.height} novas votações encontradas. Salvando...")
-            await sink.save(df_novas_votacoes, table_name="votacoes")
+        if not df_votacoes.is_empty():
+            logger.info(f"{df_votacoes.height} novas votações encontradas. Salvando...")
+            await sink.save(df_votacoes, table_name="votacoes")
 
             # Para cada nova votação, buscamos os votos nominais
-            for votacao_id in df_novas_votacoes["id"].to_list():
+            for votacao_id in df_votacoes["id"].to_list():
                 logger.info(f"   ∟ Extraindo votos nominais da votação {votacao_id}...")
-                df_votos = await votacoes_ext.extract_votos_por_votacao(votacao_id)
+                df_votos = await votacoes_ext.extract_votos(votacao_id)
                 if not df_votos.is_empty():
                     await sink.save(df_votos, table_name="votos")
 
