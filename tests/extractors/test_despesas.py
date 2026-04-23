@@ -1,27 +1,36 @@
 import pytest
 import respx
 from ipolitico.core.client import CamaraClient
+from ipolitico.core.config import CAMARA_API_BASE_URL
+from ipolitico.core.constants import ApiRoutes
 from ipolitico.extractors.camara.despesas import DespesasExtractor
+
+
+class MockStateStore:
+    def get_watermark(self, table: str, column: str) -> str | None:
+        return "2024-01-01"
+
+    def get_existing_ids(self, table: str, column: str = "id") -> list[int]:
+        return []
 
 
 @pytest.mark.asyncio
 async def test_extract_despesas_success():
     client = CamaraClient()
-    extractor = DespesasExtractor(client, db_path="fake.db")
+    state_store = MockStateStore()
+    extractor = DespesasExtractor(client, state_store)
+
     dep_id = 500
 
-    # Atualizado de dataEmissao para dataDocumento
     fake_payload = [
         {"numDocumento": "123", "dataDocumento": "2024-01-10", "valorLiquido": 150.00},
     ]
 
     with respx.mock:
-        # Usamos regex porque agora a URL real contém ano, mes, pagina e itens
-        route = respx.get(url__regex=rf".*deputados/{dep_id}/despesas.*").respond(
-            status_code=200, json={"dados": fake_payload}
-        )
+        route = respx.get(
+            url__regex=rf".*{CAMARA_API_BASE_URL}{ApiRoutes.DEPUTADOS}/{dep_id}/despesas.*"
+        ).respond(status_code=200, json={"dados": fake_payload})
 
-        # Simulando uma busca com datas explícitas para garantir o teste
         df = await extractor.extract([dep_id], data_inicio="2024-01-01", data_fim="2024-01-31")
 
         assert route.called

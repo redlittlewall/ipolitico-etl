@@ -33,7 +33,7 @@ async def run_pipeline():
         # Deputados
         logger.info("Extraindo lista de deputados federais da legislatura atual...")
         df_deputados = await deputados_ext.extract()
-        await sink.save(df_deputados, table_name="deputados")
+        await sink.save(df_deputados, "deputados", unique_keys="id")
 
         deputados_ids = await deputados_ext.get_all_ids()
 
@@ -47,7 +47,9 @@ async def run_pipeline():
         logger.info("Extraindo lista de despesa por deputados federais...")
         df_despesas = await despesas_ext.extract(deputados_ids)
         if not df_despesas.is_empty():
-            await sink.save(df_despesas, "despesas")
+            await sink.save(
+                df_despesas, "despesas", unique_keys=["id_deputado", "numDocumento", "codDocumento"]
+            )
 
         # Proposições
         logger.info("Extraindo proposições legislativas recentes...")

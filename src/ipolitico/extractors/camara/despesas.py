@@ -2,21 +2,28 @@ import logging
 from datetime import datetime
 
 import polars as pl
-from ipolitico.extractors.base import BaseExtractor
+
+from ipolitico.core.config import MAX_CONCURRENT_REQUESTS
+from ipolitico.core.constants import ApiParams, ApiRoutes
+from ipolitico.extractors.camara.camara_base import CamaraBaseExtractor
 
 logger = logging.getLogger(__name__)
 
 
-class DespesasExtractor(BaseExtractor):
+class DespesasExtractor(CamaraBaseExtractor):
     """
-    Extrator de despesas (Cota Parlamentar).
-    Delega o controle de paginação e concorrência para a BaseExtractor.
+    Extrator responsável pelo domínio de Despesas (Cota Parlamentar).
+    Implementa particionamento temporal dinâmico para otimização de requisições HTTP
+    e evasão de erros 400.
     """
 
     async def extract(
-        self, deputados_ids: list, data_inicio: str = None, data_fim: str = None
+        self, deputados_ids: list[int], data_inicio: str = None, data_fim: str = None
     ) -> pl.DataFrame:
-        # Definição do Ponto de Partida e Chegada
+        """
+        Orquestra a extração de despesas executando chunks mensais/anuais.
+        """
+        # Resolução de limites temporais (Carga Incremental vs Carga Histórica/Específica)
         if not data_inicio:
             data_inicio = self._get_last_watermark("despesas", "dataDocumento") or "2023-02-01"
         if not data_fim:
@@ -28,9 +35,9 @@ class DespesasExtractor(BaseExtractor):
         ano_ini, mes_ini = dt_ini.year, dt_ini.month
         ano_fim, mes_fim = dt_fim.year, dt_fim.month
 
-        logger.info(f"Sincronizando despesas de {data_inicio} até {data_fim}...")
+        logger.info(f"Sincronizando despesas do período: {data_inicio} a {data_fim}")
 
-        # Construindo a "Lista de Tarefas" (Jobs) para o motor da Base
+        # Construção da matriz de processamento (Jobs)
         trabalhos = []
         for ano in range(ano_ini, ano_fim + 1):
             if ano == ano_ini and ano == ano_fim:
@@ -45,41 +52,43 @@ class DespesasExtractor(BaseExtractor):
             if not meses:
                 continue
 
-            # Adiciona um "job" para cada deputado naquele ano/mês
             for d_id in deputados_ids:
                 trabalhos.append({"id": d_id, "ano": ano, "meses": meses})
 
-        # Definimos a Função Operária (O que fazer com cada Job)
+        # Definição da rotina operária
         async def fetch_despesa_deputado(job: dict) -> pl.DataFrame:
-            endpoint = f"deputados/{job['id']}/despesas"
-            params = {
-                "ano": [job["ano"]],
-                "mes": job["meses"],
-                "ordem": "ASC",
-                "ordenarPor": "dataDocumento",
+            endpoint = f"{ApiRoutes.DEPUTADOS}/{job['id']}/despesas"
+
+            raw_params = {
+                ApiParams.ANO: [job["ano"]],
+                ApiParams.MES: job["meses"],
+                ApiParams.ORDEM: ApiParams.ORDEM_ASC,
+                ApiParams.ORDENAR_POR: "dataDocumento",
             }
 
             try:
-                dados = await self.fetch_paginated(endpoint, params)
+                # Delega paginação para a classe base
+                dados = await self.fetch_paginated(endpoint, self.build_params(raw_params))
                 if not dados:
                     return pl.DataFrame()
+
                 return pl.DataFrame(dados).with_columns(pl.lit(job["id"]).alias("id_deputado"))
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Processamento vazio/falho para o job {job}: {e}")
                 return pl.DataFrame()
 
-        # Execução Concorrente via BaseExtractor
-        # A base recebe a lista de jobs e a função, e roda tudo com semáforo
+        # Execução concorrente
         df_final = await self.execute_concurrently(
-            trabalhos, fetch_despesa_deputado, max_workers=10
+            trabalhos, fetch_despesa_deputado, max_workers=MAX_CONCURRENT_REQUESTS
         )
 
-        # Sintonia Fina com Polars
+        # Transformação e filtro de precisão
         if not df_final.is_empty():
             df_final = df_final.filter(
                 (pl.col("dataDocumento") >= data_inicio) & (pl.col("dataDocumento") <= data_fim)
             )
-            logger.info(f"{df_final.height} despesas extraídas e filtradas com sucesso.")
+            logger.info(f"Pipeline concluído: {df_final.height} despesas processadas no período.")
         else:
-            logger.info("ℹNenhuma despesa nova encontrada para o período.")
+            logger.info("ℹNenhuma despesa nova encontrada para os critérios informados.")
 
         return df_final
