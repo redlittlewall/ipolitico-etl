@@ -3,7 +3,7 @@ import respx
 from ipolitico.core.client import CamaraClient
 from ipolitico.core.config import CAMARA_API_BASE_URL
 from ipolitico.core.constants import ApiRoutes
-from ipolitico.extractors.deputados import DeputadosExtractor
+from ipolitico.extractors.camara.deputados import DeputadosExtractor
 
 
 # "Dublê" do State Store para isolar o teste do banco de dados

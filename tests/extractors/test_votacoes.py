@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 import respx
 from ipolitico.core.client import CamaraClient
-from ipolitico.extractors.votacoes import VotacoesExtractor
+from ipolitico.extractors.camara.votacoes import VotacoesExtractor
 
 
 @pytest.mark.asyncio

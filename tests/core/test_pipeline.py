@@ -3,7 +3,7 @@ import sqlite3
 import pytest
 import respx
 from ipolitico.core.client import CamaraClient
-from ipolitico.extractors.deputados import DeputadosExtractor
+from ipolitico.extractors.camara.deputados import DeputadosExtractor
 from ipolitico.sinks.sqlite_sink import SQLiteSink
 
 

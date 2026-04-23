@@ -4,7 +4,7 @@ import polars as pl
 import pytest
 import respx
 from ipolitico.core.client import CamaraClient
-from ipolitico.extractors.proposicoes import ProposicoesExtractor
+from ipolitico.extractors.camara.proposicoes import ProposicoesExtractor
 
 
 @pytest.mark.asyncio
