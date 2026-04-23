@@ -46,15 +46,13 @@ class SQLiteSink:
         self, df: pl.DataFrame, table_name: str, unique_keys: Union[str, List[str]] = None
     ) -> None:
         """
-        Persiste o DataFrame no SQLite.
-        Se `unique_keys` for fornecido, executa uma operação UPSERT (Delete/Insert)
-        através de uma tabela de Staging para garantir idempotência.
+        Persiste o DataFrame no SQLite com padrão Staging Table (UPSERT)
+        e indexação automática de chaves compostas para alta performance.
         """
         if df.is_empty():
             return
 
         if not unique_keys:
-            # Comportamento padrão de Append
             df.write_database(
                 table_name=table_name,
                 connection=self._uri,
@@ -64,11 +62,9 @@ class SQLiteSink:
             logger.debug(f"[{table_name}] Append concluído: {df.height} registros.")
             return
 
-        # Padrão Staging Table para UPSERT
         keys = [unique_keys] if isinstance(unique_keys, str) else unique_keys
         staging_table = f"{table_name}_staging"
 
-        # Carga na Staging (substitui se existir lixo de execuções passadas)
         df.write_database(
             table_name=staging_table,
             connection=self._uri,
@@ -77,40 +73,45 @@ class SQLiteSink:
         )
 
         join_conditions = " AND ".join([f"t.{k} = s.{k}" for k in keys])
-
-        delete_query = f"""
-            DELETE FROM {table_name} AS t
-            WHERE EXISTS (
-                SELECT 1 FROM {staging_table} s
-                WHERE {join_conditions}
-            )
-        """
+        delete_query = (
+            f"DELETE FROM {table_name} AS t WHERE EXISTS "
+            f"(SELECT 1 FROM {staging_table} s WHERE {join_conditions})"
+        )
         insert_query = f"INSERT INTO {table_name} SELECT * FROM {staging_table}"
+
+        # Criação dinâmica da query de indexação
+        index_name = f"idx_{table_name}_{'_'.join(keys)}"
+        index_cols = ", ".join(keys)
+        index_query = f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} ({index_cols})"
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             try:
-                # Verifica se a tabela target existe
                 cursor.execute(
                     f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'"
                 )
                 target_exists = cursor.fetchone()
 
                 if target_exists:
-                    # Transação UPSERT
+                    # Garante que o índice existe ANTES do DELETE para performance máxima
+                    cursor.execute(index_query)
+
                     cursor.execute(delete_query)
                     deleted_rows = cursor.rowcount
                     cursor.execute(insert_query)
                     logger.info(
                         f"[{table_name}] UPSERT: {deleted_rows} atualizados, "
-                        f"{df.height - deleted_rows} novos inseridos."
+                        f"{df.height - deleted_rows} inseridos."
                     )
                 else:
-                    # First Load: Transforma staging na target
                     cursor.execute(f"ALTER TABLE {staging_table} RENAME TO {table_name}")
-                    logger.info(f"[{table_name}] CREATE: {df.height} registros inseridos.")
+                    # Cria o índice logo após a primeira carga
+                    cursor.execute(index_query)
+                    logger.info(
+                        f"[{table_name}] CREATE: {df.height} registros"
+                        f"inseridos com índice ({index_cols})."
+                    )
             finally:
-                # Cleanup garantido
                 cursor.execute(f"DROP TABLE IF EXISTS {staging_table}")
 
             conn.commit()
