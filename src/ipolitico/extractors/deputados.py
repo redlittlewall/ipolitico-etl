@@ -1,10 +1,11 @@
 import logging
-import sqlite3
 
 import polars as pl
 
-from ipolitico.core.config import LEGISLATURA_ATUAL
+from ipolitico.core.config import MAX_CONCURRENT_REQUESTS
+from ipolitico.core.constants import ApiParams, ApiRoutes
 from ipolitico.extractors.base import BaseExtractor
+from ipolitico.services.metadata import CamaraMetadataService
 
 logger = logging.getLogger(__name__)
 
@@ -15,67 +16,57 @@ class DeputadosExtractor(BaseExtractor):
     Consome a rota /deputados da API da Câmara.
     """
 
+    def __init__(self, client, state_store):
+        super().__init__(client, state_store)
+        self.metadata = CamaraMetadataService(client)
+
     async def get_all_ids(self) -> list[int]:
         """
-        Retorna IDs do banco local; se vazio, extrai da API e salva primeiro.
-        Isso retira a lógica de banco do main.py.
+        Pede ao banco (StateStore) os IDs. Se não tiver, extrai e devolve.
         """
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                df = pl.read_database("SELECT id FROM deputados", conn)
-                if not df.is_empty():
-                    return df["id"].to_list()
-        except Exception:
-            pass
+        ids_no_banco = self.state_store.get_existing_ids("deputados")
+        if ids_no_banco:
+            return ids_no_banco
 
         df_new = await self.extract()
-        # Nota: Idealmente, o Sink deveria ser usado aqui,
-        # mas para manter simples, retornamos e o main salva.
-        return df_new["id"].to_list()
+        return df_new["id"].to_list() if not df_new.is_empty() else []
 
     async def extract(
-        self, data_inicio: str = None, data_fim: str = None, legislatura: int = LEGISLATURA_ATUAL
+        self, data_inicio: str = None, data_fim: str = None, legislatura: int = None
     ) -> pl.DataFrame:
-        """
-        Extrai a lista de deputados da legislatura atual.
-        Neste caso, optamos por um Full Load (Carga Total) por ser um volume pequeno.
-        """
-        params = {"ordem": "ASC", "ordenarPor": "nome"}
+        if legislatura or data_inicio or data_fim:
+            raw_params = {
+                ApiParams.DATA_INICIO: data_inicio,
+                ApiParams.DATA_FIM: data_fim,
+                ApiParams.ID_LEGISLATURA: legislatura,
+            }
+            dados = await self.fetch_paginated(ApiRoutes.DEPUTADOS, self.build_params(raw_params))
+            return pl.DataFrame(dados) if dados else pl.DataFrame()
 
-        if data_inicio:
-            params["dataInicio"] = data_inicio
-        if data_fim:
-            params["dataFim"] = data_fim
-        if legislatura:
-            params["idLegislatura"] = legislatura
+        ultima_leg = await self.metadata.get_current_legislature_id()
+        logger.info(f"Sincronizando História (Legislaturas 1 a {ultima_leg})...")
 
-        logger.info("Extraindo lista básica de deputados...")
+        async def fetch_job(leg_id: int) -> pl.DataFrame:
+            params = self.build_params({ApiParams.ID_LEGISLATURA: leg_id})
+            try:
+                dados = await self.fetch_paginated(ApiRoutes.DEPUTADOS, params)
+                return pl.DataFrame(dados) if dados else pl.DataFrame()
+            except Exception:
+                return pl.DataFrame()
 
-        dados = await self.client.fetch("deputados", params=params)
-        return pl.DataFrame(dados)
+        df_historico = await self.execute_concurrently(
+            list(range(1, ultima_leg + 1)), fetch_job, max_workers=MAX_CONCURRENT_REQUESTS
+        )
+
+        return df_historico.unique(subset=["id"]) if not df_historico.is_empty() else df_historico
 
     async def extract_detalhes(self, deputados_ids: list) -> pl.DataFrame:
-        """
-        Busca informações profundas (CPF, nascimento, escolaridade) de uma lista de IDs.
-        Tira máximo proveito do motor de concorrência.
-        """
-        logger.info(f"Buscando detalhes profundos de {len(deputados_ids)} deputados...")
-
-        async def fetch_detalhe(deputado_id: int) -> pl.DataFrame:
-            endpoint = f"deputados/{deputado_id}"
+        async def fetch_detalhe(dep_id: int) -> pl.DataFrame:
+            endpoint = f"{ApiRoutes.DEPUTADOS}/{dep_id}"
             try:
                 resp = await self.client.fetch(endpoint)
-                if resp and isinstance(resp, dict):
-                    return pl.DataFrame([resp])
-                return pl.DataFrame()
-            except Exception as e:
-                logger.debug(f"Falha ao buscar detalhes do deputado {deputado_id}: {e}")
+                return pl.DataFrame([resp]) if resp else pl.DataFrame()
+            except Exception:
                 return pl.DataFrame()
 
-        # Motor concorrente com 10 requisições simultâneas
-        df_detalhes = await self.execute_concurrently(deputados_ids, fetch_detalhe, max_workers=10)
-
-        if not df_detalhes.is_empty():
-            logger.info("Detalhes extraídos com sucesso.")
-
-        return df_detalhes
+        return await self.execute_concurrently(deputados_ids, fetch_detalhe)

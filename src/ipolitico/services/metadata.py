@@ -1,0 +1,18 @@
+from ipolitico.core.constants import ApiParams, ApiRoutes
+
+
+class CamaraMetadataService:
+    def __init__(self, client):
+        self.client = client
+
+    async def get_current_legislature_id(self, fallback: int = 57) -> int:
+        """Serviço independente para regras de negócio da Câmara."""
+        params = {
+            ApiParams.ORDEM: ApiParams.ORDEM_DESC,
+            ApiParams.ORDENAR_POR: "id",
+            ApiParams.ITENS: 1,
+        }
+        dados = await self.client.fetch(ApiRoutes.LEGISLATURAS, params=params)
+        if dados and len(dados) > 0:
+            return int(dados[0]["id"])
+        return fallback

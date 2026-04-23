@@ -1,29 +1,41 @@
 import asyncio
-import sqlite3
 from abc import ABC, abstractmethod
-from asyncio.log import logger
+from typing import Protocol
 
 import polars as pl
-from pydantic import ValidationError
 
 from ipolitico.core.client import CamaraClient
+from ipolitico.core.config import CAMARA_PAGE_SIZE, MAX_CONCURRENT_REQUESTS
+from ipolitico.core.constants import ApiParams
+
+
+class IStateStore(Protocol):
+    def get_watermark(self, table: str, column: str) -> str | None: ...
+    def get_existing_ids(self, table: str, column: str = "id") -> list[int]: ...
 
 
 class BaseExtractor(ABC):
-    def __init__(self, client: CamaraClient, db_path: str):
+    def __init__(self, client: CamaraClient, state_store: IStateStore):
         self.client = client
-        self.db_path = db_path
+        self.state_store = state_store
 
     def _get_last_watermark(self, table: str, column: str) -> str | None:
         """Busca o ponto mais recente (watermark) no banco de dados."""
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute(f"SELECT max({column}) FROM {table}")
-                result = cursor.fetchone()[0]
-                return result.split("T")[0] if result else None
-        except Exception:
-            return None
+        return self.state_store.get_watermark(table, column)
+
+    def build_params(self, raw_params: dict) -> dict:
+        """
+        Constrói o dicionário final de requisição.
+        Transforma os Enums em strings e ignora chaves com valor None.
+        """
+        cleaned_params = {}
+        for key, value in raw_params.items():
+            if value is not None:
+                # Se a chave for Enum, pega o valor string, senão usa a chave como está
+                param_key = key.value if isinstance(key, ApiParams) else key
+                cleaned_params[param_key] = value
+
+        return cleaned_params
 
     @abstractmethod
     async def extract(self, **kwargs) -> pl.DataFrame:
@@ -36,10 +48,10 @@ class BaseExtractor(ABC):
         """
         all_data = []
         pagina = 1
-        params["itens"] = 100
+        params[ApiParams.ITENS.value] = CAMARA_PAGE_SIZE
 
         while True:
-            params["pagina"] = pagina
+            params[ApiParams.PAGINA.value] = pagina
             dados = await self.client.fetch(endpoint, params=params)
 
             if not dados:
@@ -47,8 +59,7 @@ class BaseExtractor(ABC):
 
             all_data.extend(dados)
 
-            # Se vieram menos de 100 itens, significa que é a última página
-            if len(dados) < 100:
+            if len(dados) < CAMARA_PAGE_SIZE:
                 break
 
             pagina += 1
@@ -56,7 +67,7 @@ class BaseExtractor(ABC):
         return all_data
 
     async def execute_concurrently(
-        self, items: list, fetch_func, max_workers: int = 10
+        self, items: list, fetch_func, max_workers: int = MAX_CONCURRENT_REQUESTS
     ) -> pl.DataFrame:
         """
         Orquestrador central de concorrência.
@@ -74,10 +85,10 @@ class BaseExtractor(ABC):
         frames = [r for r in resultados if isinstance(r, pl.DataFrame) and not r.is_empty()]
         return pl.concat(frames) if frames else pl.DataFrame()
 
-    def validate_data(self, schema, data: list):
-        """Valida a lista de dicionários contra um Schema Pydantic."""
-        try:
-            return [schema(**item).dict() for item in data]
-        except ValidationError as e:
-            logger.error(f"Erro de contrato na API: {e.json()}")
-            raise
+    # def validate_data(self, schema, data: list):
+    #     """Valida a lista de dicionários contra um Schema Pydantic."""
+    #     try:
+    #         return [schema(**item).dict() for item in data]
+    #     except ValidationError as e:
+    #         logger.error(f"Erro de contrato na API: {e.json()}")
+    #         raise

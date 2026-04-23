@@ -17,5 +17,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 CAMARA_API_BASE_URL = "https://dadosabertos.camara.leg.br/api/v2"
 LEGISLATURA_ATUAL = 57
 
+
+# --- Configurações de Extração (Tuning) ---
+# Quantos itens a API da Câmara permite por página
+CAMARA_PAGE_SIZE = 100
+# Quantas requisições simultâneas nossa máquina fará ao governo
+MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", 10))
+
 # Configurações de Armazenamento (Sinks)
 SQLITE_DB_PATH = os.getenv("IPOLITICO_DB_PATH", str(BASE_DIR / "ipolitico.db"))
