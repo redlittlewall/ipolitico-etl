@@ -41,7 +41,7 @@ async def run_pipeline():
         logger.info("Extraindo detalhes de deputados ...")
         df_detalhes = await deputados_ext.extract_detalhes(deputados_ids)
         if not df_detalhes.is_empty():
-            await sink.save(df_detalhes, "deputados_detalhes")
+            await sink.save(df_detalhes, "deputados_detalhes", unique_keys="id")
 
         # Despesas (por deputado)
         logger.info("Extraindo lista de despesa por deputados federais...")
@@ -54,18 +54,16 @@ async def run_pipeline():
         # Proposições
         logger.info("Extraindo proposições legislativas recentes...")
         logger.info("Sincronizando Proposições...")
-        df_prop = await proposicoes_ext.extract()
-        if not df_prop.is_empty():
-            await sink.save(df_prop, table_name="proposicoes")
+        df_proposicoes = await proposicoes_ext.extract()
+        if not df_proposicoes.is_empty():
+            await sink.save(df_proposicoes, "proposicoes", unique_keys="id")
 
         # Votações
         logger.info("Extraindo votações legislativas recentes...")
         df_votacoes = await votacoes_ext.extract()
 
         if not df_votacoes.is_empty():
-            logger.info(f"{df_votacoes.height} novas votações encontradas. Salvando...")
-            await sink.save(df_votacoes, table_name="votacoes")
-
+            await sink.save(df_votacoes, "votacoes", unique_keys="id")
             # Para cada nova votação, buscamos os votos nominais
             for votacao_id in df_votacoes["id"].to_list():
                 logger.info(f"   ∟ Extraindo votos nominais da votação {votacao_id}...")
