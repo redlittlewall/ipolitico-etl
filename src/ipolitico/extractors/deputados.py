@@ -1,9 +1,12 @@
+import logging
 import sqlite3
 
 import polars as pl
 
 from ipolitico.core.config import LEGISLATURA_ATUAL
 from ipolitico.extractors.base import BaseExtractor
+
+logger = logging.getLogger(__name__)
 
 
 class DeputadosExtractor(BaseExtractor):
@@ -30,12 +33,49 @@ class DeputadosExtractor(BaseExtractor):
         # mas para manter simples, retornamos e o main salva.
         return df_new["id"].to_list()
 
-    async def extract(self) -> pl.DataFrame:
+    async def extract(
+        self, data_inicio: str = None, data_fim: str = None, legislatura: int = LEGISLATURA_ATUAL
+    ) -> pl.DataFrame:
         """
         Extrai a lista de deputados da legislatura atual.
         Neste caso, optamos por um Full Load (Carga Total) por ser um volume pequeno.
         """
-        params = {"idLegislatura": LEGISLATURA_ATUAL, "ordem": "ASC", "ordenarPor": "nome"}
+        params = {"ordem": "ASC", "ordenarPor": "nome"}
+
+        if data_inicio:
+            params["dataInicio"] = data_inicio
+        if data_fim:
+            params["dataFim"] = data_fim
+        if legislatura:
+            params["idLegislatura"] = legislatura
+
+        logger.info("Extraindo lista básica de deputados...")
 
         dados = await self.client.fetch("deputados", params=params)
         return pl.DataFrame(dados)
+
+    async def extract_detalhes(self, deputados_ids: list) -> pl.DataFrame:
+        """
+        Busca informações profundas (CPF, nascimento, escolaridade) de uma lista de IDs.
+        Tira máximo proveito do motor de concorrência.
+        """
+        logger.info(f"Buscando detalhes profundos de {len(deputados_ids)} deputados...")
+
+        async def fetch_detalhe(deputado_id: int) -> pl.DataFrame:
+            endpoint = f"deputados/{deputado_id}"
+            try:
+                resp = await self.client.fetch(endpoint)
+                if resp and isinstance(resp, dict):
+                    return pl.DataFrame([resp])
+                return pl.DataFrame()
+            except Exception as e:
+                logger.debug(f"Falha ao buscar detalhes do deputado {deputado_id}: {e}")
+                return pl.DataFrame()
+
+        # Motor concorrente com 10 requisições simultâneas
+        df_detalhes = await self.execute_concurrently(deputados_ids, fetch_detalhe, max_workers=10)
+
+        if not df_detalhes.is_empty():
+            logger.info("Detalhes extraídos com sucesso.")
+
+        return df_detalhes

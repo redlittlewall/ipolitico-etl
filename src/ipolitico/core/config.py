@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -5,6 +6,9 @@ from dotenv import load_dotenv
 
 # Carrega variáveis de ambiente de um arquivo .env, se existir
 load_dotenv()
+
+# Mantém logs de INFO ou superior, mas silencia logs de bibliotecas como httpx
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 # Caminhos Base
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
