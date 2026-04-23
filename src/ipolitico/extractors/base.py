@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Protocol
 
 import polars as pl
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
 from ipolitico.core.config import MAX_CONCURRENT_REQUESTS
 
@@ -29,17 +30,37 @@ class BaseExtractor(ABC):
         pass
 
     async def execute_concurrently(
-        self, items: list, fetch_func, max_workers: int = MAX_CONCURRENT_REQUESTS
+        self,
+        items: list,
+        fetch_func,
+        max_workers: int = MAX_CONCURRENT_REQUESTS,
+        desc: str = "Processando",
     ) -> pl.DataFrame:
         """Motor de concorrência genérico. Roda tarefas assíncronas em paralelo com segurança."""
+        if not items:
+            return pl.DataFrame()
+
         semaforo = asyncio.Semaphore(max_workers)
 
-        async def bounded_fetch(item):
-            async with semaforo:
-                return await fetch_func(item)
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
+        ) as progress:
+            task_id = progress.add_task(f"[cyan]{desc}...", total=len(items))
 
-        tarefas = [bounded_fetch(item) for item in items]
-        resultados = await asyncio.gather(*tarefas)
+            async def bounded_fetch(item):
+                async with semaforo:
+                    try:
+                        res = await fetch_func(item)
+                        return res
+                    finally:
+                        progress.advance(task_id)
+
+            tarefas = [bounded_fetch(item) for item in items]
+            resultados = await asyncio.gather(*tarefas)
 
         frames = [r for r in resultados if isinstance(r, pl.DataFrame) and not r.is_empty()]
-        return pl.concat(frames) if frames else pl.DataFrame()
+        return pl.concat(frames, how="diagonal_relaxed") if frames else pl.DataFrame()

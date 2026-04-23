@@ -1,6 +1,8 @@
+import json
 import logging
 
 import polars as pl
+
 from ipolitico.core.config import MAX_CONCURRENT_REQUESTS
 from ipolitico.core.constants import ApiParams, ApiRoutes
 from ipolitico.extractors.camara.camara_base import CamaraBaseExtractor
@@ -35,26 +37,31 @@ class DeputadosExtractor(CamaraBaseExtractor):
     ) -> pl.DataFrame:
         if legislatura or data_inicio or data_fim:
             raw_params = {
-                ApiParams.DATA_INICIO: data_inicio,
-                ApiParams.DATA_FIM: data_fim,
-                ApiParams.ID_LEGISLATURA: legislatura,
+                ApiParams.DATA_INICIO.value: data_inicio,
+                ApiParams.DATA_FIM.value: data_fim,
+                ApiParams.ID_LEGISLATURA.value: legislatura,
             }
-            dados = await self.fetch_paginated(ApiRoutes.DEPUTADOS, self.build_params(raw_params))
+            dados = await self.fetch_paginated(
+                ApiRoutes.DEPUTADOS.value, self.build_params(raw_params)
+            )
             return pl.DataFrame(dados) if dados else pl.DataFrame()
 
         ultima_leg = await self.metadata.get_current_legislature_id()
         logger.info(f"Sincronizando História (Legislaturas 1 a {ultima_leg})...")
 
         async def fetch_job(leg_id: int) -> pl.DataFrame:
-            params = self.build_params({ApiParams.ID_LEGISLATURA: leg_id})
+            params = self.build_params({ApiParams.ID_LEGISLATURA.value: leg_id})
             try:
-                dados = await self.fetch_paginated(ApiRoutes.DEPUTADOS, params)
+                dados = await self.fetch_paginated(ApiRoutes.DEPUTADOS.value, params)
                 return pl.DataFrame(dados) if dados else pl.DataFrame()
             except Exception:
                 return pl.DataFrame()
 
         df_historico = await self.execute_concurrently(
-            list(range(1, ultima_leg + 1)), fetch_job, max_workers=MAX_CONCURRENT_REQUESTS
+            list(range(1, ultima_leg + 1)),
+            fetch_job,
+            max_workers=MAX_CONCURRENT_REQUESTS,
+            desc="Baixando Deputados",
         )
 
         return df_historico.unique(subset=["id"]) if not df_historico.is_empty() else df_historico
@@ -64,8 +71,16 @@ class DeputadosExtractor(CamaraBaseExtractor):
             endpoint = f"{ApiRoutes.DEPUTADOS}/{dep_id}"
             try:
                 resp = await self.client.fetch(endpoint)
-                return pl.DataFrame([resp]) if resp else pl.DataFrame()
+                if resp:
+                    for key, value in resp.items():
+                        if isinstance(value, (dict, list)):
+                            resp[key] = json.dumps(value, ensure_ascii=False)
+
+                    return pl.DataFrame([resp])
+                return pl.DataFrame()
             except Exception:
                 return pl.DataFrame()
 
-        return await self.execute_concurrently(deputados_ids, fetch_detalhe)
+        return await self.execute_concurrently(
+            deputados_ids, fetch_detalhe, desc="Baixando Detalhes dos Deputados"
+        )

@@ -57,7 +57,7 @@ class DespesasExtractor(CamaraBaseExtractor):
 
         # Definição da rotina operária
         async def fetch_despesa_deputado(job: dict) -> pl.DataFrame:
-            endpoint = f"{ApiRoutes.DEPUTADOS}/{job['id']}/despesas"
+            endpoint = f"{ApiRoutes.DEPUTADOS.value}/{job['id']}/despesas"
 
             raw_params = {
                 ApiParams.ANO: [job["ano"]],
@@ -79,7 +79,10 @@ class DespesasExtractor(CamaraBaseExtractor):
 
         # Execução concorrente
         df_final = await self.execute_concurrently(
-            trabalhos, fetch_despesa_deputado, max_workers=MAX_CONCURRENT_REQUESTS
+            trabalhos,
+            fetch_despesa_deputado,
+            max_workers=MAX_CONCURRENT_REQUESTS,
+            desc="Baixando Despesas dos Deputados",
         )
 
         # Transformação e filtro de precisão

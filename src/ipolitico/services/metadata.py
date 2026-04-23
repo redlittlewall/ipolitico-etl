@@ -8,9 +8,9 @@ class CamaraMetadataService:
     async def get_current_legislature_id(self, fallback: int = 57) -> int:
         """Serviço independente para regras de negócio da Câmara."""
         params = {
-            ApiParams.ORDEM: ApiParams.ORDEM_DESC,
-            ApiParams.ORDENAR_POR: "id",
-            ApiParams.ITENS: 1,
+            ApiParams.ORDEM.value: ApiParams.ORDEM_DESC.value,
+            ApiParams.ORDENAR_POR.value: "id",
+            ApiParams.ITENS.value: 1,
         }
         dados = await self.client.fetch(ApiRoutes.LEGISLATURAS, params=params)
         if dados and len(dados) > 0:

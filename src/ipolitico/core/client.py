@@ -83,6 +83,16 @@ class CamaraClient:
                 f"{self.max_retries} tentativas com backoff."
             )
 
+    async def close(self) -> None:
+        """Fecha a sessão HTTP assíncrona com segurança (Graceful Shutdown)."""
+        # Verifica dinamicamente qual é o nome do atributo que guarda o seu httpx.AsyncClient
+        if hasattr(self, "client"):
+            await self.client.aclose()
+        elif hasattr(self, "session"):
+            await self.session.aclose()
+        elif hasattr(self, "_client"):
+            await getattr(self, "_client").aclose()
+
     async def _backoff(self, attempt: int) -> None:
         """Implementa Exponential Backoff para não sobrecarregar o serviço público."""
         sleep_time = 2**attempt  # Espera 2s, 4s, 8s, 16s...

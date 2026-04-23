@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from ipolitico.core.client import CamaraClient
 from ipolitico.core.config import SQLITE_DB_PATH
@@ -12,38 +13,37 @@ from ipolitico.sinks.sqlite_sink import SQLiteSink
 logger = setup_logger()
 
 
-async def run_pipeline():
+async def run_pipeline(data_ini: str = None, data_fim: str = None):
     """
     Orquestra o fluxo completo do ETL iPolitico.
     Segue a arquitetura modular e o SRP discutidos.
     """
-    logger.info("Iniciando Pipeline de Auditoria Cidadã iPolitico...")
 
-    # Instanciação dos componentes (Desacoplados)
     client = CamaraClient()
     sink = SQLiteSink(db_path=SQLITE_DB_PATH)
 
-    deputados_ext = DeputadosExtractor(client, db_path=SQLITE_DB_PATH)
-    despesas_ext = DespesasExtractor(client, db_path=SQLITE_DB_PATH)
-    proposicoes_ext = ProposicoesExtractor(client, db_path=SQLITE_DB_PATH)
-    votacoes_ext = VotacoesExtractor(client, db_path=SQLITE_DB_PATH)
+    deputados_ext = DeputadosExtractor(client, state_store=sink)
+    despesas_ext = DespesasExtractor(client, state_store=sink)
+    proposicoes_ext = ProposicoesExtractor(client, state_store=sink)
+    votacoes_ext = VotacoesExtractor(client, state_store=sink)
 
     try:
         # Deputados
-        logger.info("Extraindo lista de deputados federais da legislatura atual...")
-        df_deputados = await deputados_ext.extract()
-        await sink.save(df_deputados, "deputados", unique_keys="id")
+        logger.info("Extraindo lista de deputados federais...")
+        df_deputados = await deputados_ext.extract(data_inicio=data_ini, data_fim=data_fim)
+        if not df_deputados.is_empty():
+            await sink.save(df_deputados, "deputados", unique_keys="id")
 
         deputados_ids = await deputados_ext.get_all_ids()
 
         # Detalhes Deputados
-        logger.info("Extraindo detalhes de deputados ...")
+        logger.info("Extraindo detalhes cadastrais dos deputados ...")
         df_detalhes = await deputados_ext.extract_detalhes(deputados_ids)
         if not df_detalhes.is_empty():
             await sink.save(df_detalhes, "deputados_detalhes", unique_keys="id")
 
         # Despesas (por deputado)
-        logger.info("Extraindo lista de despesa por deputados federais...")
+        logger.info("Extraindo despesas da Cota Parlamentar...")
         df_despesas = await despesas_ext.extract(deputados_ids)
         if not df_despesas.is_empty():
             await sink.save(
@@ -51,20 +51,20 @@ async def run_pipeline():
             )
 
         # Proposições
-        logger.info("Extraindo proposições legislativas recentes...")
+        logger.info("Extraindo Proposições (Projetos de Lei...")
         logger.info("Sincronizando Proposições...")
         df_proposicoes = await proposicoes_ext.extract()
         if not df_proposicoes.is_empty():
             await sink.save(df_proposicoes, "proposicoes", unique_keys="id")
 
         # Votações
-        logger.info("Extraindo votações legislativas recentes...")
+        logger.info("Extraindo Votações...")
         df_votacoes = await votacoes_ext.extract()
 
         if not df_votacoes.is_empty():
             await sink.save(df_votacoes, "votacoes", unique_keys="id")
             votacoes_ids = df_votacoes["id"].to_list()
-            logger.info(f"Extraindo votos nominais de {len(votacoes_ids)} votações...")
+            logger.info(f"   ∟ Extraindo votos nominais de {len(votacoes_ids)} votações...")
 
             df_votos = await votacoes_ext.extract_votos(votacoes_ids)
             if not df_votos.is_empty():
@@ -78,6 +78,21 @@ async def run_pipeline():
         logger.error(f"Falha crítica na execução do pipeline: {e}")
         raise
 
+    finally:
+        # Garante que o client HTTP seja fechado corretamente
+        await client.close()
+
+
+async def main():
+    start_time = time.perf_counter()
+    logger.info("Iniciando Pipeline de Auditoria Cidadã iPolitico...")
+
+    await run_pipeline(data_ini="2024-03-01", data_fim="2024-03-31")
+
+    end_time = time.perf_counter()
+    duration = end_time - start_time
+    logger.info(f"Pipeline finalizado em {duration:.2f} segundos ({duration / 60:.2f} minutos).")
+
 
 if __name__ == "__main__":
-    asyncio.run(run_pipeline())
+    asyncio.run(main())
