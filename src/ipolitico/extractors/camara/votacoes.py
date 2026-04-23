@@ -1,30 +1,68 @@
+import logging
+from datetime import datetime
+
 import polars as pl
-from ipolitico.core.config import LEGISLATURA_ATUAL
-from ipolitico.extractors.base import BaseExtractor
+
+from ipolitico.core.config import MAX_CONCURRENT_REQUESTS
+from ipolitico.core.constants import ApiParams, ApiRoutes
+from ipolitico.extractors.camara.camara_base import CamaraBaseExtractor
+
+logger = logging.getLogger(__name__)
 
 
-class VotacoesExtractor(BaseExtractor):
-    async def extract(self, data_inicio: str = None) -> pl.DataFrame:
+class VotacoesExtractor(CamaraBaseExtractor):
+    """
+    Extrator de Votações da Câmara dos Deputados.
+    """
+
+    async def extract(self, data_inicio: str = None, data_fim: str = None) -> pl.DataFrame:
         """
-        Implementa a extração incremental de votações.
+        Orquestra a extração dividindo a janela temporal solicitada em blocos anuais de requisição.
         """
         if not data_inicio:
-            data_inicio = self._get_last_watermark("votacoes", "dataHoraRegistro") or "2023-02-01"
+            data_inicio = self._get_last_watermark("votacoes", "data") or "2023-01-01"
+        if not data_fim:
+            data_fim = datetime.now().strftime("%Y-%m-%d")
 
-        params = {
-            "idLegislatura": LEGISLATURA_ATUAL,
-            "dataInicio": data_inicio,
-            "ordem": "ASC",
-            "ordenarPor": "dataHoraRegistro",
-        }
+        dt_ini = datetime.strptime(data_inicio.split("T")[0], "%Y-%m-%d")
+        dt_fim = datetime.strptime(data_fim.split("T")[0], "%Y-%m-%d")
 
-        dados = await self.client.fetch("votacoes", params=params)
-        return pl.DataFrame(dados)
+        logger.info(f"Sincronizando Votações do período: {data_inicio} a {data_fim}")
 
-    async def extract_votos(self, votacao_id: str) -> pl.DataFrame:
-        """: Votos nominais são uma sub-rota."""
-        endpoint = f"votacoes/{votacao_id}/votos"
-        dados = await self.client.fetch(endpoint)
-        if not dados:
-            return pl.DataFrame()
-        return pl.DataFrame(dados).with_columns(pl.lit(votacao_id).alias("id_votacao"))
+        anos = list(range(dt_ini.year, dt_fim.year + 1))
+
+        async def fetch_votacoes_ano(ano: int) -> pl.DataFrame:
+            # Delimita as bordas temporais de cada bloco (ano) processado
+            start_date = f"{ano}-01-01" if ano > dt_ini.year else data_inicio
+            end_date = f"{ano}-12-31" if ano < dt_fim.year else data_fim
+
+            raw_params = {
+                ApiParams.DATA_INICIO: start_date,
+                ApiParams.DATA_FIM: end_date,
+                ApiParams.ORDEM: ApiParams.ORDEM_ASC,
+                ApiParams.ORDENAR_POR: "data",
+            }
+            try:
+                dados = await self.fetch_paginated(
+                    ApiRoutes.VOTACOES, self.build_params(raw_params)
+                )
+                return pl.DataFrame(dados) if dados else pl.DataFrame()
+            except Exception as e:
+                logger.debug(f"Falha ao buscar votações de {ano}: {e}")
+                return pl.DataFrame()
+
+        df_final = await self.execute_concurrently(
+            anos, fetch_votacoes_ano, max_workers=MAX_CONCURRENT_REQUESTS
+        )
+
+        if not df_final.is_empty() and "data" in df_final.columns:
+            # Filtro Polars de segurança para garantir a janela exata
+            # (a API pode vazar os últimos dias do parâmetro)
+            df_final = df_final.filter(
+                (pl.col("data") >= data_inicio) & (pl.col("data") <= data_fim)
+            )
+            logger.info(f"{df_final.height} votações extraídas.")
+        else:
+            logger.info("ℹNenhuma votação nova no período.")
+
+        return df_final

@@ -69,7 +69,7 @@ async def run_pipeline():
                 logger.info(f"   ∟ Extraindo votos nominais da votação {votacao_id}...")
                 df_votos = await votacoes_ext.extract_votos(votacao_id)
                 if not df_votos.is_empty():
-                    await sink.save(df_votos, table_name="votos")
+                    await sink.save(df_votos, table_name="votos", unique_keys="id")
 
         else:
             logger.info("ℹNenhuma votação nova detectada pelo marcador incremental.")
