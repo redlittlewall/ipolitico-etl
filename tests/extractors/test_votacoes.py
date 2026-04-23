@@ -11,12 +11,16 @@ async def test_votacoes_extractor_inheritance():
     client = CamaraClient()
     extractor = VotacoesExtractor(client, db_path="fake.db")
 
-    # Mockando o método da classe PAI
-    extractor._get_last_watermark = MagicMock(return_value="2024-01-01")
+    data_teste = "2024-01-01"
+    extractor._get_last_watermark = MagicMock(return_value=data_teste)
 
     with respx.mock:
-        route = respx.get(url__contains="dataInicio=2024-01-01").respond(
-            status_code=200, json={"dados": []}
+        mock_data = [{"id": "999", "dataHoraRegistro": "2024-01-01T10:00:00"}]
+        route = respx.get(url__regex=rf".*votacoes.*dataInicio={data_teste}.*").respond(
+            status_code=200, json={"dados": mock_data}
         )
-        await extractor.extract()
+
+        df = await extractor.extract()
+
         assert route.called
+        assert df["id"][0] == "999"

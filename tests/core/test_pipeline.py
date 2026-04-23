@@ -16,7 +16,7 @@ async def test_pipeline_full_flow(tmp_path):
 
     # Instanciando as peças
     client = CamaraClient()
-    extractor = DeputadosExtractor(client)
+    extractor = DeputadosExtractor(client, db_path=str(db_file))
     sink = SQLiteSink(db_path=str(db_file))
 
     # Mock dos dados da Câmara
@@ -28,7 +28,7 @@ async def test_pipeline_full_flow(tmp_path):
         )
 
         # Execução do fluxo que o nosso futuro Pipeline fará:
-        df = await extractor.extract_atuaies()
+        df = await extractor.extract()
         await sink.save(df, table_name="deputados")
 
     # Verificação final no banco de dados

@@ -15,7 +15,7 @@ async def test_proposicoes_incremental_flow():
     extractor._get_last_watermark = MagicMock(return_value="2023-12-25")
 
     with respx.mock:
-        route = respx.get(url__contains="dataInicio=2023-12-25").respond(
+        route = respx.get(url__regex=r".*proposicoes.*dataInicio=2023-12-25.*").respond(
             status_code=200, json={"dados": [{"id": 1, "ementa": "Teste"}]}
         )
 

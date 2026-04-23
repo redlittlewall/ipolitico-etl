@@ -4,6 +4,7 @@ import logging
 from ipolitico.core.client import CamaraClient
 from ipolitico.core.config import SQLITE_DB_PATH
 from ipolitico.extractors.deputados import DeputadosExtractor
+from ipolitico.extractors.despesas import DespesasExtractor
 from ipolitico.extractors.proposicoes import ProposicoesExtractor
 from ipolitico.extractors.votacoes import VotacoesExtractor
 from ipolitico.sinks.sqlite_sink import SQLiteSink
@@ -24,23 +25,29 @@ async def run_pipeline():
     sink = SQLiteSink(db_path=SQLITE_DB_PATH)
 
     deputados_ext = DeputadosExtractor(client)
+    despesas_ext = DespesasExtractor(client, db_path=SQLITE_DB_PATH)
     proposicoes_ext = ProposicoesExtractor(client)
     votacoes_ext = VotacoesExtractor(client, db_path=SQLITE_DB_PATH)
 
     try:
-        # 1. Deputados
+        # Deputados
         logger.info("Extraindo lista de deputados federais da legislatura atual...")
         df_deputados = await deputados_ext.extract()
         await sink.save(df_deputados, table_name="deputados")
 
-        # 2. Proposições
+        # Despesas (por deputado)
+        ids = deputados_ext["id"].to_list()
+        df_despesas = await despesas_ext.extract_all(ids)
+        await sink.save(df_despesas, "despesas")
+
+        # Proposições
         logger.info("Extraindo proposições legislativas recentes...")
         logger.info("📄 Sincronizando Proposições...")
         df_prop = await proposicoes_ext.extract()
         if not df_prop.is_empty():
             await sink.save(df_prop, table_name="proposicoes")
 
-        # 3. otações
+        # Votações
         logger.info("Extraindo votações legislativas recentes...")
         df_votacoes = await votacoes_ext.extract_atuais()
         await sink.save(df_votacoes, table_name="votacoes")
