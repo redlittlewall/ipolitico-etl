@@ -2,7 +2,6 @@ import logging
 from datetime import datetime
 
 import polars as pl
-
 from ipolitico.extractors.base import BaseExtractor
 
 logger = logging.getLogger(__name__)

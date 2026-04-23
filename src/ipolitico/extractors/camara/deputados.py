@@ -1,16 +1,15 @@
 import logging
 
 import polars as pl
-
 from ipolitico.core.config import MAX_CONCURRENT_REQUESTS
 from ipolitico.core.constants import ApiParams, ApiRoutes
-from ipolitico.extractors.base import BaseExtractor
+from ipolitico.extractors.camara.camara_base import CamaraBaseExtractor
 from ipolitico.services.metadata import CamaraMetadataService
 
 logger = logging.getLogger(__name__)
 
 
-class DeputadosExtractor(BaseExtractor):
+class DeputadosExtractor(CamaraBaseExtractor):
     """
     Extrator responsável por buscar a listagem de deputados federais.
     Consome a rota /deputados da API da Câmara.

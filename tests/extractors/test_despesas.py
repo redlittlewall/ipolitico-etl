@@ -1,7 +1,7 @@
 import pytest
 import respx
 from ipolitico.core.client import CamaraClient
-from ipolitico.extractors.despesas import DespesasExtractor
+from ipolitico.extractors.camara.despesas import DespesasExtractor
 
 
 @pytest.mark.asyncio

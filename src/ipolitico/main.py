@@ -3,10 +3,10 @@ import logging
 
 from ipolitico.core.client import CamaraClient
 from ipolitico.core.config import SQLITE_DB_PATH
-from ipolitico.extractors.deputados import DeputadosExtractor
-from ipolitico.extractors.despesas import DespesasExtractor
-from ipolitico.extractors.proposicoes import ProposicoesExtractor
-from ipolitico.extractors.votacoes import VotacoesExtractor
+from ipolitico.extractors.camara.deputados import DeputadosExtractor
+from ipolitico.extractors.camara.despesas import DespesasExtractor
+from ipolitico.extractors.camara.proposicoes import ProposicoesExtractor
+from ipolitico.extractors.camara.votacoes import VotacoesExtractor
 from ipolitico.sinks.sqlite_sink import SQLiteSink
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")

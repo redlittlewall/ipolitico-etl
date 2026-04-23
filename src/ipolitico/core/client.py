@@ -3,9 +3,9 @@ import logging
 from typing import Any
 
 import httpx
+
 from ipolitico.core.config import CAMARA_API_BASE_URL
 
-# Configuração de log para visibilidade da orquestração no terminal
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class CamaraClient:
                 try:
                     response = await client.get(url, params=params)
 
-                    # 1. Defesa contra Throttling (Saturação e Limitação de Taxa)
+                    # Defesa contra Throttling (Saturação e Limitação de Taxa)
                     if response.status_code in (429, 503):
                         logger.warning(
                             f"Throttling detectado ({response.status_code}) em {url}. "
@@ -58,7 +58,7 @@ class CamaraClient:
                     response.raise_for_status()
                     payload = response.json()
 
-                    # 2. Defesa contra a Falha Silenciosa de Array Vazio (Ameaça Mapeada)
+                    # Defesa contra a Falha Silenciosa de Array Vazio (Ameaça Mapeada)
                     if "dados" in payload:
                         dados = payload["dados"]
                         # Se for uma lista vazia,

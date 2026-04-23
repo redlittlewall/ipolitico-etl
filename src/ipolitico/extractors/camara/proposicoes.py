@@ -1,5 +1,4 @@
 import polars as pl
-
 from ipolitico.core.config import LEGISLATURA_ATUAL
 from ipolitico.extractors.base import BaseExtractor
 
