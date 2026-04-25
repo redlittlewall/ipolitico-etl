@@ -13,15 +13,29 @@ logger = logging.getLogger(__name__)
 class DespesasExtractor(CamaraBaseExtractor):
     """
     Extrator responsável pelo domínio de Despesas (Cota Parlamentar).
-    Implementa particionamento temporal dinâmico para otimização de requisições HTTP
-    e evasão de erros 400.
+
+    A API da Câmara possui um limite rígido de itens por requisição e frequentemente
+    retorna HTTP 400 (Bad Request) se a janela temporal de busca for muito ampla.
+    Este extrator implementa um algoritmo de particionamento (Chunking) dinâmico,
+    fatiando as buscas mes a mes para cada deputado, garantindo extração segura.
     """
 
     async def extract(
         self, deputados_ids: list[int] = None, start_date: str = None, end_date: str = None
     ) -> pl.DataFrame:
         """
-        Orquestra a extração de despesas executando chunks mensais/anuais.
+        Orquestra a extração de despesas executando jobs mensais/anuais.
+
+        Args:
+            deputados_ids (list[int]): Lista de IDs dos deputados. Obrigatório.
+            start_date (str): Data inicial no formato YYYY-MM-DD. Obrigatório.
+            end_date (str): Data final no formato YYYY-MM-DD. Obrigatório.
+
+        Returns:
+            pl.DataFrame: DataFrame contendo as despesas filtradas e validadas.
+
+        Raises:
+            ValueError: Caso os limites temporais ou IDs não sejam fornecidos.
         """
         if not start_date or not end_date or not deputados_ids:
             raise ValueError(
@@ -35,7 +49,7 @@ class DespesasExtractor(CamaraBaseExtractor):
         end_year, end_month = end_dt.year, end_dt.month
         logger.debug(f"Sincronizando despesas do período: {start_date} a {end_date}")
 
-        # Construção da matriz de processamento (Jobs)
+        # Construção da matriz de processamento (Jobs Temporais)
         jobs = []
         for year in range(start_year, end_year + 1):
             months = (
@@ -52,12 +66,12 @@ class DespesasExtractor(CamaraBaseExtractor):
                 for month in months:
                     jobs.append({"id": d_id, "year": year, "month": month})
 
-        # Definição da rotina operária
+        # Definição da rotina operária estrita
         async def fetch_despesa_deputado(job: dict) -> pl.DataFrame:
             endpoint = f"{ApiRoutes.DEPUTADOS.value}/{job['id']}/despesas"
 
             raw_params = {
-                ApiParams.ANO: [job["year"]],
+                ApiParams.ANO: job["year"],  # Correção Crítica: Sem colchetes
                 ApiParams.MES: job["month"],
                 ApiParams.ORDEM: ApiParams.ORDEM_ASC.value,
                 ApiParams.ORDENAR_POR: "dataDocumento",
@@ -67,14 +81,15 @@ class DespesasExtractor(CamaraBaseExtractor):
             if not dados:
                 return pl.DataFrame()
 
+            # Injeção da Chave Estrangeira
             return pl.DataFrame(dados).with_columns(pl.lit(job["id"]).alias("id_deputado"))
 
-        # Execução concorrente
+        # Execução concorrente usando o motor do BaseExtractor
         df_final = await self.execute_concurrently(
             jobs,
             fetch_despesa_deputado,
             max_workers=MAX_CONCURRENT_REQUESTS,
-            desc="Baixando Despesas dos Deputados",
+            desc="Baixando Despesas",
         )
 
         # Transformação e filtro de precisão
@@ -88,6 +103,6 @@ class DespesasExtractor(CamaraBaseExtractor):
             else:
                 logger.debug(f"{df_final.height} registros prontos para salvar.")
         else:
-            logger.debug("ℹNenhuma despesa nova encontrada para os critérios informados.")
+            logger.debug("ℹ Nenhuma despesa nova encontrada para os critérios informados.")
 
         return df_final
