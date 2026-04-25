@@ -1,63 +1,111 @@
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-import respx
-from ipolitico.core.client import CamaraClient
-from ipolitico.core.config import CAMARA_API_BASE_URL
-from ipolitico.core.constants import ApiRoutes
+from ipolitico.core.constants import ApiParams
 from ipolitico.extractors.camara.deputados import DeputadosExtractor
 
 
-# "Dublê" do State Store para isolar o teste do banco de dados
-class MockStateStore:
-    def get_watermark(self, table: str, column: str) -> str | None:
-        return None
+# Fixtures (Preparação do ambiente de teste)
+@pytest.fixture
+def mock_client():
+    client = AsyncMock()
+    # Mock do fetch genérico para os detalhes
+    client.fetch = AsyncMock()
+    return client
 
-    def get_existing_ids(self, table: str, column: str = "id") -> list[int]:
-        return []
+
+@pytest.fixture
+def mock_state_store():
+    store = MagicMock()
+    # Finge que já temos o deputado ID 1 no banco, mas não o 2
+    store.get_existing_ids.return_value = [1]
+    return store
 
 
-@pytest.mark.asyncio
-async def test_extract_deputados_especificos():
-    client = CamaraClient()
-    state_store = MockStateStore()
-    extractor = DeputadosExtractor(client, state_store)
+@pytest.fixture
+def extractor(mock_client, mock_state_store):
+    # Injetamos as dependências falsas no extrator real
+    ext = DeputadosExtractor(client=mock_client, state_store=mock_state_store)
 
-    fake_payload = [
-        {"id": 123, "nome": "Deputado Teste", "siglaPartido": "PT"},
-        {"id": 456, "nome": "Deputado Teste 2", "siglaPartido": "PL"},
-    ]
+    # Mockamos a paginação da classe base para não testar lógica HTTP aqui
+    ext.fetch_paginated = AsyncMock()
 
-    with respx.mock:
-        # Mockamos a rota de deputados
-        route_deputados = respx.get(url__regex=rf".*{ApiRoutes.DEPUTADOS}.*").respond(
-            status_code=200, json={"dados": fake_payload}
-        )
+    # Mock do serviço de metadados para não bater na API
+    ext.metadata.get_current_legislature_id = AsyncMock(return_value=57)
+    return ext
 
-        # Testamos a extração passando uma legislatura específica
-        df = await extractor.extract(legislatura=57)
 
-        assert route_deputados.called
-        assert not df.is_empty()
-        assert df.height == 2
-        assert "nome" in df.columns
+# --- BATERIA DE TESTES ---
 
 
 @pytest.mark.asyncio
-async def test_extract_detalhes_deputados():
-    client = CamaraClient()
-    state_store = MockStateStore()
-    extractor = DeputadosExtractor(client, state_store)
+async def test_extract_com_filtros_explicitos(extractor):
+    """Garante que se passarmos datas, ele foca no payload exato sem olhar para metadados."""
+    # Dado que a API retorna um deputado
+    extractor.fetch_paginated.return_value = [{"id": 1, "nome": "Fulano"}]
 
-    deputado_id = 123
-    fake_detalhe = {"id": deputado_id, "nomeCivil": "Nome Completo", "cpf": "000.000.000-00"}
+    # Quando chamamos com filtros
+    df = await extractor.extract(start_date="2025-01-01", end_date="2025-12-31")
 
-    with respx.mock:
-        # Mockamos a rota de detalhes de UM deputado específico
-        route_detalhes = respx.get(
-            f"{CAMARA_API_BASE_URL}{ApiRoutes.DEPUTADOS}/{deputado_id}"
-        ).respond(status_code=200, json={"dados": fake_detalhe})
+    # Então o DataFrame deve ser criado corretamente
+    assert not df.is_empty()
+    assert df.height == 1
+    assert df["nome"][0] == "Fulano"
 
-        df = await extractor.extract_detalhes([deputado_id])
+    # E o cliente HTTP deve ter sido chamado com as chaves de data corretas
+    extractor.fetch_paginated.assert_called_once()
+    args, kwargs = extractor.fetch_paginated.call_args
+    params_enviados = args[1]
 
-        assert route_detalhes.called
-        assert not df.is_empty()
-        assert df["nomeCivil"][0] == "Nome Completo"
+    assert ApiParams.DATA_INICIO.value in params_enviados
+    assert params_enviados[ApiParams.DATA_INICIO.value] == "2025-01-01"
+
+
+@pytest.mark.asyncio
+async def test_extract_legislatura_atual_fallback(extractor):
+    """Garante que sem filtros, ele busca apenas a legislatura atual por padrão."""
+    extractor.fetch_paginated.return_value = [{"id": 2, "nome": "Ciclano"}]
+
+    # Quando chamamos VAZIO e FULL_LOAD = False
+    df = await extractor.extract(full_load=False)
+
+    assert not df.is_empty()
+    # Verifica se bateu no serviço de metadados para descobrir qual é a atual (57)
+    extractor.metadata.get_current_legislature_id.assert_called_once()
+
+    # Verifica se os parâmetros da chamada HTTP continham a legislatura 57
+    args, kwargs = extractor.fetch_paginated.call_args
+    params_enviados = args[1]
+    assert params_enviados[ApiParams.ID_LEGISLATURA.value] == 57
+
+
+@pytest.mark.asyncio
+async def test_extract_detalhes_converte_dicionarios(extractor):
+    """
+    O extrator de detalhes DEVE converter dicionários/listas aninhados da API
+    para JSON em string para não quebrar o banco SQLite.
+    """
+    # A API da Câmara retorna o 'ultimoStatus' como um sub-dicionário
+    mock_resposta_api = {
+        "id": 10,
+        "nomeCivil": "Beltrano",
+        "ultimoStatus": {"gabinete": "123", "situacao": "Exercício"},
+    }
+    extractor.client.fetch.return_value = mock_resposta_api
+
+    df = await extractor.extract_detalhes(deputados_ids=[10])
+
+    assert not df.is_empty()
+    # Verifica se a chave foi transformada numa string JSON e não mantida como dict Python
+    assert isinstance(df["ultimoStatus"][0], str)
+    assert "gabinete" in df["ultimoStatus"][0]
+
+
+@pytest.mark.asyncio
+async def test_get_all_ids_usa_cache_do_banco(extractor, mock_state_store):
+    """Se o banco já tem IDs, não devemos fazer requests HTTP desnecessários."""
+    ids = await extractor.get_all_ids()
+
+    assert ids == [1]
+    # O fetch nunca deve ter sido chamado, poupando a rede
+    extractor.fetch_paginated.assert_not_called()
