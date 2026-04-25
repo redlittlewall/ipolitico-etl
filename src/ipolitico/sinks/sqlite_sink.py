@@ -1,5 +1,6 @@
 import logging
 import sqlite3
+from datetime import datetime
 from typing import List, Union
 
 import polars as pl
@@ -32,8 +33,10 @@ class SQLiteSink:
             return None
 
     def get_existing_ids(self, table: str, column: str = "id") -> list[int]:
-        """Recupera lista de chaves primárias já persistidas para evitar chamadas"""
-        """de API desnecessárias."""
+        """
+        Recupera lista de chaves primárias já persistidas no banco.
+        Evita chamadas HTTP desnecessárias para detalhamentos estáticos.
+        """
         query = f"SELECT {column} FROM {table}"
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -46,11 +49,14 @@ class SQLiteSink:
         self, df: pl.DataFrame, table_name: str, unique_keys: Union[str, List[str]] = None
     ) -> None:
         """
-        Persiste o DataFrame no SQLite com padrão Staging Table (UPSERT)
-        e indexação automática de chaves compostas para alta performance.
+        Persiste o DataFrame no SQLite.
+        Utiliza UPSERT (Staging Table) se chaves únicas forem fornecidas, ou APPEND simples.
         """
         if df.is_empty():
+            logger.debug(f"ℹ[{table_name}] Nada para salvar (DataFrame vazio).")
             return
+
+        df = df.with_columns(pl.lit(datetime.now().isoformat()).alias("captured_at"))
 
         if not unique_keys:
             df.write_database(
@@ -99,7 +105,7 @@ class SQLiteSink:
                     cursor.execute(delete_query)
                     deleted_rows = cursor.rowcount
                     cursor.execute(insert_query)
-                    logger.info(
+                    logger.debug(
                         f"[{table_name}] UPSERT: {deleted_rows} atualizados, "
                         f"{df.height - deleted_rows} inseridos."
                     )
@@ -107,7 +113,7 @@ class SQLiteSink:
                     cursor.execute(f"ALTER TABLE {staging_table} RENAME TO {table_name}")
                     # Cria o índice logo após a primeira carga
                     cursor.execute(index_query)
-                    logger.info(
+                    logger.debug(
                         f"[{table_name}] CREATE: {df.height} registros"
                         f"inseridos com índice ({index_cols})."
                     )
@@ -115,3 +121,27 @@ class SQLiteSink:
                 cursor.execute(f"DROP TABLE IF EXISTS {staging_table}")
 
             conn.commit()
+
+    async def delete_period(self, table: str, start_date: str, end_date: str, date_column: str):
+        """
+        Elimina registos numa janela temporal (Idempotência de FULL LOAD).
+        Inclui ativação estrita de Foreign Keys para deleção em cascata.
+        """
+        query = f"DELETE FROM {table} WHERE {date_column} >= ? AND {date_column} <= ?"
+
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("PRAGMA foreign_keys = ON;")
+
+                cursor = conn.cursor()
+                cursor.execute(query, (start_date, end_date))
+
+                deleted_rows = cursor.rowcount
+                if deleted_rows > 0:
+                    logger.warning(
+                        f"[{table}] FULL_LOAD: {deleted_rows} registos eliminados no período "
+                        f"{start_date} a {end_date}."
+                    )
+
+        except sqlite3.OperationalError as e:
+            logger.debug(f"[{table}] Ignorando deleção. Tabela ainda não existe: {e}")
