@@ -75,7 +75,7 @@ async def run_pipeline(data_ini: str = None, data_fim: str = None):
         logger.info("Pipeline finalizado com sucesso! Dados prontos para análise.")
 
     except Exception as e:
-        logger.error(f"Falha crítica na execução do pipeline: {e}")
+        logger.error(f"❌ Falha crítica: {e}")
         raise
 
     finally:

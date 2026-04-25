@@ -1,28 +1,30 @@
+"""
+Configurações Globais do iPolitico ETL.
+Centraliza os limites arquiteturais, variáveis de ambiente e tunning de performance.
+"""
+
 import logging
 import os
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Carrega variáveis de ambiente de um arquivo .env, se existir
 load_dotenv()
 
-# Mantém logs de INFO ou superior, mas silencia logs de bibliotecas como httpx
+# Silencia logs verbosos de bibliotecas de infraestrutura
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-# Caminhos Base
+# --- Caminhos Base ---
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+SQLITE_DB_PATH = os.getenv("IPOLITICO_DB_PATH", str(BASE_DIR / "ipolitico.db"))
 
-# Configurações da API Governamental
+# --- Configurações da API Governamental ---
 CAMARA_API_BASE_URL = "https://dadosabertos.camara.leg.br/api/v2"
 LEGISLATURA_ATUAL = 57
 
-
-# --- Configurações de Extração (Tuning) ---
-# Quantos itens a API da Câmara permite por página
+# --- Tunning de Concorrência e Extração ---
+# Limite de paginação da Câmara
 CAMARA_PAGE_SIZE = 100
-# Quantas requisições simultâneas nossa máquina fará ao governo
-MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", 10))
 
-# Configurações de Armazenamento (Sinks)
-SQLITE_DB_PATH = os.getenv("IPOLITICO_DB_PATH", str(BASE_DIR / "ipolitico.db"))
+# Limite de Concorrência: Evita HTTP 429
+MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", 10))

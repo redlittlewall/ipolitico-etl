@@ -16,3 +16,11 @@ class CamaraMetadataService:
         if dados and len(dados) > 0:
             return int(dados[0]["id"])
         return fallback
+
+    async def get_legislature_start_date(self, legislatura_id: int) -> str:
+        """Busca a data de início de uma legislatura específica."""
+        endpoint = f"{ApiRoutes.LEGISLATURAS.value}/{legislatura_id}"
+        dados = await self.client.fetch(endpoint)
+        if dados:
+            return dados.get("dataInicio")
+        return None

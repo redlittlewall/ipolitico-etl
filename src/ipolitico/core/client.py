@@ -15,18 +15,18 @@ class CamaraAPIError(Exception):
     pass
 
 
-class SilentEmptyDataError(CamaraAPIError):
-    """Lançada para barrar o bug da API que retorna 200 OK com array vazio em instabilidades."""
-
-    pass
-
-
 class CamaraClient:
+    """
+    Cliente HTTP Assíncrono focado na resiliência contra infraestruturas estatais.
+
+    Implementa defesas ativas contra Throttling (HTTP 429), timeouts e falhas
+    determinísticas (falsos positivos de HTTP 404).
+    """
+
     BASE_URL = CAMARA_API_BASE_URL
 
     def __init__(self, max_retries: int = 5):
         self.max_retries = max_retries
-        # User-Agent claro e institucional evita bloqueios automáticos por firewalls do governo
         self.headers = {
             "Accept": "application/json",
             "User-Agent": "iPolitico-ETL-OpenSource/1.0",
@@ -36,7 +36,17 @@ class CamaraClient:
         self, endpoint: str, params: dict[str, Any] | None = None
     ) -> list[Any] | dict[str, Any]:
         """
-        Realiza requisições GET assíncronas com tratamento de erros focado nas falhas estatais.
+        Executa requisições GET à API com lógica de retentativa e backoff.
+
+        Args:
+            endpoint (str): O caminho da API (ex: '/deputados').
+            params (dict, optional): Parâmetros da query string.
+
+        Returns:
+            list | dict: Payload de dados retornado pela API. Retorna lista vazia em 404.
+
+        Raises:
+            CamaraAPIError: Se esgotar as tentativas de conexão ou receber erros de servidor.
         """
         url = f"{self.BASE_URL}/{endpoint.lstrip('/')}"
 
@@ -45,7 +55,7 @@ class CamaraClient:
                 try:
                     response = await client.get(url, params=params)
 
-                    # Defesa contra Throttling (Saturação e Limitação de Taxa)
+                    # Defesa contra Throttling (Erros Transientes)
                     if response.status_code in (429, 503):
                         logger.warning(
                             f"Throttling detectado ({response.status_code}) em {url}. "
@@ -54,20 +64,17 @@ class CamaraClient:
                         await self._backoff(attempt)
                         continue
 
+                    # Defesa contra Falsos Positivos da API - Aborta tentativa
+                    if response.status_code == 404:
+                        logger.debug(f"Recurso inexistente (404) em {url}. Assumindo lista vazia.")
+                        return []
+
                     response.raise_for_status()
                     payload = response.json()
 
-                    # Defesa contra a Falha Silenciosa de Array Vazio (Ameaça Mapeada)
+                    # Isola os dados úteis da casca de metadados da Câmara
                     if "dados" in payload:
-                        dados = payload["dados"]
-                        # Se for uma lista vazia,
-                        # barramos a extração para proteger a integridade do banco
-                        if isinstance(dados, list) and len(dados) == 0:
-                            raise SilentEmptyDataError(
-                                f"Erro silencioso flagrado: HTTP 200 recebido, "
-                                f"mas 'dados' vazio em {url}"
-                            )
-                        return dados
+                        return payload["dados"]
 
                     return payload
 
@@ -77,25 +84,21 @@ class CamaraClient:
                     )
                     await self._backoff(attempt)
 
-            # Se esgotar as tentativas, é preferível abortar o pipeline a gravar lixo no Data Lake
+            # Esgotadas as tentativas, estouramos o erro para o Extrator/Orquestrador agir
             raise CamaraAPIError(
                 f"Falha catastrófica ao acessar {url} após "
                 f"{self.max_retries} tentativas com backoff."
             )
 
     async def close(self) -> None:
-        """Fecha a sessão HTTP assíncrona com segurança (Graceful Shutdown)."""
-        # Verifica dinamicamente qual é o nome do atributo que guarda o seu httpx.AsyncClient
-        if hasattr(self, "client"):
-            await self.client.aclose()
-        elif hasattr(self, "session"):
-            await self.session.aclose()
-        elif hasattr(self, "_client"):
-            await getattr(self, "_client").aclose()
+        """
+        Garante a compatibilidade com a interface do orquestrador.
+        """
+        pass
 
     async def _backoff(self, attempt: int) -> None:
-        """Implementa Exponential Backoff para não sobrecarregar o serviço público."""
-        sleep_time = 2**attempt  # Espera 2s, 4s, 8s, 16s...
+        """Pausa a execução usando Crescimento Exponencial (2s, 4s, 8s...)"""
+        sleep_time = 2**attempt
         logger.info(
             f"Recuo tático. Aguardando {sleep_time} segundos antes da próxima requisição..."
         )
