@@ -46,10 +46,10 @@ class VotacoesExtractor(CamaraBaseExtractor):
             current_end = f"{ano}-12-31" if ano < end_dt.year else clean_end
 
             raw_params = {
-                ApiParams.DATA_INICIO.value: current_start,
-                ApiParams.DATA_FIM.value: current_end,
-                ApiParams.ORDEM.value: ApiParams.ORDEM_ASC.value,
-                ApiParams.ORDENAR_POR.value: "data",
+                ApiParams.DATA_INICIO: current_start,
+                ApiParams.DATA_FIM: current_end,
+                ApiParams.ORDEM: ApiParams.ORDEM_ASC.value,
+                ApiParams.ORDENAR_POR: "data",
             }
             dados = await self.fetch_paginated(
                 ApiRoutes.VOTACOES.value, self.build_params(raw_params)
