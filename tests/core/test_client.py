@@ -1,35 +1,53 @@
 import pytest
 import respx
-from ipolitico.core.client import CamaraClient, SilentEmptyDataError
+from ipolitico.core.client import CamaraClient
 
 
 @pytest.mark.asyncio
-async def test_camara_client_silent_empty_data_error():
+async def test_camara_client_returns_empty_on_404():
     """
-    Testa a anomalia governamental mapeada:
-    A API retorna HTTP 200, mas o payload 'dados' é um array vazio.
-    O client deve interceptar isso e levantar um erro em vez de seguir com o ETL.
+    Testa a defesa contra Falsos Positivos (ex: votações simbólicas).
+    A API retorna HTTP 404, e o cliente deve interceptar e converter
+    silenciosamente para uma lista vazia [], em vez de fazer retries inúteis.
     """
     client = CamaraClient()
 
-    # Usamos o respx para interceptar a chamada de rede e simular o erro do governo
     with respx.mock:
-        respx.get("https://dadosabertos.camara.leg.br/api/v2/deputados").respond(
+        respx.get("https://dadosabertos.camara.leg.br/api/v2/votacoes/123/votos").respond(
+            status_code=404
+        )
+
+        resultado = await client.fetch("votacoes/123/votos")
+
+        assert isinstance(resultado, list)
+        assert len(resultado) == 0
+
+
+@pytest.mark.asyncio
+async def test_camara_client_empty_array_200():
+    """
+    Testa se o cliente lida corretamente com HTTP 200 e array vazio
+    (ex: deputado sem gastos num determinado mês).
+    """
+    client = CamaraClient()
+
+    with respx.mock:
+        respx.get("https://dadosabertos.camara.leg.br/api/v2/deputados/1/despesas").respond(
             status_code=200, json={"dados": [], "links": []}
         )
 
-        # O teste PASSARÁ se a função levantar a exceção SilentEmptyDataError
-        with pytest.raises(SilentEmptyDataError):
-            await client.fetch("deputados")
+        resultado = await client.fetch("deputados/1/despesas")
+        assert resultado == []
 
 
 @pytest.mark.asyncio
 async def test_camara_client_success():
     """
-    Testa o caminho feliz: a API retorna dados estruturados.
+    Testa o caminho feliz: a API retorna dados estruturados e o cliente
+    isola a chave 'dados' ignorando o resto.
     """
     client = CamaraClient()
-    fake_payload = {"dados": [{"id": 1, "nome": "Deputado Teste"}], "links": []}
+    fake_payload = {"dados": [{"id": 1, "nome": "Deputado Teste"}], "links": [{"rel": "next"}]}
 
     with respx.mock:
         respx.get("https://dadosabertos.camara.leg.br/api/v2/deputados").respond(
