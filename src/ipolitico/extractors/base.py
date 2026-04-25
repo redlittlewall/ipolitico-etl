@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Protocol
 
 import polars as pl
-from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from ipolitico.core.config import MAX_CONCURRENT_REQUESTS
 
@@ -15,8 +15,9 @@ class IStateStore(Protocol):
 
 class BaseExtractor(ABC):
     """
-    Base Universal. Totalmente cega em relação a APIs, paginações ou formatos de arquivo.
-    Fornece apenas os utilitários fundamentais (Concorrência e Estado).
+    Base Universal do iPolitico.
+    Fornece o motor assíncrono estrito com tolerância a falhas (Exponential Backoff).
+    Totalmente agnóstico: não conhece a API do governo nem o banco de dados local.
     """
 
     def __init__(self, state_store: IStateStore):
@@ -34,33 +35,30 @@ class BaseExtractor(ABC):
         items: list,
         fetch_func,
         max_workers: int = MAX_CONCURRENT_REQUESTS,
-        desc: str = "Processando",
+        desc: str = "",
     ) -> pl.DataFrame:
-        """Motor de concorrência genérico. Roda tarefas assíncronas em paralelo com segurança."""
+        """
+        Motor de concorrência genérico.
+        Executa tarefas em paralelo respeitando limites de requisição e implementando
+        retry automático para proteger contra instabilidades de rede.
+        """
         if not items:
             return pl.DataFrame()
 
         semaforo = asyncio.Semaphore(max_workers)
 
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            TimeElapsedColumn(),
-        ) as progress:
-            task_id = progress.add_task(f"[cyan]{desc}...", total=len(items))
+        @retry(
+            wait=wait_exponential(multiplier=1, min=2, max=16),
+            stop=stop_after_attempt(5),
+            retry=retry_if_exception_type(Exception),
+            reraise=True,
+        )
+        async def bounded_fetch(item):
+            async with semaforo:
+                return await fetch_func(item)
 
-            async def bounded_fetch(item):
-                async with semaforo:
-                    try:
-                        res = await fetch_func(item)
-                        return res
-                    finally:
-                        progress.advance(task_id)
-
-            tarefas = [bounded_fetch(item) for item in items]
-            resultados = await asyncio.gather(*tarefas)
+        tarefas = [bounded_fetch(item) for item in items]
+        resultados = await asyncio.gather(*tarefas, return_exceptions=False)
 
         frames = [r for r in resultados if isinstance(r, pl.DataFrame) and not r.is_empty()]
         return pl.concat(frames, how="diagonal_relaxed") if frames else pl.DataFrame()
