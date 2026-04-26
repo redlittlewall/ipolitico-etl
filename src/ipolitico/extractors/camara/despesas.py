@@ -99,7 +99,7 @@ class DespesasExtractor(CamaraBaseExtractor):
                 & (pl.col("dataDocumento").str.slice(0, 10) <= end_date)
             )
             if df_final.is_empty():
-                logger.warning("O filtro removeu todos os dados! Verifique os formatos de data.")
+                logger.debug("O filtro removeu todos os dados! Verifique os formatos de data.")
             else:
                 logger.debug(f"{df_final.height} registros prontos para salvar.")
         else:

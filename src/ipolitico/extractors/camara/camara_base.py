@@ -52,7 +52,6 @@ class CamaraBaseExtractor(BaseExtractor):
         """
         all_data = []
         pagina = 1
-        params[ApiParams.ITENS.value] = CAMARA_PAGE_SIZE
 
         while True:
             params[ApiParams.PAGINA.value] = pagina

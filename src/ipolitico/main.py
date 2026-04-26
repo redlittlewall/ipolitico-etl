@@ -115,7 +115,7 @@ async def run_pipeline(
 
                 if i == 1 or i == total_lotes or i % checkpoint == 0:
                     percentual = (i / total_lotes) * 100
-                    logger.info(f"       ⏳ Progresso: {percentual:.0f}% (Lote {i}/{total_lotes})")
+                    logger.info(f"        Progresso: {percentual:.0f}% (Lote {i}/{total_lotes})")
         else:
             logger.info("     ∟ Detalhes cadastrais já estão atualizados.")
 
@@ -156,7 +156,7 @@ async def run_pipeline(
 
             if i == 1 or i == total_lotes_desp or i % checkpoint_desp == 0:
                 percentual = (i / total_lotes_desp) * 100
-                logger.info(f"     ⏳ Progresso: {percentual:.0f}% (Lote {i}/{total_lotes_desp})")
+                logger.info(f"      Progresso: {percentual:.0f}% (Lote {i}/{total_lotes_desp})")
 
         # --- PROPOSIÇÕES ---
         if is_full:
@@ -215,7 +215,7 @@ async def run_pipeline(
                 if i == 1 or i == total_lotes_votos or i % checkpoint_votos == 0:
                     percentual = (i / total_lotes_votos) * 100
                     logger.info(
-                        f"       Progresso: {percentual:.0f}% (Lote {i}/{total_lotes_votos})"
+                        f"        Progresso: {percentual:.0f}% (Lote {i}/{total_lotes_votos})"
                     )
 
         logger.info("Pipeline finalizado com sucesso!")
@@ -230,12 +230,10 @@ async def run_pipeline(
 async def main():
     start_time = time.perf_counter()
     logger.info("Iniciando iPolitico...")
-    # Pega o primeiro dia do mês atual e o dia de hoje
-    hoje = datetime.now().strftime("%Y-%m-%d")
-    primeiro_dia_mes = datetime.now().strftime("%Y-%m-01")
+    # hoje = datetime.now().strftime("%Y-%m-%d")
+    # primeiro_dia_mes = datetime.now().strftime("%Y-%m-01")
 
-    # Primeira execução: FULL LOAD restrito a este mês para criar a base e injetar os dados
-    await run_pipeline(start_date=primeiro_dia_mes, end_date=hoje, strategy=LoadStrategy.FULL_LOAD)
+    await run_pipeline(strategy=LoadStrategy.INCREMENTAL)
     logger.info(f"Tempo total: {time.perf_counter() - start_time:.2f}s")
 
 
