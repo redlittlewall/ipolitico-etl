@@ -56,7 +56,7 @@ class CamaraClient:
                     response = await client.get(url, params=params)
 
                     # Defesa contra Throttling (Erros Transientes)
-                    if response.status_code in (429, 503):
+                    if response.status_code in (429, 500, 502, 503, 504):
                         logger.warning(
                             f"Throttling detectado ({response.status_code}) em {url}. "
                             f"Tentativa {attempt}/{self.max_retries}."
