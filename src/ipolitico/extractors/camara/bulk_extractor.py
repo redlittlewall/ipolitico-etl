@@ -43,6 +43,23 @@ class CamaraBulkExtractor:
         tema = domain_map[domain]
         return f"{self.base_api_url}/{tema}/csv/{tema}-{year}.csv"
 
+    def _standardize_schema(self, df: pl.DataFrame, domain: str) -> pl.DataFrame:
+        """Traduz as colunas do CSV do Governo para o padrão da nossa API."""
+        if domain == "despesas":
+            mapping = {
+                "nuDeputadoId": "id_deputado",
+                "datEmissao": "dataDocumento",
+                "vlrDocumento": "valorDocumento",
+                "vlrLiquido": "valorLiquido",
+                "txtFornecedor": "nomeFornecedor",
+                "txtCNPJCPF": "cnpjCpfFornecedor",
+                "ideDocumento": "codDocumento",
+                "txtNumero": "numDocumento",
+            }
+            cols_to_rename = {k: v for k, v in mapping.items() if k in df.columns}
+            df = df.rename(cols_to_rename)
+        return df
+
     async def extract(self, domain: str, year: int = None) -> pl.DataFrame:
         """
         Faz o download do dump estático e carrega em um DataFrame Polars.
@@ -68,20 +85,13 @@ class CamaraBulkExtractor:
 
             logger.info("     ∟ Lendo dados com Polars...")
 
-            # O Polars é inteligente o suficiente para ler CSVs zipados se a extensão for .zip
             try:
-                # separator=";" é o padrão comum do governo brasileiro em CSVs
                 df = pl.read_csv(
                     dest_path, separator=";", ignore_errors=True, infer_schema_length=10000
                 )
+                df = self._standardize_schema(df, domain)
             except Exception as e:
                 logger.error(f"Falha ao ler o CSV de {domain}: {e}")
                 return pl.DataFrame()
-
-            # TODO: Fase 2 - Opcional.
-            # Como a API e o CSV às vezes tem nomes de colunas diferentes
-            # (ex: txNomeParlamentar vs nome),
-            # aqui seria o local perfeito para um bloco de rename() para garantir que
-            # o DataLake receba o schema idêntico, independentemente se veio da API ou do Bulk.
 
             return df

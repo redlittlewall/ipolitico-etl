@@ -57,7 +57,11 @@ async def test_run_pipeline_full_load_triggers_deletes(mock_dependencies):
     sink = mock_dependencies["sink"]
 
     await run_pipeline(
-        start_date="2026-01-01", end_date="2026-12-31", strategy=LoadStrategy.FULL_LOAD
+        sink=sink,
+        state_store=sink,
+        start_date="2026-01-01",
+        end_date="2026-12-31",
+        strategy=LoadStrategy.FULL_LOAD,
     )
 
     # O FULL_LOAD DEVE ter acionado a limpeza em despesas, proposições e votações.
@@ -76,7 +80,11 @@ async def test_run_pipeline_incremental_skips_deletes(mock_dependencies):
     """
     sink = mock_dependencies["sink"]
 
-    await run_pipeline(strategy=LoadStrategy.INCREMENTAL)
+    await run_pipeline(
+        sink=sink,
+        state_store=sink,
+        strategy=LoadStrategy.INCREMENTAL,
+    )
 
     # O INCREMENTAL NUNCA deve apagar dados
     sink.delete_period.assert_not_called()
