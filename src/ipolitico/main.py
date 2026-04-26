@@ -4,9 +4,12 @@ import time
 from datetime import datetime
 from enum import Enum
 
+import polars as pl
+
 from ipolitico.core.client import CamaraClient
 from ipolitico.core.config import SQLITE_DB_PATH
 from ipolitico.core.logger import setup_logger
+from ipolitico.extractors.camara.bulk_extractor import CamaraBulkExtractor
 from ipolitico.extractors.camara.deputados import DeputadosExtractor
 from ipolitico.extractors.camara.despesas import DespesasExtractor
 from ipolitico.extractors.camara.proposicoes import ProposicoesExtractor
@@ -59,6 +62,7 @@ async def run_pipeline(
     start_date: str = None,
     end_date: str = None,
     strategy: LoadStrategy = LoadStrategy.INCREMENTAL,
+    source: str = "api",
 ):
     """
     Executa a pipeline de extração, transformação e carregamento (ETL).
@@ -85,44 +89,77 @@ async def run_pipeline(
     proposicoes_ext = ProposicoesExtractor(client, state_store=state_store)
     votacoes_ext = VotacoesExtractor(client, state_store=state_store)
 
+    bulk_ext = CamaraBulkExtractor(client) if source == "bulk" else None
+
     try:
         is_full = strategy == LoadStrategy.FULL_LOAD
-
         actual_start = start_date
+        start_year = datetime.strptime(actual_start or "2023-01-01", "%Y-%m-%d").year
+        end_year = datetime.strptime(
+            end_date or datetime.now().strftime("%Y-%m-%d"), "%Y-%m-%d"
+        ).year
+        anos_alvo = list(range(start_year, end_year + 1))
 
         logger.info(f"Modo: {strategy.value} | Data Informada: {actual_start or 'Nenhuma'}")
 
         # --- DEPUTADOS ---
-        logger.info("Sincronizando Deputados (Lista Base)...")
-        df_deputados = await deputados_ext.extract(
-            start_date=actual_start, end_date=end_date, full_load=is_full
-        )
-
-        if not df_deputados.is_empty():
-            await sink.save(df_deputados, "deputados", unique_keys="id")
-
-        deputados_ids = await deputados_ext.get_all_ids()
+        logger.info(f"Sincronizando Deputados via {source.upper()}...")
+        df_deputados = pl.DataFrame()
+        if source == "bulk":
+            df_deputados = await bulk_ext.extract("deputados")
+            if not df_deputados.is_empty():
+                await sink.save(df_deputados, "deputados", unique_keys="uri")
+        else:
+            df_deputados = await deputados_ext.extract(
+                start_date=actual_start, end_date=end_date, full_load=is_full
+            )
+            if not df_deputados.is_empty():
+                await sink.save(df_deputados, "deputados", unique_keys="id")
 
         # --- DETALHES CADASTRAIS  ---
-        existent_ids = sink.get_existing_ids("deputados_detalhes")
-        ids_to_load = [d for d in deputados_ids if d not in existent_ids]
+        deputados_ids = await deputados_ext.get_all_ids()
 
-        if ids_to_load:
-            logger.info(f"     ∟ Baixando detalhes pendentes de {len(ids_to_load)} deputados...")
-            tamanho_lote = 50
-            total_lotes = (len(ids_to_load) + tamanho_lote - 1) // tamanho_lote
-            checkpoint = max(1, total_lotes // 4)
+        if not df_deputados.is_empty():
+            if "uri" in df_deputados.columns and "id" not in df_deputados.columns:
+                deputados_ids = (
+                    df_deputados["uri"].str.split("/").list.last().cast(pl.Int64).to_list()
+                )
+            else:
+                deputados_ids = df_deputados["id"].to_list()
 
-            for i, batch_ids in enumerate(chunk_list(ids_to_load, tamanho_lote), 1):
-                df_detalhes = await deputados_ext.extract_detalhes(batch_ids)
-                if not df_detalhes.is_empty():
-                    await sink.save(df_detalhes, "deputados_detalhes", unique_keys="id")
-
-                if i == 1 or i == total_lotes or i % checkpoint == 0:
-                    percentual = (i / total_lotes) * 100
-                    logger.info(f"        Progresso: {percentual:.0f}% (Lote {i}/{total_lotes})")
         else:
-            logger.info("     ∟ Detalhes cadastrais já estão atualizados.")
+            deputados_ids = state_store.get_existing_ids("deputados")
+
+        if deputados_ids:
+            existent_ids = state_store.get_existing_ids("deputados_detalhes")
+            ids_to_load = [d for d in deputados_ids if d not in existent_ids]
+
+            if ids_to_load:
+                logger.info(
+                    f"     ∟ Baixando detalhes pendentes de {len(ids_to_load)} deputados..."
+                )
+                tamanho_lote = 50
+                total_lotes = (len(ids_to_load) + tamanho_lote - 1) // tamanho_lote
+                checkpoint = max(1, total_lotes // 4)
+
+                try:
+                    for i, batch_ids in enumerate(chunk_list(ids_to_load, tamanho_lote), 1):
+                        df_detalhes = await deputados_ext.extract_detalhes(batch_ids)
+                        if not df_detalhes.is_empty():
+                            await sink.save(df_detalhes, "deputados_detalhes", unique_keys="id")
+
+                        if i == 1 or i == total_lotes or i % checkpoint == 0:
+                            percentual = (i / total_lotes) * 100
+                            logger.info(
+                                f"        Progresso: {percentual:.0f}% (Lote {i}/{total_lotes})"
+                            )
+                except Exception as e:
+                    logger.error(
+                        f"     ∟ A API rejeitou a extração de detalhes: {e}."
+                        f" O DataLake ignorará os detalhes por enquanto."
+                    )
+            else:
+                logger.info("     ∟ Detalhes cadastrais já estão atualizados.")
 
         # --- DESPESAS  ---
         # O Orquestrador determina os limites temporais
@@ -142,26 +179,32 @@ async def run_pipeline(
             logger.info(
                 f"Sincronizando Despesas a partir de {start_despesas} até {end_despesas}..."
             )
+        if source == "bulk":
+            for ano in anos_alvo:
+                df_despesas = await bulk_ext.extract("despesas", ano)
+                if not df_despesas.is_empty():
+                    # O Parquet não precisa do chunking extremo do SQLite, envia direto
+                    await sink.save(df_despesas, "despesas")
+        else:
+            tamanho_lote_desp = 20
+            total_lotes_desp = (len(deputados_ids) + tamanho_lote_desp - 1) // tamanho_lote_desp
+            checkpoint_desp = max(1, total_lotes_desp // 4)
 
-        tamanho_lote_desp = 20
-        total_lotes_desp = (len(deputados_ids) + tamanho_lote_desp - 1) // tamanho_lote_desp
-        checkpoint_desp = max(1, total_lotes_desp // 4)
-
-        for i, batch_ids in enumerate(chunk_list(deputados_ids, tamanho_lote_desp), 1):
-            df_despesas = await despesas_ext.extract(
-                deputados_ids=batch_ids, start_date=start_despesas, end_date=end_despesas
-            )
-
-            if not df_despesas.is_empty():
-                await sink.save(
-                    df_despesas,
-                    "despesas",
-                    unique_keys=["id_deputado", "numDocumento", "codDocumento"],
+            for i, batch_ids in enumerate(chunk_list(deputados_ids, tamanho_lote_desp), 1):
+                df_despesas = await despesas_ext.extract(
+                    deputados_ids=batch_ids, start_date=start_despesas, end_date=end_despesas
                 )
 
-            if i == 1 or i == total_lotes_desp or i % checkpoint_desp == 0:
-                percentual = (i / total_lotes_desp) * 100
-                logger.info(f"      Progresso: {percentual:.0f}% (Lote {i}/{total_lotes_desp})")
+                if not df_despesas.is_empty():
+                    await sink.save(
+                        df_despesas,
+                        "despesas",
+                        unique_keys=["id_deputado", "numDocumento", "codDocumento"],
+                    )
+
+                if i == 1 or i == total_lotes_desp or i % checkpoint_desp == 0:
+                    percentual = (i / total_lotes_desp) * 100
+                    logger.info(f"      Progresso: {percentual:.0f}% (Lote {i}/{total_lotes_desp})")
 
         # --- PROPOSIÇÕES ---
         if is_full:
@@ -176,10 +219,16 @@ async def run_pipeline(
             end_prop = end_date or datetime.now().strftime("%Y-%m-%d")
             logger.info(f"Sincronizando Proposições a partir de {start_prop} até {end_prop}...")
 
-        df_proposicoes = await proposicoes_ext.extract(start_prop, end_prop)
+        if source == "bulk":
+            for ano in anos_alvo:
+                df_proposicoes = await bulk_ext.extract("proposicoes", ano)
+                if not df_proposicoes.is_empty():
+                    await sink.save(df_proposicoes, "proposicoes")
+        else:
+            df_proposicoes = await proposicoes_ext.extract(start_prop, end_prop)
 
-        if not df_proposicoes.is_empty():
-            await sink.save(df_proposicoes, "proposicoes", unique_keys="id")
+            if not df_proposicoes.is_empty():
+                await sink.save(df_proposicoes, "proposicoes", unique_keys="id")
 
         # --- VOTAÇÕES E VOTOS NOMINAIS ---
         if is_full:
@@ -197,10 +246,21 @@ async def run_pipeline(
                 f"Sincronizando Votações a partir de {start_votacoes} até {end_votacoes}..."
             )
 
-        df_votacoes = await votacoes_ext.extract(start_date=start_votacoes, end_date=end_votacoes)
+        if source == "bulk":
+            for ano in anos_alvo:
+                df_votacoes = await bulk_ext.extract("votacoes", ano)
+                if not df_votacoes.is_empty():
+                    await sink.save(df_votacoes, "votacoes")
 
-        if not df_votacoes.is_empty():
-            await sink.save(df_votacoes, "votacoes", unique_keys="id")
+                df_votos = await bulk_ext.extract("votos", ano)
+                if not df_votos.is_empty():
+                    await sink.save(df_votos, "votos")
+        else:
+            df_votacoes = await votacoes_ext.extract(
+                start_date=start_votacoes, end_date=end_votacoes
+            )
+            if not df_votacoes.is_empty():
+                await sink.save(df_votacoes, "votacoes", unique_keys="id")
 
             votacoes_ids = df_votacoes["id"].to_list()
             tamanho_lote_votos = 50
@@ -236,6 +296,14 @@ async def main():
     parser = argparse.ArgumentParser(description="Motor ETL iPolitico - Dados da Câmara")
 
     parser.add_argument(
+        "--source",
+        type=str,
+        choices=["api", "bulk"],
+        default="api",
+        help="Origem dos dados: 'api' (paginada) ou 'bulk' (arquivos massivos)",
+    )
+
+    parser.add_argument(
         "--sink",
         type=str,
         choices=["sqlite", "datalake"],
@@ -257,7 +325,8 @@ async def main():
     start_time = time.perf_counter()
     logger.info("=" * 60)
     logger.info(
-        f" Iniciando iPolitico | Sink: {args.sink.upper()} | Estratégia: {args.strategy.upper()}"
+        f" Iniciando iPolitico | Origem: {args.source.upper()} | Sink: {args.sink.upper()}"
+        f" | Estratégia: {args.strategy.upper()}"
     )
     logger.info("=" * 60)
 

@@ -27,3 +27,11 @@ venv/
 .coverage
 htmlcov/ipolitico_etl.log
 ipolitico_etl.log
+
+# Bancos de Dados e Data Lake
+datalake/
+*.db
+*.db-journal
+*.parquet
+*.csv
+*.zip
