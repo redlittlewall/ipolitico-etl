@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import time
 from datetime import datetime
@@ -10,6 +11,7 @@ from ipolitico.extractors.camara.deputados import DeputadosExtractor
 from ipolitico.extractors.camara.despesas import DespesasExtractor
 from ipolitico.extractors.camara.proposicoes import ProposicoesExtractor
 from ipolitico.extractors.camara.votacoes import VotacoesExtractor
+from ipolitico.sinks.datalake_sink import DataLakeSink
 from ipolitico.sinks.sqlite_sink import SQLiteSink
 
 logger = setup_logger()
@@ -52,7 +54,11 @@ def chunk_list(lst: list, n: int):
 
 
 async def run_pipeline(
-    start_date: str = None, end_date: str = None, strategy: LoadStrategy = LoadStrategy.INCREMENTAL
+    sink,
+    state_store,
+    start_date: str = None,
+    end_date: str = None,
+    strategy: LoadStrategy = LoadStrategy.INCREMENTAL,
 ):
     """
     Executa a pipeline de extração, transformação e carregamento (ETL).
@@ -72,13 +78,12 @@ async def run_pipeline(
         Exception: Propaga exceções críticas caso as tentativas de extração (retry backoff) falhem.
     """
     client = CamaraClient()
-    sink = SQLiteSink(db_path=SQLITE_DB_PATH)
     # metadata = CamaraMetadataService(client)
 
-    deputados_ext = DeputadosExtractor(client, state_store=sink)
-    despesas_ext = DespesasExtractor(client, state_store=sink)
-    proposicoes_ext = ProposicoesExtractor(client, state_store=sink)
-    votacoes_ext = VotacoesExtractor(client, state_store=sink)
+    deputados_ext = DeputadosExtractor(client, state_store=state_store)
+    despesas_ext = DespesasExtractor(client, state_store=state_store)
+    proposicoes_ext = ProposicoesExtractor(client, state_store=state_store)
+    votacoes_ext = VotacoesExtractor(client, state_store=state_store)
 
     try:
         is_full = strategy == LoadStrategy.FULL_LOAD
@@ -228,12 +233,60 @@ async def run_pipeline(
 
 
 async def main():
-    start_time = time.perf_counter()
-    logger.info("Iniciando iPolitico...")
-    # hoje = datetime.now().strftime("%Y-%m-%d")
-    # primeiro_dia_mes = datetime.now().strftime("%Y-%m-01")
+    parser = argparse.ArgumentParser(description="Motor ETL iPolitico - Dados da Câmara")
 
-    await run_pipeline(strategy=LoadStrategy.INCREMENTAL)
+    parser.add_argument(
+        "--sink",
+        type=str,
+        choices=["sqlite", "datalake"],
+        default="sqlite",
+        help="Destino dos dados (sqlite transacional ou datalake parquet).",
+    )
+    parser.add_argument(
+        "--strategy",
+        type=str,
+        choices=["incremental", "full_load"],
+        default="incremental",
+        help="Estratégia de sincronização.",
+    )
+    parser.add_argument("--start-date", type=str, default=None, help="Data Inicial (YYYY-MM-DD)")
+    parser.add_argument("--end-date", type=str, default=None, help="Data Final (YYYY-MM-DD)")
+
+    args = parser.parse_args()
+
+    start_time = time.perf_counter()
+    logger.info("=" * 60)
+    logger.info(
+        f" Iniciando iPolitico | Sink: {args.sink.upper()} | Estratégia: {args.strategy.upper()}"
+    )
+    logger.info("=" * 60)
+
+    #  O State Store (O Cérebro) será SEMPRE o SQLite
+    state_store = SQLiteSink(db_path=SQLITE_DB_PATH)
+
+    # O Sink de Dados (O Músculo) é escolhido pelo usuário
+    data_sink = SQLiteSink(db_path=SQLITE_DB_PATH) if args.sink == "sqlite" else DataLakeSink()
+
+    # Define as datas padrão se o usuário não informar nada no modo FULL_LOAD
+    if args.strategy == "full_load" and not args.start_date:
+        hoje = datetime.now().strftime("%Y-%m-%d")
+        primeiro_dia_mes = datetime.now().strftime("%Y-%m-01")
+        actual_start, actual_end = primeiro_dia_mes, hoje
+    else:
+        actual_start, actual_end = args.start_date, args.end_date
+
+    strat_enum = (
+        LoadStrategy.FULL_LOAD if args.strategy == "full_load" else LoadStrategy.INCREMENTAL
+    )
+
+    await run_pipeline(
+        sink=data_sink,
+        state_store=state_store,
+        start_date=actual_start,
+        end_date=actual_end,
+        strategy=strat_enum,
+    )
+
     logger.info(f"Tempo total: {time.perf_counter() - start_time:.2f}s")
 
 

@@ -90,6 +90,50 @@ class CamaraClient:
                 f"{self.max_retries} tentativas com backoff."
             )
 
+    async def download_file(self, url: str, dest_path: str) -> bool:
+        """
+        Faz o download de arquivos estáticos (CSV/ZIP) com a mesma resiliência
+        usada na API (Exponential Backoff para 50X e 429).
+
+        Args:
+            url (str): A URL completa e absoluta do arquivo.
+            dest_path (str): O caminho no disco onde o arquivo será salvo.
+
+        Returns:
+            bool: True se o download foi um sucesso, False se o arquivo não existir (404).
+        """
+        async with httpx.AsyncClient(timeout=60.0, headers=self.headers) as client:
+            for attempt in range(1, self.max_retries + 1):
+                try:
+                    # Usamos stream para não sobrecarregar a RAM com arquivos de 2GB
+                    async with client.stream("GET", url) as response:
+                        if response.status_code in (429, 500, 502, 503, 504):
+                            logger.warning(
+                                f"Instabilidade ({response.status_code}) ao baixar {url}."
+                                f"Tentativa {attempt}/{self.max_retries}."
+                            )
+                            await self._backoff(attempt)
+                            continue
+
+                        if response.status_code == 404:
+                            logger.debug(f"Arquivo não encontrado (404): {url}")
+                            return False
+
+                        response.raise_for_status()
+
+                        with open(dest_path, "wb") as f:
+                            async for chunk in response.aiter_bytes(chunk_size=8192):
+                                f.write(chunk)
+                        return True
+
+                except httpx.RequestError as e:
+                    logger.error(f"Falha de rede ao baixar arquivo: {e}")
+                    await self._backoff(attempt)
+
+            raise CamaraAPIError(
+                f"Falha catastrófica ao baixar {url} após {self.max_retries} tentativas."
+            )
+
     async def close(self) -> None:
         """
         Garante a compatibilidade com a interface do orquestrador.
