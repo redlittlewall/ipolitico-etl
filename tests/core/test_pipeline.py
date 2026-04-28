@@ -1,58 +1,49 @@
+"""
+Testes Unitários do Orquestrador (Pipeline).
+Garante o cumprimento dos contratos de idempotência (FULL LOAD vs INCREMENTAL)
+e o isolamento de domínios solicitados pelo usuário.
+"""
+
 from unittest.mock import AsyncMock, patch
 
-import polars as pl
 import pytest
 from ipolitico.main import LoadStrategy, run_pipeline
 
 
 @pytest.fixture
 def mock_dependencies():
-    """Mocka todas as dependências pesadas (Rede, Banco e Serviços) do main.py."""
+    """Mocka a infraestrutura pesada (Rede e Banco) mantendo o isolamento dos testes."""
     with (
         patch("ipolitico.main.CamaraClient", autospec=True) as _,
         patch("ipolitico.main.SQLiteSink", autospec=True) as MockSink,
-        patch("ipolitico.main.DeputadosExtractor", autospec=True) as MockDep,
-        patch("ipolitico.main.DespesasExtractor", autospec=True) as MockDesp,
-        patch("ipolitico.main.ProposicoesExtractor", autospec=True) as MockProp,
-        patch("ipolitico.main.VotacoesExtractor", autospec=True) as MockVot,
+        patch("ipolitico.main.CamaraExtractorFactory.get_extractor") as mock_get_extractor,
     ):
-        # Configurações do Sink (Banco)
+        # 1. Configurações do Sink (Banco de Dados Fake)
         sink_instance = MockSink.return_value
         sink_instance.save = AsyncMock()
         sink_instance.delete_period = AsyncMock()
-        sink_instance.get_existing_ids.return_value = []
-        sink_instance.get_watermark.return_value = None
+        sink_instance.get_existing_ids.return_value = [100, 200]  # Simula IDs já baixados
+        sink_instance.get_watermark.return_value = "2023-01-01"
 
-        # Configurações dos Extratores
-        dep_instance = MockDep.return_value
-        dep_instance.extract = AsyncMock(return_value=pl.DataFrame({"id": [1]}))
-        dep_instance.extract_detalhes = AsyncMock(return_value=pl.DataFrame())
-        dep_instance.get_all_ids = AsyncMock(return_value=[1])
+        # 2. Configurações do Extrator (Nova arquitetura de streaming retorna None)
+        mock_extractor = AsyncMock()
+        mock_extractor.extract = AsyncMock(return_value=None)
+        mock_extractor.extract_detalhes = AsyncMock(return_value=None)
+        mock_extractor.extract_votos = AsyncMock(return_value=None)
 
-        desp_instance = MockDesp.return_value
-        desp_instance.extract = AsyncMock(return_value=pl.DataFrame())
-
-        prop_instance = MockProp.return_value
-        prop_instance.extract = AsyncMock(return_value=pl.DataFrame())
-
-        vot_instance = MockVot.return_value
-        vot_instance.extract = AsyncMock(return_value=pl.DataFrame({"id": ["VOT1"]}))
-        vot_instance.extract_votos = AsyncMock(return_value=pl.DataFrame())
+        mock_get_extractor.return_value = mock_extractor
 
         yield {
             "sink": sink_instance,
-            "deputados": dep_instance,
-            "despesas": desp_instance,
-            "proposicoes": prop_instance,
-            "votacoes": vot_instance,
+            "mock_extractor": mock_extractor,
         }
 
 
 @pytest.mark.asyncio
 async def test_run_pipeline_full_load_triggers_deletes(mock_dependencies):
     """
-    Testa se a estratégia FULL_LOAD aciona os métodos destrutivos corretos no banco
-    antes de iniciar a extração.
+    Testa se a estratégia FULL_LOAD aciona os métodos de deleção destrutiva
+    no banco de dados para os 3 domínios temporais, garantindo a idempotência.
     """
     sink = mock_dependencies["sink"]
 
@@ -64,19 +55,21 @@ async def test_run_pipeline_full_load_triggers_deletes(mock_dependencies):
         strategy=LoadStrategy.FULL_LOAD,
     )
 
-    # O FULL_LOAD DEVE ter acionado a limpeza em despesas, proposições e votações.
+    # O FULL_LOAD DEVE ter acionado a limpeza em despesas, proposições e votações (3 vezes)
     assert sink.delete_period.call_count == 3
 
-    # Verifica os argumentos da primeira chamada (Despesas)
-    args, kwargs = sink.delete_period.call_args_list[0]
+    # Audita se o primeiro expurgo foi chamado corretamente para as Despesas
+    args, _ = sink.delete_period.call_args_list[0]
     assert args[0] == "despesas"
     assert args[1] == "2026-01-01"
+    assert args[2] == "2026-12-31"
 
 
 @pytest.mark.asyncio
 async def test_run_pipeline_incremental_skips_deletes(mock_dependencies):
     """
-    Testa se a estratégia INCREMENTAL ignora deleções e tenta ler os watermarks do banco.
+    Testa se a estratégia INCREMENTAL protege os dados antigos,
+    ignorando deleções e lendo os watermarks do banco (state_store).
     """
     sink = mock_dependencies["sink"]
 
@@ -89,5 +82,27 @@ async def test_run_pipeline_incremental_skips_deletes(mock_dependencies):
     # O INCREMENTAL NUNCA deve apagar dados
     sink.delete_period.assert_not_called()
 
-    # Ele DEVE perguntar o watermark para as tabelas temporais
+    # DEVE perguntar o watermark para 'despesas', 'proposicoes' e 'votacoes'
     assert sink.get_watermark.call_count >= 3
+
+
+@pytest.mark.asyncio
+async def test_run_pipeline_respects_domain_filter(mock_dependencies):
+    """
+    Testa o recurso de 'Modo Light'.
+    Se o usuário pediu apenas 'deputados', os outros domínios não podem ser extraídos.
+    """
+    sink = mock_dependencies["sink"]
+    extractor = mock_dependencies["mock_extractor"]
+
+    await run_pipeline(
+        sink=sink,
+        state_store=sink,
+        domains=["deputados"],  # Isolando o escopo
+    )
+
+    # Verifica se os watermarks das outras tabelas NÃO foram consultados
+    sink.get_watermark.assert_not_called()
+
+    # A extração ocorreu, mas não apagou nem buscou metadados dos outros domínios
+    assert extractor.extract.call_count > 0

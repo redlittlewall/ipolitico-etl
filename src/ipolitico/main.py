@@ -45,31 +45,28 @@ async def run_pipeline(
     end_date: str = None,
     strategy: LoadStrategy = LoadStrategy.INCREMENTAL,
     source: str = "api",
-    # domains: list = None,
+    domains: list[str] = None,
 ):
     """
     Executa a pipeline de extração, transformação e carregamento (ETL).
 
     Delega as extrações aos 'Extractors' instanciados dinamicamente via Factory,
-    podendo operar de forma cirúrgica com micro-batching (API) ou através do
-    consumo massivo de arquivos estáticos (Bulk). Os resultados são persistidos
-    no 'sink', enquanto o controle de estado fica isolado no 'state_store'.
+    operando com micro-batching e Backpressure estrito.
 
     Args:
-        sink (SQLiteSink | DataLakeSink): Destino final dos dados pesados.
-        state_store (SQLiteSink): Banco de metadados para controle de watermarks e IDs/
-        start_date (str, optional): Data de início ('YYYY-MM-DD'). Se None e a estratégia
-            for INCREMENTAL, o sistema calculará o 'watermark' automaticamente.
-        end_date (str, optional): Data de fim ('YYYY-MM-DD'). Se None, assume a data atual.
-        strategy (LoadStrategy): FULL_LOAD (limpa o período) ou INCREMENTAL (aplica Upsert).
-        source (str): Origem dos dados. "api" (paginação JSON) ou "bulk" (Dumps CSV/ZIP).
-
-    Raises:
-        Exception: Propaga exceções críticas caso a rede falhe após todas as
-            tentativas de retry backoff se esgotarem.
+        sink (SQLiteSink | DataLakeSink): Destino final dos dados.
+        state_store (SQLiteSink): Banco de metadados para controle de watermarks.
+        start_date (str, optional): Data de início ('YYYY-MM-DD').
+        end_date (str, optional): Data de fim ('YYYY-MM-DD').
+        strategy (LoadStrategy): FULL_LOAD (recria período) ou INCREMENTAL (Upsert).
+        source (str): Origem dos dados ("api" ou "bulk").
+        domains (list[str], optional): Lista de domínios a serem extraídos.
+            Padrão: ["deputados", "despesas", "proposicoes", "votacoes"].
     """
 
     client = CamaraClient()
+
+    domains = domains or ["deputados", "despesas", "proposicoes", "votacoes"]
 
     # Injeção Dinâmica: O Orquestrador recebe os extratores sem saber se são API ou BULK
     deputados_ext = CamaraExtractorFactory.get_extractor("deputados", source, client, state_store)
@@ -92,23 +89,23 @@ async def run_pipeline(
         # ==========================================
         # 1. DEPUTADOS
         # ==========================================
-        logger.info(f"Sincronizando Deputados via {source.upper()}...")
+        if "deputados" in domains:
+            logger.info(f"Sincronizando Deputados via {source.upper()}...")
 
-        if source == "bulk":
-            await deputados_ext.extract(sink.save, unique_keys="id")
+            if source == "bulk":
+                await deputados_ext.extract(sink.save, unique_keys="id")
 
-        else:
-            await deputados_ext.extract(
-                sink.save, start_date=actual_start, end_date=end_date, full_load=is_full
-            )
+            else:
+                await deputados_ext.extract(
+                    sink.save, start_date=actual_start, end_date=end_date, full_load=is_full
+                )
 
         deputados_ids = state_store.get_existing_ids("deputados")
 
         # DETALHES CADASTRAIS (Sempre via API)
-        if deputados_ids:
+        if "deputados" in domains and deputados_ids:
             existent_ids = state_store.get_existing_ids("deputados_detalhes")
             ids_to_load = [d for d in deputados_ids if d not in existent_ids]
-
             if ids_to_load:
                 logger.info(
                     f"     ∟ Baixando detalhes de {len(ids_to_load)} deputados (Via API)..."
@@ -123,92 +120,105 @@ async def run_pipeline(
         # ==========================================
         # 2. DESPESAS
         # ==========================================
-        if source == "bulk":
-            logger.info(f"Sincronizando Despesas de {start_year} a {end_year} via BULK (CSV)...")
-            for ano in anos_alvo:
-                await despesas_ext.extract(
-                    sink.save, unique_keys=["id_deputado", "numDocumento", "codDocumento"], year=ano
-                )
-        else:
-            if is_full:
-                start_despesas = start_date or DOMAINS_EARLIEST_DATES["despesas"]
-                end_despesas = end_date or datetime.now().strftime("%Y-%m-%d")
-                logger.warning(
-                    f"[FULL LOAD] Limpando Despesas ({start_despesas} a {end_despesas})..."
-                )
-                await sink.delete_period(
-                    "despesas", start_despesas, end_despesas, date_column="dataDocumento"
-                )
-            else:
-                start_despesas = (
-                    state_store.get_watermark("despesas", "dataDocumento") or "2023-02-01"
-                )
-                end_despesas = end_date or datetime.now().strftime("%Y-%m-%d")
+        if "despesas" in domains:
+            if source == "bulk":
                 logger.info(
-                    f"Sincronizando Despesas a partir de "
-                    f"{start_despesas} até {end_despesas} via API..."
+                    f"Sincronizando Despesas de {start_year} a {end_year} via BULK (CSV)..."
                 )
+                for ano in anos_alvo:
+                    await despesas_ext.extract(
+                        sink.save,
+                        unique_keys=["id_deputado", "numDocumento", "codDocumento"],
+                        year=ano,
+                    )
+            else:
+                if is_full:
+                    start_despesas = start_date or DOMAINS_EARLIEST_DATES["despesas"]
+                    end_despesas = end_date or datetime.now().strftime("%Y-%m-%d")
+                    logger.warning(
+                        f"[FULL LOAD] Limpando Despesas ({start_despesas} a {end_despesas})..."
+                    )
+                    await sink.delete_period(
+                        "despesas", start_despesas, end_despesas, date_column="dataDocumento"
+                    )
+                else:
+                    start_despesas = (
+                        state_store.get_watermark("despesas", "dataDocumento") or "2023-02-01"
+                    )
+                    end_despesas = end_date or datetime.now().strftime("%Y-%m-%d")
+                    logger.info(
+                        f"Sincronizando Despesas a partir de "
+                        f"{start_despesas} até {end_despesas} via API..."
+                    )
 
-            await despesas_ext.extract(
-                sink.save,
-                deputados_ids=deputados_ids,
-                start_date=start_despesas,
-                end_date=end_despesas,
-            )
+                await despesas_ext.extract(
+                    sink.save,
+                    deputados_ids=deputados_ids,
+                    start_date=start_despesas,
+                    end_date=end_despesas,
+                )
 
         # ==========================================
         # 3. PROPOSIÇÕES
         # ==========================================
-        if source == "bulk":
-            logger.info(f"Sincronizando Proposições de {start_year} a {end_year} via BULK...")
-            for ano in anos_alvo:
-                await proposicoes_ext.extract(sink.save, unique_keys="id", year=ano)
-        else:
-            if is_full:
-                start_prop = start_date or DOMAINS_EARLIEST_DATES["proposicoes"]
-                end_prop = end_date or datetime.now().strftime("%Y-%m-%d")
-                logger.warning(f"[FULL LOAD] Limpando Proposições ({start_prop} a {end_prop})...")
-                await sink.delete_period(
-                    "proposicoes", start_prop, end_prop, date_column="dataApresentacao"
-                )
+        if "proposicoes" in domains:
+            if source == "bulk":
+                logger.info(f"Sincronizando Proposições de {start_year} a {end_year} via BULK...")
+                for ano in anos_alvo:
+                    await proposicoes_ext.extract(sink.save, unique_keys="id", year=ano)
             else:
-                start_prop = (
-                    state_store.get_watermark("proposicoes", "dataApresentacao") or "2023-02-01"
-                )
-                end_prop = end_date or datetime.now().strftime("%Y-%m-%d")
+                if is_full:
+                    start_prop = start_date or DOMAINS_EARLIEST_DATES["proposicoes"]
+                    end_prop = end_date or datetime.now().strftime("%Y-%m-%d")
+                    logger.warning(
+                        f"[FULL LOAD] Limpando Proposições ({start_prop} a {end_prop})..."
+                    )
+                    await sink.delete_period(
+                        "proposicoes", start_prop, end_prop, date_column="dataApresentacao"
+                    )
+                else:
+                    start_prop = (
+                        state_store.get_watermark("proposicoes", "dataApresentacao") or "2023-02-01"
+                    )
+                    end_prop = end_date or datetime.now().strftime("%Y-%m-%d")
 
-            logger.info(
-                f"Sincronizando Proposições a partir de {start_prop} até {end_prop} via API..."
-            )
-            await proposicoes_ext.extract(sink.save, start_prop, end_prop)
+                logger.info(
+                    f"Sincronizando Proposições a partir de {start_prop} até {end_prop} via API..."
+                )
+                await proposicoes_ext.extract(sink.save, start_prop, end_prop)
 
         # ==========================================
         # 4. VOTAÇÕES E VOTOS NOMINAIS
         # ==========================================
-        if source == "bulk":
-            logger.info(f"Sincronizando Votações e Votos de {start_year} a {end_year} via BULK...")
-            for ano in anos_alvo:
-                await votacoes_ext.extract(sink.save, unique_keys="id", year=ano)
+        if "votacoes" in domains:
+            if source == "bulk":
+                logger.info(
+                    f"Sincronizando Votações e Votos de {start_year} a {end_year} via BULK..."
+                )
+                for ano in anos_alvo:
+                    await votacoes_ext.extract(sink.save, unique_keys="id", year=ano)
 
-                votos_ext = CamaraExtractorFactory.get_extractor("votos", "bulk", client)
-                await votos_ext.extract(
-                    sink.save, unique_keys=["idVotacao", "deputado_id"], year=ano
-                )
-        else:
-            if is_full:
-                start_votacoes = start_date or DOMAINS_EARLIEST_DATES["votacoes"]
-                end_votacoes = end_date or datetime.now().strftime("%Y-%m-%d")
-                logger.warning(
-                    f"[FULL LOAD] Limpando Votações ({start_votacoes} a {end_votacoes})..."
-                )
-                await sink.delete_period(
-                    "votacoes", start_votacoes, end_votacoes, date_column="data"
-                )
+                    votos_ext = CamaraExtractorFactory.get_extractor("votos", "bulk", client)
+                    await votos_ext.extract(
+                        sink.save, unique_keys=["idVotacao", "deputado_id"], year=ano
+                    )
             else:
-                start_votacoes = state_store.get_watermark("votacoes", "data") or "1991-01-01"
-                end_votacoes = end_date or datetime.now().strftime("%Y-%m-%d")
+                if is_full:
+                    start_votacoes = start_date or DOMAINS_EARLIEST_DATES["votacoes"]
+                    end_votacoes = end_date or datetime.now().strftime("%Y-%m-%d")
+                    logger.warning(
+                        f"[FULL LOAD] Limpando Votações ({start_votacoes} a {end_votacoes})..."
+                    )
+                    await sink.delete_period(
+                        "votacoes", start_votacoes, end_votacoes, date_column="data"
+                    )
+                else:
+                    start_votacoes = state_store.get_watermark("votacoes", "data") or "1991-01-01"
+                    end_votacoes = end_date or datetime.now().strftime("%Y-%m-%d")
 
-            await votacoes_ext.extract(sink.save, start_date=start_votacoes, end_date=end_votacoes)
+                await votacoes_ext.extract(
+                    sink.save, start_date=start_votacoes, end_date=end_votacoes
+                )
 
         logger.info("Pipeline finalizado com sucesso!")
 
@@ -243,12 +253,12 @@ async def main():
         default="incremental",
         help="Estratégia de sincronização.",
     )
-    # parser.add_argument(
-    #     "--domains",
-    #     nargs="+",
-    #     default=None,
-    #     help="Lista de domínios a processar",
-    # )
+    parser.add_argument(
+        "--domains",
+        nargs="+",
+        default=["deputados", "despesas", "proposicoes", "votacoes"],
+        help="Lista de domínios a processar (ex: --domains deputados despesas)",
+    )
 
     parser.add_argument("--start-date", type=str, default=None, help="Data Inicial (YYYY-MM-DD)")
     parser.add_argument("--end-date", type=str, default=None, help="Data Final (YYYY-MM-DD)")
