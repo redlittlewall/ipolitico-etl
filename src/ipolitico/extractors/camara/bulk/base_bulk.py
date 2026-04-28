@@ -1,5 +1,7 @@
 import logging
+import os
 import tempfile
+import zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -62,6 +64,15 @@ class BaseBulkExtractor:
                 logger.warning(f"Dump de {self.domain_name} para {year} não existe no servidor.")
                 return
 
+            if dest_path.endswith(".zip"):
+                try:
+                    with zipfile.ZipFile(dest_path, "r") as zip_ref:
+                        csv_filename = zip_ref.namelist()[0]
+                        zip_ref.extract(csv_filename, tmpdir)
+                        dest_path = os.path.join(tmpdir, csv_filename)
+                except zipfile.BadZipFile:
+                    logger.error(f"Arquivo ZIP corrompido baixado de {url}. Abortando.")
+                    return
             try:
                 lazy_reader = pl.scan_csv(
                     dest_path,
