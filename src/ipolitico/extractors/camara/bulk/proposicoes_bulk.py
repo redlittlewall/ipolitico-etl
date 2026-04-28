@@ -7,6 +7,8 @@ class ProposicoesBulkExtractor(BaseBulkExtractor):
     domain_name = "proposicoes"
 
     def _standardize_schema(self, df: pl.DataFrame) -> pl.DataFrame:
-        # O CSV de proposições tem um schema muito próximo ao da API.
-        # Adicione mapeamentos aqui futuramente caso encontre anomalias nos relatórios do DuckDB.
-        return df
+        date_cols = ["dataApresentacao"]
+
+        return df.with_columns(
+            [pl.col(c).str.to_datetime(strict=False) for c in date_cols if c in df.columns]
+        )

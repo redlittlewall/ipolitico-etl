@@ -1,5 +1,6 @@
 import logging
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 import polars as pl
@@ -55,13 +56,18 @@ class BaseBulkExtractor:
                 return pl.DataFrame()
 
             try:
-                # infer_schema_length=0 força a leitura como String para evitar crashs
                 df = pl.read_csv(
                     dest_path, separator=";", ignore_errors=True, infer_schema_length=0
                 )
-
-                # Invoca a tradução de colunas específica da classe filha
                 df = self._standardize_schema(df)
+
+                agora = datetime.now()
+                df = df.with_columns(
+                    [
+                        pl.lit(agora).cast(pl.Datetime).alias("captured_at"),
+                        pl.lit(agora).cast(pl.Datetime).alias("updated_at"),
+                    ]
+                )
                 return df
             except Exception as e:
                 logger.error(f"Falha ao ler o CSV de {self.domain_name}: {e}")

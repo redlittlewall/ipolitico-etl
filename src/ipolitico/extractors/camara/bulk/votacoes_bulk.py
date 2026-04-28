@@ -10,4 +10,8 @@ class VotacoesBulkExtractor(BaseBulkExtractor):
     domain_name = "votacoes"
 
     def _standardize_schema(self, df: pl.DataFrame) -> pl.DataFrame:
-        return df
+        date_cols = ["data", "dataHoraRegistro"]
+
+        return df.with_columns(
+            [pl.col(c).str.to_datetime(strict=False) for c in date_cols if c in df.columns]
+        )

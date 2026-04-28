@@ -24,7 +24,14 @@ class DespesasBulkExtractor(BaseBulkExtractor):
             "txtNumero": "numDocumento",
         }
 
-        # Filtra para renomear apenas colunas que realmente existem no arquivo
-        cols_to_rename = {k: v for k, v in mapping.items() if k in df.columns}
+        df = df.rename({k: v for k, v in mapping.items() if k in df.columns})
 
-        return df.rename(cols_to_rename)
+        # Conversão de Datas e Números
+        return df.with_columns(
+            [
+                pl.col("dataDocumento").str.to_datetime(strict=False),
+                pl.col("valorLiquido").str.replace(",", ".").cast(pl.Float64, strict=False),
+                pl.col("valorDocumento").str.replace(",", ".").cast(pl.Float64, strict=False),
+                pl.col("id_deputado").cast(pl.Int64, strict=False),
+            ]
+        )

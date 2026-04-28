@@ -319,6 +319,13 @@ async def main():
         default="incremental",
         help="Estratégia de sincronização.",
     )
+    parser.add_argument(
+        "--domains",
+        nargs="+",
+        default=["deputados", "despesas", "proposicoes", "votacoes"],
+        help="Lista de domínios a processar",
+    )
+
     parser.add_argument("--start-date", type=str, default=None, help="Data Inicial (YYYY-MM-DD)")
     parser.add_argument("--end-date", type=str, default=None, help="Data Final (YYYY-MM-DD)")
 

@@ -12,4 +12,7 @@ class DeputadosBulkExtractor(BaseBulkExtractor):
             df = df.with_columns(
                 pl.col("uri").str.split("/").list.last().cast(pl.Int64).alias("id")
             )
-        return df
+        cols_to_int = ["id", "idLegislatura"]
+        return df.with_columns(
+            [pl.col(c).cast(pl.Int64, strict=False) for c in cols_to_int if c in df.columns]
+        )
