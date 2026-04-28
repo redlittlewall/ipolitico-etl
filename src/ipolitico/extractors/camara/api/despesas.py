@@ -5,7 +5,7 @@ import polars as pl
 
 from ipolitico.core.config import MAX_CONCURRENT_REQUESTS
 from ipolitico.core.constants import ApiParams, ApiRoutes
-from ipolitico.extractors.camara.camara_base import CamaraBaseExtractor
+from ipolitico.extractors.camara.api.camara_base import CamaraBaseExtractor
 
 logger = logging.getLogger(__name__)
 

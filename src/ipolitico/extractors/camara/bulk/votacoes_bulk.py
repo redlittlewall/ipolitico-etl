@@ -1,0 +1,13 @@
+import polars as pl
+
+from ipolitico.extractors.camara.bulk.base_bulk import BaseBulkExtractor
+
+
+class VotacoesBulkExtractor(BaseBulkExtractor):
+    # O domínio "votacoes" fará o download do CSV de Votações (Cabeçalho)
+    # Para extrair os votos, você pode passar domain="votos" no main, e a Factory
+    # instanciará a mesma classe, pois o motor resolve a URL no registry.
+    domain_name = "votacoes"
+
+    def _standardize_schema(self, df: pl.DataFrame) -> pl.DataFrame:
+        return df
