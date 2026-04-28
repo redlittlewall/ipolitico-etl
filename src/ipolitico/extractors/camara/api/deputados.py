@@ -3,7 +3,6 @@ import logging
 
 import polars as pl
 
-from ipolitico.core.config import MAX_CONCURRENT_REQUESTS
 from ipolitico.core.constants import ApiParams, ApiRoutes
 from ipolitico.extractors.camara.api.camara_base import CamaraBaseExtractor
 from ipolitico.services.metadata import CamaraMetadataService
@@ -15,8 +14,8 @@ class DeputadosExtractor(CamaraBaseExtractor):
     """
     Extrator responsável pelo domínio de Deputados Federais.
 
-    Gere a extração da lista base de políticos em exercício ou o levantamento histórico
-    completo de todas as legislaturas desde o Império (1826).
+    Gere a extração via streaming, permitindo o processamento paralelo de
+    múltiplas legislaturas ou detalhes individuais sem sobrecarregar a memória.
     """
 
     def __init__(self, client, state_store):
@@ -32,11 +31,12 @@ class DeputadosExtractor(CamaraBaseExtractor):
 
     async def extract(
         self,
+        sink_func,
         start_date: str = None,
         end_date: str = None,
         legislatura: int = None,
         full_load: bool = False,
-    ) -> pl.DataFrame:
+    ) -> None:
         """
         Extrai a lista de deputados com base em filtros temporais ou legislaturas.
 
@@ -45,6 +45,7 @@ class DeputadosExtractor(CamaraBaseExtractor):
         - Se False: Sincroniza apenas os deputados da legislatura em curso.
 
         Args:
+            sink_func (callable): Função assíncrona de persistência.
             start_date (str, optional): Filtro de data inicial (YYYY-MM-DD).
             end_date (str, optional): Filtro de data final (YYYY-MM-DD).
             legislatura (int, optional): ID específico da legislatura.
@@ -52,7 +53,7 @@ class DeputadosExtractor(CamaraBaseExtractor):
                 se os filtros estiverem vazios.
 
         Returns:
-            pl.DataFrame: DataFrame contendo a identificação e dados básicos dos deputados.
+            None: Os dados são enviados diretamente para a fila do consumidor (sink_func).
         """
         if legislatura or start_date or end_date:
             logger.debug(
@@ -66,35 +67,27 @@ class DeputadosExtractor(CamaraBaseExtractor):
             dados = await self.fetch_paginated(
                 ApiRoutes.DEPUTADOS.value, self.build_params(raw_params)
             )
-            return pl.DataFrame(dados) if dados else pl.DataFrame()
+            if dados:
+                await sink_func(pl.DataFrame(dados), "deputados", "id")
+            return
 
         ultima_leg = await self.metadata.get_current_legislature_id()
-
-        if full_load:
-            logger.warning(f"Carga Completa: Legislaturas 1 a {ultima_leg}")
-            legislaturas_alvo = list(range(1, ultima_leg + 1))
-            desc_barra = "História Completa"
-        else:
-            logger.debug(f"Sincronizando apenas Legislatura Atual ({ultima_leg})")
-            legislaturas_alvo = [ultima_leg]
-            desc_barra = f"Legislatura {ultima_leg}"
+        legislaturas_alvo = list(range(1, ultima_leg + 1)) if full_load else [ultima_leg]
 
         async def fetch_job(leg_id: int) -> pl.DataFrame:
             params = self.build_params({ApiParams.ID_LEGISLATURA.value: leg_id})
             dados = await self.fetch_paginated(ApiRoutes.DEPUTADOS.value, params)
             return pl.DataFrame(dados) if dados else pl.DataFrame()
 
-        df_extracao = await self.execute_concurrently(
-            legislaturas_alvo, fetch_job, max_workers=MAX_CONCURRENT_REQUESTS, desc=desc_barra
+        await self.execute_pipeline(
+            items=legislaturas_alvo,
+            fetch_func=fetch_job,
+            sink_func=sink_func,
+            table_name="deputados",
+            unique_keys="id",
         )
 
-        if not df_extracao.is_empty():
-            df_extracao = df_extracao.unique(subset=["id"])
-            logger.debug(f"{df_extracao.height} registos processados.")
-
-        return df_extracao
-
-    async def extract_detalhes(self, deputados_ids: list) -> pl.DataFrame:
+    async def extract_detalhes(self, sink_func, deputados_ids: list) -> None:
         """
         Extrai informações cadastrais profundas de uma lista específica de deputados.
 
@@ -103,13 +96,14 @@ class DeputadosExtractor(CamaraBaseExtractor):
         prevenindo erros de schema no Polars/SQLite.
 
         Args:
+            sink_func (callable): Função assíncrona de persistência.
             deputados_ids (list[int]): Lista de IDs únicos dos deputados a processar.
 
         Returns:
-            pl.DataFrame: DataFrame com os dados detalhados prontos para persistência.
+            None: Os dados são enviados diretamente para a fila do consumidor (sink_func).
         """
         if not deputados_ids:
-            return pl.DataFrame()
+            return
 
         async def fetch_detalhe(dep_id: int) -> pl.DataFrame:
             endpoint = f"{ApiRoutes.DEPUTADOS.value}/{dep_id}"
@@ -121,6 +115,10 @@ class DeputadosExtractor(CamaraBaseExtractor):
                 return pl.DataFrame([resp])
             return pl.DataFrame()
 
-        return await self.execute_concurrently(
-            deputados_ids, fetch_detalhe, desc="Detalhes Cadastrais"
+        await self.execute_pipeline(
+            items=deputados_ids,
+            fetch_func=fetch_detalhe,
+            sink_func=sink_func,
+            table_name="deputados_detalhes",
+            unique_keys="id",
         )

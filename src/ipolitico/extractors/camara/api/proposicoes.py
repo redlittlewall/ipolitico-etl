@@ -3,7 +3,6 @@ from datetime import datetime
 
 import polars as pl
 
-from ipolitico.core.config import MAX_CONCURRENT_REQUESTS
 from ipolitico.core.constants import ApiParams, ApiRoutes
 from ipolitico.extractors.camara.api.camara_base import CamaraBaseExtractor
 
@@ -19,16 +18,14 @@ class ProposicoesExtractor(CamaraBaseExtractor):
     governamental.
     """
 
-    async def extract(self, start_date: str, end_date: str) -> pl.DataFrame:
+    async def extract(self, sink_func, start_date: str, end_date: str) -> pl.DataFrame:
         """
         Executa a extração de proposições numa janela de tempo estrita.
 
         Args:
-            start_date (str): Data de início (YYYY-MM-DD). Obrigatório.
-            end_date (str): Data de fim (YYYY-MM-DD). Obrigatório.
-
-        Returns:
-            pl.DataFrame: DataFrame contendo as proposições do período filtrado.
+            sink_func (callable): Função assíncrona de persistência.
+            start_date (str): Data de início (YYYY-MM-DD).
+            end_date (str): Data de fim (YYYY-MM-DD).
         """
         if not start_date or not end_date:
             raise ValueError("O Extrator de Proposições exige limites temporais explícitos.")
@@ -49,20 +46,18 @@ class ProposicoesExtractor(CamaraBaseExtractor):
             dados = await self.fetch_paginated(
                 ApiRoutes.PROPOSICOES.value, self.build_params(raw_params)
             )
-            return pl.DataFrame(dados) if dados else pl.DataFrame()
+            df = pl.DataFrame(dados) if dados else pl.DataFrame()
+            if not df.is_empty():
+                df = df.filter(
+                    (pl.col("dataApresentacao").str.slice(0, 10) >= start_date)
+                    & (pl.col("dataApresentacao").str.slice(0, 10) <= end_date)
+                )
+            return df
 
-        df_final = await self.execute_concurrently(
-            anos,
-            fetch_proposicoes_ano,
-            max_workers=MAX_CONCURRENT_REQUESTS,
-            desc="Baixando Proposições",
+        await self.execute_pipeline(
+            items=anos,
+            fetch_func=fetch_proposicoes_ano,
+            sink_func=sink_func,
+            table_name="proposicoes",
+            unique_keys="id",
         )
-
-        if not df_final.is_empty():
-            df_final = df_final.filter(
-                (pl.col("dataApresentacao").str.slice(0, 10) >= start_date)
-                & (pl.col("dataApresentacao").str.slice(0, 10) <= end_date)
-            )
-            logger.debug(f"{df_final.height} proposições processadas.")
-
-        return df_final
