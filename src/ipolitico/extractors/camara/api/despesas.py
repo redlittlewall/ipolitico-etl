@@ -3,7 +3,6 @@ from datetime import datetime
 
 import polars as pl
 
-from ipolitico.core.config import MAX_CONCURRENT_REQUESTS
 from ipolitico.core.constants import ApiParams, ApiRoutes
 from ipolitico.extractors.camara.api.camara_base import CamaraBaseExtractor
 
@@ -14,25 +13,32 @@ class DespesasExtractor(CamaraBaseExtractor):
     """
     Extrator responsável pelo domínio de Despesas (Cota Parlamentar).
 
-    A API da Câmara possui um limite rígido de itens por requisição e frequentemente
-    retorna HTTP 400 (Bad Request) se a janela temporal de busca for muito ampla.
-    Este extrator implementa um algoritmo de particionamento (Chunking) dinâmico,
-    fatiando as buscas mes a mes para cada deputado, garantindo extração segura.
+    A API da Câmara possui um limite rígido de itens por requisição. Este extrator
+    implementa um modelo Producer-Consumer que fatiia as buscas (chunking) e realiza
+    o streaming dos dados diretamente para o sink, evitando acúmulo na RAM.
     """
 
     async def extract(
-        self, deputados_ids: list[int] = None, start_date: str = None, end_date: str = None
-    ) -> pl.DataFrame:
+        self,
+        sink_func,
+        deputados_ids: list[int] = None,
+        start_date: str = None,
+        end_date: str = None,
+    ) -> None:
         """
-        Orquestra a extração de despesas executando jobs mensais/anuais.
+            Orquestra a extração de despesas executando jobs mensais/anuais em paralelo.
+
+        Utiliza o motor execute_pipeline para garantir que cada lote de despesa processado
+        seja salvo imediatamente via sink_func.
 
         Args:
+            sink_func (callable): Função assíncrona de persistência (ex: SQLiteSink.save).
             deputados_ids (list[int]): Lista de IDs dos deputados. Obrigatório.
             start_date (str): Data inicial no formato YYYY-MM-DD. Obrigatório.
             end_date (str): Data final no formato YYYY-MM-DD. Obrigatório.
 
         Returns:
-            pl.DataFrame: DataFrame contendo as despesas filtradas e validadas.
+            None: Os dados são enviados diretamente para a fila do consumidor (sink_func).
 
         Raises:
             ValueError: Caso os limites temporais ou IDs não sejam fornecidos.
@@ -82,27 +88,17 @@ class DespesasExtractor(CamaraBaseExtractor):
                 return pl.DataFrame()
 
             # Injeção da Chave Estrangeira
-            return pl.DataFrame(dados).with_columns(pl.lit(job["id"]).alias("id_deputado"))
+            df = pl.DataFrame(dados).with_columns(pl.lit(job["id"]).alias("id_deputado"))
 
-        # Execução concorrente usando o motor do BaseExtractor
-        df_final = await self.execute_concurrently(
-            jobs,
-            fetch_despesa_deputado,
-            max_workers=MAX_CONCURRENT_REQUESTS,
-            desc="Baixando Despesas",
-        )
-
-        # Transformação e filtro de precisão
-        if not df_final.is_empty():
-            df_final = df_final.filter(
+            return df.filter(
                 (pl.col("dataDocumento").str.slice(0, 10) >= start_date)
                 & (pl.col("dataDocumento").str.slice(0, 10) <= end_date)
             )
-            if df_final.is_empty():
-                logger.debug("O filtro removeu todos os dados! Verifique os formatos de data.")
-            else:
-                logger.debug(f"{df_final.height} registros prontos para salvar.")
-        else:
-            logger.debug("ℹ Nenhuma despesa nova encontrada para os critérios informados.")
 
-        return df_final
+        await self.execute_pipeline(
+            items=jobs,
+            fetch_func=fetch_despesa_deputado,
+            sink_func=sink_func,
+            table_name="despesas",
+            unique_keys=["id_deputado", "numDocumento", "codDocumento"],
+        )
