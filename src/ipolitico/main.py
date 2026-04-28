@@ -47,7 +47,7 @@ async def run_pipeline(
     end_date: str = None,
     strategy: LoadStrategy = LoadStrategy.INCREMENTAL,
     source: str = "api",
-    domains: list = None,
+    # domains: list = None,
 ):
     """
     Executa a pipeline de extração, transformação e carregamento (ETL).
@@ -99,20 +99,15 @@ async def run_pipeline(
 
         if source == "bulk":
             df_deputados = await deputados_ext.extract()
+            if not df_deputados.is_empty():
+                await sink.save(df_deputados, "deputados", unique_keys="id")
 
         else:
             df_deputados = await deputados_ext.extract(
-                start_date=actual_start, end_date=end_date, full_load=is_full
+                sink.save, start_date=actual_start, end_date=end_date, full_load=is_full
             )
 
-        if not df_deputados.is_empty():
-            await sink.save(df_deputados, "deputados", unique_keys="id")
-
-        deputados_ids = []
-        if not df_deputados.is_empty():
-            deputados_ids = df_deputados["id"].to_list()
-        else:
-            deputados_ids = state_store.get_existing_ids("deputados")
+        deputados_ids = state_store.get_existing_ids("deputados")
 
         # DETALHES CADASTRAIS (Sempre via API)
         if deputados_ids:
@@ -123,28 +118,10 @@ async def run_pipeline(
                 logger.info(
                     f"     ∟ Baixando detalhes de {len(ids_to_load)} deputados (Via API)..."
                 )
-                tamanho_lote = 50
-                total_lotes = (len(ids_to_load) + tamanho_lote - 1) // tamanho_lote
-                checkpoint = max(1, total_lotes // 4)
-
-                try:
-                    # Instancia um extrator de API puro só para os detalhes,
-                    # caso o principal seja BULK
-                    detalhes_ext = CamaraExtractorFactory.get_extractor(
-                        "deputados", "api", client, state_store
-                    )
-                    for i, batch_ids in enumerate(chunk_list(ids_to_load, tamanho_lote), 1):
-                        df_detalhes = await detalhes_ext.extract_detalhes(batch_ids)
-                        if not df_detalhes.is_empty():
-                            await sink.save(df_detalhes, "deputados_detalhes", unique_keys="id")
-
-                        if i == 1 or i == total_lotes or i % checkpoint == 0:
-                            logger.info(
-                                f"        Progresso: {(i / total_lotes) * 100:.0f}% "
-                                f"(Lote {i}/{total_lotes})"
-                            )
-                except Exception as e:
-                    logger.error(f"     ∟ A API rejeitou a extração de detalhes: {e}.")
+                detalhes_ext = CamaraExtractorFactory.get_extractor(
+                    "deputados", "api", client, state_store
+                )
+                await detalhes_ext.extract_detalhes(sink.save, ids_to_load)
             else:
                 logger.info("     ∟ Detalhes cadastrais já estão atualizados.")
 
@@ -178,25 +155,12 @@ async def run_pipeline(
                     f"{start_despesas} até {end_despesas} via API..."
                 )
 
-            tamanho_lote_desp = 20
-            total_lotes_desp = (len(deputados_ids) + tamanho_lote_desp - 1) // tamanho_lote_desp
-            checkpoint_desp = max(1, total_lotes_desp // 4)
-
-            for i, batch_ids in enumerate(chunk_list(deputados_ids, tamanho_lote_desp), 1):
-                df_despesas = await despesas_ext.extract(
-                    deputados_ids=batch_ids, start_date=start_despesas, end_date=end_despesas
-                )
-                if not df_despesas.is_empty():
-                    await sink.save(
-                        df_despesas,
-                        "despesas",
-                        unique_keys=["id_deputado", "numDocumento", "codDocumento"],
-                    )
-                if i == 1 or i == total_lotes_desp or i % checkpoint_desp == 0:
-                    logger.info(
-                        f"        Progresso: {(i / total_lotes_desp) * 100:.0f}% "
-                        f"(Lote {i}/{total_lotes_desp})"
-                    )
+            await despesas_ext.extract(
+                sink.save,
+                deputados_ids=deputados_ids,
+                start_date=start_despesas,
+                end_date=end_despesas,
+            )
 
         # ==========================================
         # 3. PROPOSIÇÕES
@@ -221,13 +185,11 @@ async def run_pipeline(
                     state_store.get_watermark("proposicoes", "dataApresentacao") or "2023-02-01"
                 )
                 end_prop = end_date or datetime.now().strftime("%Y-%m-%d")
-                logger.info(
-                    f"Sincronizando Proposições a partir de {start_prop} até {end_prop} via API..."
-                )
 
-            df_proposicoes = await proposicoes_ext.extract(start_prop, end_prop)
-            if not df_proposicoes.is_empty():
-                await sink.save(df_proposicoes, "proposicoes", unique_keys="id")
+            logger.info(
+                f"Sincronizando Proposições a partir de {start_prop} até {end_prop} via API..."
+            )
+            await proposicoes_ext.extract(sink.save, start_prop, end_prop)
 
         # ==========================================
         # 4. VOTAÇÕES E VOTOS NOMINAIS
@@ -256,36 +218,8 @@ async def run_pipeline(
             else:
                 start_votacoes = state_store.get_watermark("votacoes", "data") or "1991-01-01"
                 end_votacoes = end_date or datetime.now().strftime("%Y-%m-%d")
-                logger.info(
-                    f"Sincronizando Votações a partir de "
-                    f"{start_votacoes} até {end_votacoes} via API..."
-                )
 
-            df_votacoes = await votacoes_ext.extract(
-                start_date=start_votacoes, end_date=end_votacoes
-            )
-            if not df_votacoes.is_empty():
-                await sink.save(df_votacoes, "votacoes", unique_keys="id")
-
-                votacoes_ids = df_votacoes["id"].to_list()
-                tamanho_lote_votos = 50
-                total_lotes_votos = (
-                    len(votacoes_ids) + tamanho_lote_votos - 1
-                ) // tamanho_lote_votos
-                checkpoint_votos = max(1, total_lotes_votos // 4)
-
-                logger.info(f"     ∟ Extraindo votos nominais de {len(votacoes_ids)} votações...")
-
-                for i, batch_ids in enumerate(chunk_list(votacoes_ids, tamanho_lote_votos), 1):
-                    df_votos = await votacoes_ext.extract_votos(batch_ids)
-                    if not df_votos.is_empty():
-                        await sink.save(df_votos, "votos", unique_keys=["idVotacao", "deputado_id"])
-
-                    if i == 1 or i == total_lotes_votos or i % checkpoint_votos == 0:
-                        logger.info(
-                            f"        Progresso: {(i / total_lotes_votos) * 100:.0f}% "
-                            f"(Lote {i}/{total_lotes_votos})"
-                        )
+            await votacoes_ext.extract(sink.save, start_date=start_votacoes, end_date=end_votacoes)
 
         logger.info("Pipeline finalizado com sucesso!")
 
