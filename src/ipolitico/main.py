@@ -4,8 +4,6 @@ import time
 from datetime import datetime
 from enum import Enum
 
-import polars as pl
-
 from ipolitico.core.client import CamaraClient
 from ipolitico.core.config import SQLITE_DB_PATH
 from ipolitico.core.logger import setup_logger
@@ -95,15 +93,12 @@ async def run_pipeline(
         # 1. DEPUTADOS
         # ==========================================
         logger.info(f"Sincronizando Deputados via {source.upper()}...")
-        df_deputados = pl.DataFrame()
 
         if source == "bulk":
-            df_deputados = await deputados_ext.extract()
-            if not df_deputados.is_empty():
-                await sink.save(df_deputados, "deputados", unique_keys="id")
+            await deputados_ext.extract(sink.save, unique_keys="id")
 
         else:
-            df_deputados = await deputados_ext.extract(
+            await deputados_ext.extract(
                 sink.save, start_date=actual_start, end_date=end_date, full_load=is_full
             )
 
@@ -131,10 +126,9 @@ async def run_pipeline(
         if source == "bulk":
             logger.info(f"Sincronizando Despesas de {start_year} a {end_year} via BULK (CSV)...")
             for ano in anos_alvo:
-                df_despesas = await despesas_ext.extract(year=ano)
-                if not df_despesas.is_empty():
-                    await sink.save(df_despesas, "despesas")
-                    logger.info(f"     ∟ Ano {ano} salvo com {df_despesas.height} registros.")
+                await despesas_ext.extract(
+                    sink.save, unique_keys=["id_deputado", "numDocumento", "codDocumento"], year=ano
+                )
         else:
             if is_full:
                 start_despesas = start_date or DOMAINS_EARLIEST_DATES["despesas"]
@@ -168,10 +162,7 @@ async def run_pipeline(
         if source == "bulk":
             logger.info(f"Sincronizando Proposições de {start_year} a {end_year} via BULK...")
             for ano in anos_alvo:
-                df_proposicoes = await proposicoes_ext.extract(year=ano)
-                if not df_proposicoes.is_empty():
-                    await sink.save(df_proposicoes, "proposicoes")
-                    logger.info(f"     ∟ Ano {ano} salvo com {df_proposicoes.height} registros.")
+                await proposicoes_ext.extract(sink.save, unique_keys="id", year=ano)
         else:
             if is_full:
                 start_prop = start_date or DOMAINS_EARLIEST_DATES["proposicoes"]
@@ -197,14 +188,12 @@ async def run_pipeline(
         if source == "bulk":
             logger.info(f"Sincronizando Votações e Votos de {start_year} a {end_year} via BULK...")
             for ano in anos_alvo:
-                df_votacoes = await votacoes_ext.extract(year=ano)
-                if not df_votacoes.is_empty():
-                    await sink.save(df_votacoes, "votacoes")
+                await votacoes_ext.extract(sink.save, unique_keys="id", year=ano)
 
                 votos_ext = CamaraExtractorFactory.get_extractor("votos", "bulk", client)
-                df_votos = await votos_ext.extract(year=ano)
-                if not df_votos.is_empty():
-                    await sink.save(df_votos, "votos")
+                await votos_ext.extract(
+                    sink.save, unique_keys=["idVotacao", "deputado_id"], year=ano
+                )
         else:
             if is_full:
                 start_votacoes = start_date or DOMAINS_EARLIEST_DATES["votacoes"]

@@ -37,7 +37,14 @@ class BaseBulkExtractor:
         """Método de tradução. Retorna o DF intocado por padrão."""
         return df
 
-    async def extract(self, year: int = None) -> pl.DataFrame:
+    async def extract(
+        self, sink_func, unique_keys: str | list[str] | None = None, year: int = None
+    ) -> None:
+        """
+        Descarrega o Dump estático e processa-o via Disk-to-Database Streaming.
+        Lê o CSV em lotes (batches) para garantir consumo mínimo de RAM.
+        """
+
         if not self.domain_name:
             raise NotImplementedError("domain_name deve ser definido na classe filha.")
 
@@ -53,10 +60,10 @@ class BaseBulkExtractor:
 
             if not sucesso:
                 logger.warning(f"Dump de {self.domain_name} para {year} não existe no servidor.")
-                return pl.DataFrame()
+                return
 
             try:
-                df = pl.read_csv(
+                lazy_reader = pl.scan_csv(
                     dest_path,
                     separator=";",
                     ignore_errors=True,
@@ -65,23 +72,25 @@ class BaseBulkExtractor:
                     quote_char='"',
                 )
 
-                df = df.rename(
-                    {
-                        c: c.replace("ï»¿", "").replace("\ufeff", "").replace('"', "").strip()
-                        for c in df.columns
-                    }
-                )
+                for df_chunk in lazy_reader.collect_batches():
+                    df_chunk = df_chunk.rename(
+                        {
+                            c: c.replace("ï»¿", "").replace("\ufeff", "").replace('"', "").strip()
+                            for c in df_chunk.columns
+                        }
+                    )
 
-                df = self._standardize_schema(df)
+                    df_chunk = self._standardize_schema(df_chunk)
 
-                agora = datetime.now()
-                df = df.with_columns(
-                    [
-                        pl.lit(agora).cast(pl.Datetime).alias("captured_at"),
-                        pl.lit(agora).cast(pl.Datetime).alias("updated_at"),
-                    ]
-                )
-                return df
+                    agora = datetime.now()
+                    df_chunk = df_chunk.with_columns(
+                        [
+                            pl.lit(agora).cast(pl.Datetime).alias("captured_at"),
+                            pl.lit(agora).cast(pl.Datetime).alias("updated_at"),
+                        ]
+                    )
+
+                    await sink_func(df_chunk, self.domain_name, unique_keys)
+
             except Exception as e:
-                logger.error(f"Falha ao ler o CSV de {self.domain_name}: {e}")
-                return pl.DataFrame()
+                logger.error(f"Falha crítica ao parsear o CSV de {self.domain_name}: {e}")
