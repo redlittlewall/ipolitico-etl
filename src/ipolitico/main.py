@@ -2,10 +2,10 @@ import argparse
 import asyncio
 import time
 from datetime import datetime
-from enum import Enum
 
 from ipolitico.core.client import CamaraClient
 from ipolitico.core.config import SQLITE_DB_PATH
+from ipolitico.core.constants import DomainType, LoadStrategy, SinkType, SourceType
 from ipolitico.core.logger import setup_logger
 from ipolitico.extractors.camara.bulk.factory import CamaraExtractorFactory
 from ipolitico.sinks.datalake_sink import DataLakeSink
@@ -27,11 +27,6 @@ DOMAINS_EARLIEST_DATES = {
 }
 
 
-class LoadStrategy(Enum):
-    FULL_LOAD = "full_load"
-    INCREMENTAL = "incremental"
-
-
 def chunk_list(lst: list, n: int):
     """Gera lotes de tamanho n a partir de uma lista para salvamento progressivo."""
     for i in range(0, len(lst), n):
@@ -44,8 +39,8 @@ async def run_pipeline(
     start_date: str = None,
     end_date: str = None,
     strategy: LoadStrategy = LoadStrategy.INCREMENTAL,
-    source: str = "api",
-    domains: list[str] = None,
+    source: SourceType = SourceType.API,
+    domains: list[DomainType] = None,
 ):
     """
     Executa a pipeline de extração, transformação e carregamento (ETL).
@@ -66,16 +61,26 @@ async def run_pipeline(
 
     client = CamaraClient()
 
-    domains = domains or ["deputados", "despesas", "proposicoes", "votacoes"]
+    domains = domains or [
+        DomainType.DEPUTADOS,
+        DomainType.DESPESAS,
+        DomainType.PROPOSICOES,
+        DomainType.VOTACOES,
+    ]
 
     # Injeção Dinâmica: O Orquestrador recebe os extratores sem saber se são API ou BULK
-    deputados_ext = CamaraExtractorFactory.get_extractor("deputados", source, client, state_store)
-    despesas_ext = CamaraExtractorFactory.get_extractor("despesas", source, client, state_store)
-    proposicoes_ext = CamaraExtractorFactory.get_extractor(
-        "proposicoes", source, client, state_store
+    deputados_ext = CamaraExtractorFactory.get_extractor(
+        DomainType.DEPUTADOS, source, client, state_store
     )
-    votacoes_ext = CamaraExtractorFactory.get_extractor("votacoes", source, client, state_store)
-
+    despesas_ext = CamaraExtractorFactory.get_extractor(
+        DomainType.DESPESAS, source, client, state_store
+    )
+    proposicoes_ext = CamaraExtractorFactory.get_extractor(
+        DomainType.PROPOSICOES, source, client, state_store
+    )
+    votacoes_ext = CamaraExtractorFactory.get_extractor(
+        DomainType.VOTACOES, source, client, state_store
+    )
     try:
         is_full = strategy == LoadStrategy.FULL_LOAD
         actual_start = start_date
@@ -89,10 +94,10 @@ async def run_pipeline(
         # ==========================================
         # 1. DEPUTADOS
         # ==========================================
-        if "deputados" in domains:
-            logger.info(f"Sincronizando Deputados via {source.upper()}...")
+        if DomainType.DEPUTADOS in domains:
+            logger.info(f"Sincronizando Deputados via {source.value.upper()}...")
 
-            if source == "bulk":
+            if source == SourceType.BULK:
                 await deputados_ext.extract(sink.save, unique_keys="id")
 
             else:
@@ -100,10 +105,10 @@ async def run_pipeline(
                     sink.save, start_date=actual_start, end_date=end_date, full_load=is_full
                 )
 
-        deputados_ids = state_store.get_existing_ids("deputados")
+        deputados_ids = state_store.get_existing_ids(DomainType.DEPUTADOS)
 
         # DETALHES CADASTRAIS (Sempre via API)
-        if "deputados" in domains and deputados_ids:
+        if DomainType.DEPUTADOS in domains and deputados_ids:
             existent_ids = state_store.get_existing_ids("deputados_detalhes")
             ids_to_load = [d for d in deputados_ids if d not in existent_ids]
             if ids_to_load:
@@ -111,7 +116,7 @@ async def run_pipeline(
                     f"     ∟ Baixando detalhes de {len(ids_to_load)} deputados (Via API)..."
                 )
                 detalhes_ext = CamaraExtractorFactory.get_extractor(
-                    "deputados", "api", client, state_store
+                    DomainType.DEPUTADOS, SourceType.API, client, state_store
                 )
                 await detalhes_ext.extract_detalhes(sink.save, ids_to_load)
             else:
@@ -120,8 +125,8 @@ async def run_pipeline(
         # ==========================================
         # 2. DESPESAS
         # ==========================================
-        if "despesas" in domains:
-            if source == "bulk":
+        if DomainType.DESPESAS in domains:
+            if source == SourceType.BULK:
                 logger.info(
                     f"Sincronizando Despesas de {start_year} a {end_year} via BULK (CSV)..."
                 )
@@ -161,8 +166,8 @@ async def run_pipeline(
         # ==========================================
         # 3. PROPOSIÇÕES
         # ==========================================
-        if "proposicoes" in domains:
-            if source == "bulk":
+        if DomainType.PROPOSICOES in domains:
+            if source == SourceType.BULK:
                 logger.info(f"Sincronizando Proposições de {start_year} a {end_year} via BULK...")
                 for ano in anos_alvo:
                     await proposicoes_ext.extract(sink.save, unique_keys="id", year=ano)
@@ -190,15 +195,17 @@ async def run_pipeline(
         # ==========================================
         # 4. VOTAÇÕES E VOTOS NOMINAIS
         # ==========================================
-        if "votacoes" in domains:
-            if source == "bulk":
+        if DomainType.VOTACOES in domains:
+            if source == SourceType.BULK:
                 logger.info(
                     f"Sincronizando Votações e Votos de {start_year} a {end_year} via BULK..."
                 )
                 for ano in anos_alvo:
                     await votacoes_ext.extract(sink.save, unique_keys="id", year=ano)
 
-                    votos_ext = CamaraExtractorFactory.get_extractor("votos", "bulk", client)
+                    votos_ext = CamaraExtractorFactory.get_extractor(
+                        DomainType.VOTOS, SourceType.BULK, client
+                    )
                     await votos_ext.extract(
                         sink.save, unique_keys=["idVotacao", "deputado_id"], year=ano
                     )
@@ -234,30 +241,32 @@ async def main():
 
     parser.add_argument(
         "--source",
-        type=str,
-        choices=["api", "bulk"],
-        default="api",
-        help="Origem dos dados: 'api' (paginada) ou 'bulk' (arquivos massivos)",
+        type=SourceType,
+        choices=list(SourceType),
+        default=SourceType.API,
+        help="Origem dos dados.",
     )
     parser.add_argument(
         "--sink",
-        type=str,
-        choices=["sqlite", "datalake"],
-        default="sqlite",
-        help="Destino dos dados (sqlite transacional ou datalake parquet).",
+        type=SinkType,
+        choices=list(SinkType),
+        default=SinkType.SQLITE,
+        help="Destino dos dados.",
     )
     parser.add_argument(
         "--strategy",
-        type=str,
-        choices=["incremental", "full_load"],
-        default="incremental",
+        type=LoadStrategy,
+        choices=list(LoadStrategy),
+        default=LoadStrategy.INCREMENTAL,
         help="Estratégia de sincronização.",
     )
     parser.add_argument(
         "--domains",
         nargs="+",
-        default=["deputados", "despesas", "proposicoes", "votacoes"],
-        help="Lista de domínios a processar (ex: --domains deputados despesas)",
+        type=DomainType,
+        choices=list(DomainType),
+        default=None,
+        help="Lista de domínios a processar.",
     )
 
     parser.add_argument("--start-date", type=str, default=None, help="Data Inicial (YYYY-MM-DD)")
@@ -268,33 +277,33 @@ async def main():
     start_time = time.perf_counter()
     logger.info("=" * 60)
     logger.info(
-        f" Iniciando iPolitico | Origem: {args.source.upper()} | Sink: {args.sink.upper()}"
-        f" | Estratégia: {args.strategy.upper()}"
+        f" Iniciando iPolitico | Origem: {args.source.value.upper()}"
+        f" | Sink: {args.sink.value.upper()}"
+        f" | Estratégia: {args.strategy.value.upper()}"
     )
     logger.info("=" * 60)
 
     state_store = SQLiteSink(db_path=SQLITE_DB_PATH)
-    data_sink = SQLiteSink(db_path=SQLITE_DB_PATH) if args.sink == "sqlite" else DataLakeSink()
 
-    if args.strategy == "full_load" and not args.start_date:
+    data_sink = (
+        SQLiteSink(db_path=SQLITE_DB_PATH) if args.sink == SinkType.SQLITE else DataLakeSink()
+    )
+
+    if args.strategy == LoadStrategy.FULL_LOAD and not args.start_date:
         hoje = datetime.now().strftime("%Y-%m-%d")
         primeiro_dia_mes = datetime.now().strftime("%Y-%m-01")
         actual_start, actual_end = primeiro_dia_mes, hoje
     else:
         actual_start, actual_end = args.start_date, args.end_date
 
-    strat_enum = (
-        LoadStrategy.FULL_LOAD if args.strategy == "full_load" else LoadStrategy.INCREMENTAL
-    )
-
     await run_pipeline(
         sink=data_sink,
         state_store=state_store,
         start_date=actual_start,
         end_date=actual_end,
-        strategy=strat_enum,
+        strategy=args.strategy,
         source=args.source,
-        # domains=args.domains,
+        domains=args.domains,
     )
 
     logger.info(f"Tempo total: {time.perf_counter() - start_time:.2f}s")

@@ -40,3 +40,26 @@ class ApiParams(str, Enum):
     # Valores padrão da API
     ORDEM_ASC = "ASC"
     ORDEM_DESC = "DESC"
+
+
+class LoadStrategy(str, Enum):
+    FULL_LOAD = "full_load"
+    INCREMENTAL = "incremental"
+
+
+class SourceType(str, Enum):
+    API = "api"
+    BULK = "bulk"
+
+
+class SinkType(str, Enum):
+    SQLITE = "sqlite"
+    DATALAKE = "datalake"
+
+
+class DomainType(str, Enum):
+    DEPUTADOS = "deputados"
+    DESPESAS = "despesas"
+    PROPOSICOES = "proposicoes"
+    VOTACOES = "votacoes"
+    VOTOS = "votos"

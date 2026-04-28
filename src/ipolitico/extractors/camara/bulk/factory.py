@@ -1,4 +1,5 @@
 from ipolitico.core.client import CamaraClient
+from ipolitico.core.constants import DomainType, SourceType
 
 # Imports da API
 from ipolitico.extractors.camara.api.deputados import DeputadosExtractor
@@ -20,29 +21,31 @@ class CamaraExtractorFactory:
     """
 
     @staticmethod
-    def get_extractor(domain: str, source: str, client: CamaraClient, state_store=None):
+    def get_extractor(
+        domain: DomainType, source: SourceType, client: CamaraClient, state_store=None
+    ):
         # 1. Fluxo API (Precisa de state_store para Incremental)
-        if source == "api":
-            if domain == "deputados":
+        if source == SourceType.API:
+            if domain == DomainType.DEPUTADOS:
                 return DeputadosExtractor(client, state_store)
-            elif domain == "despesas":
+            elif domain == DomainType.DESPESAS:
                 return DespesasExtractor(client, state_store)
-            elif domain == "proposicoes":
+            elif domain == DomainType.PROPOSICOES:
                 return ProposicoesExtractor(client, state_store)
-            elif domain == "votacoes":
+            elif domain == DomainType.VOTACOES:
                 return VotacoesExtractor(client, state_store)
 
         # 2. Fluxo Bulk (Dumps estáticos)
-        elif source == "bulk":
-            if domain == "deputados":
+        elif source == SourceType.BULK:
+            if domain == DomainType.DEPUTADOS:
                 return DeputadosBulkExtractor(client)
-            if domain == "despesas":
+            if domain == DomainType.DESPESAS:
                 return DespesasBulkExtractor(client)
-            if domain == "proposicoes":
+            if domain == DomainType.PROPOSICOES:
                 return ProposicoesBulkExtractor(client)
-            if domain == "votacoes":
+            if domain == DomainType.VOTACOES:
                 return VotacoesBulkExtractor(client)
-            if domain == "votos":
+            if domain == DomainType.VOTOS:
                 return VotosBulkExtractor(client)
 
-        raise ValueError(f"Extrator não suportado: domain={domain}, source={source}")
+        raise ValueError(f"Extrator não suportado: domain={domain.value}, source={source.value}")

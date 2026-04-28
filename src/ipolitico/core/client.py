@@ -25,7 +25,7 @@ class CamaraClient:
 
     BASE_URL = CAMARA_API_BASE_URL
 
-    def __init__(self, max_retries: int = 5):
+    def __init__(self, max_retries: int = 10):
         self.max_retries = max_retries
         self.headers = {
             "Accept": "application/json",
