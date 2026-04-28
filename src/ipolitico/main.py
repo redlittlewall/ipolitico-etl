@@ -47,6 +47,7 @@ async def run_pipeline(
     end_date: str = None,
     strategy: LoadStrategy = LoadStrategy.INCREMENTAL,
     source: str = "api",
+    domains: list = None,
 ):
     """
     Executa a pipeline de extração, transformação e carregamento (ETL).
@@ -98,14 +99,14 @@ async def run_pipeline(
 
         if source == "bulk":
             df_deputados = await deputados_ext.extract()
-            if not df_deputados.is_empty():
-                await sink.save(df_deputados, "deputados", unique_keys="id")
+
         else:
             df_deputados = await deputados_ext.extract(
                 start_date=actual_start, end_date=end_date, full_load=is_full
             )
-            if not df_deputados.is_empty():
-                await sink.save(df_deputados, "deputados", unique_keys="id")
+
+        if not df_deputados.is_empty():
+            await sink.save(df_deputados, "deputados", unique_keys="id")
 
         deputados_ids = []
         if not df_deputados.is_empty():
@@ -319,12 +320,12 @@ async def main():
         default="incremental",
         help="Estratégia de sincronização.",
     )
-    parser.add_argument(
-        "--domains",
-        nargs="+",
-        default=["deputados", "despesas", "proposicoes", "votacoes"],
-        help="Lista de domínios a processar",
-    )
+    # parser.add_argument(
+    #     "--domains",
+    #     nargs="+",
+    #     default=None,
+    #     help="Lista de domínios a processar",
+    # )
 
     parser.add_argument("--start-date", type=str, default=None, help="Data Inicial (YYYY-MM-DD)")
     parser.add_argument("--end-date", type=str, default=None, help="Data Final (YYYY-MM-DD)")
@@ -360,6 +361,7 @@ async def main():
         end_date=actual_end,
         strategy=strat_enum,
         source=args.source,
+        # domains=args.domains,
     )
 
     logger.info(f"Tempo total: {time.perf_counter() - start_time:.2f}s")

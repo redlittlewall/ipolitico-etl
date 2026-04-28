@@ -57,8 +57,21 @@ class BaseBulkExtractor:
 
             try:
                 df = pl.read_csv(
-                    dest_path, separator=";", ignore_errors=True, infer_schema_length=0
+                    dest_path,
+                    separator=";",
+                    ignore_errors=True,
+                    infer_schema_length=0,
+                    truncate_ragged_lines=True,
+                    quote_char='"',
                 )
+
+                df = df.rename(
+                    {
+                        c: c.replace("ï»¿", "").replace("\ufeff", "").replace('"', "").strip()
+                        for c in df.columns
+                    }
+                )
+
                 df = self._standardize_schema(df)
 
                 agora = datetime.now()
