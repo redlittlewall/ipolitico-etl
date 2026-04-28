@@ -80,7 +80,6 @@ class BaseExtractor(ABC):
         if not items:
             return
 
-        # Fila de trabalhos a fazer (infinita, pois guarda apenas IDs/Jobs leves)
         job_queue = asyncio.Queue()
         for item in items:
             job_queue.put_nowait(item)

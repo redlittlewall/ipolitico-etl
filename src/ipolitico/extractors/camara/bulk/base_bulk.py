@@ -70,6 +70,7 @@ class BaseBulkExtractor:
                     infer_schema_length=0,
                     truncate_ragged_lines=True,
                     quote_char='"',
+                    encoding="utf8-lossy",
                 )
 
                 for df_chunk in lazy_reader.collect_batches():

@@ -1,6 +1,6 @@
 from ipolitico.core.client import CamaraClient
 
-# Imports da API (Assumindo que você moveu eles para a pasta api/)
+# Imports da API
 from ipolitico.extractors.camara.api.deputados import DeputadosExtractor
 from ipolitico.extractors.camara.api.despesas import DespesasExtractor
 from ipolitico.extractors.camara.api.proposicoes import ProposicoesExtractor
@@ -10,7 +10,7 @@ from ipolitico.extractors.camara.api.votacoes import VotacoesExtractor
 from ipolitico.extractors.camara.bulk.deputados_bulk import DeputadosBulkExtractor
 from ipolitico.extractors.camara.bulk.despesas_bulk import DespesasBulkExtractor
 from ipolitico.extractors.camara.bulk.proposicoes_bulk import ProposicoesBulkExtractor
-from ipolitico.extractors.camara.bulk.votacoes_bulk import VotacoesBulkExtractor
+from ipolitico.extractors.camara.bulk.votacoes_bulk import VotacoesBulkExtractor, VotosBulkExtractor
 
 
 class CamaraExtractorFactory:
@@ -40,7 +40,9 @@ class CamaraExtractorFactory:
                 return DespesasBulkExtractor(client)
             if domain == "proposicoes":
                 return ProposicoesBulkExtractor(client)
-            if domain in ("votacoes", "votos"):
+            if domain == "votacoes":
                 return VotacoesBulkExtractor(client)
+            if domain == "votos":
+                return VotosBulkExtractor(client)
 
         raise ValueError(f"Extrator não suportado: domain={domain}, source={source}")

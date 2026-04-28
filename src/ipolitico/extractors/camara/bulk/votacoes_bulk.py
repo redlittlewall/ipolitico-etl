@@ -15,3 +15,13 @@ class VotacoesBulkExtractor(BaseBulkExtractor):
         return df.with_columns(
             [pl.col(c).str.to_datetime(strict=False) for c in date_cols if c in df.columns]
         )
+
+
+class VotosBulkExtractor(BaseBulkExtractor):
+    domain_name = "votos"
+
+    def _standardize_schema(self, df: pl.DataFrame) -> pl.DataFrame:
+        mapping = {"idDeputado": "deputado_id"}
+        df = df.rename({k: v for k, v in mapping.items() if k in df.columns})
+
+        return df.with_columns([pl.col("deputado_id").cast(pl.Int64, strict=False)])
