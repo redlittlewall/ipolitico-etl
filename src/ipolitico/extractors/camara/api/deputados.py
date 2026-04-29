@@ -22,13 +22,6 @@ class DeputadosExtractor(CamaraBaseExtractor):
         super().__init__(client, state_store)
         self.metadata = CamaraMetadataService(client)
 
-    async def get_all_ids(self) -> list[int]:
-        ids_no_banco = self.state_store.get_existing_ids("deputados")
-        if ids_no_banco:
-            return ids_no_banco
-        df_new = await self.extract()
-        return df_new["id"].to_list() if not df_new.is_empty() else []
-
     async def extract(
         self,
         sink_func,

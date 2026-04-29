@@ -26,12 +26,28 @@ class DespesasBulkExtractor(BaseBulkExtractor):
 
         df = df.rename({k: v for k, v in mapping.items() if k in df.columns})
 
-        # Conversão de Datas e Números
-        return df.with_columns(
-            [
-                pl.col("dataDocumento").str.to_datetime(strict=False),
-                pl.col("valorLiquido").str.replace(",", ".").cast(pl.Float64, strict=False),
-                pl.col("valorDocumento").str.replace(",", ".").cast(pl.Float64, strict=False),
-                pl.col("id_deputado").cast(pl.Int64, strict=False),
-            ]
-        )
+        transformations = []
+
+        if "dataDocumento" in df.columns:
+            transformations.append(pl.col("dataDocumento").str.to_datetime(strict=False))
+
+        def parse_br_currency(col_name):
+            return (
+                pl.col(col_name)
+                .str.replace_all(r"\.", "")
+                .str.replace(",", ".")
+                .cast(pl.Float64, strict=False)
+            )
+
+        if "valorLiquido" in df.columns:
+            transformations.append(parse_br_currency("valorLiquido"))
+
+        if "valorDocumento" in df.columns:
+            transformations.append(parse_br_currency("valorDocumento"))
+
+        if "id_deputado" in df.columns:
+            transformations.append(pl.col("id_deputado").cast(pl.Int64, strict=False))
+
+        if transformations:
+            df = df.with_columns(transformations)
+        return df

@@ -18,7 +18,7 @@ class VotacoesExtractor(CamaraBaseExtractor):
     de memória baixo e constante, independente do volume da legislatura.
     """
 
-    async def extract(self, sink_func, start_date: str, end_date: str) -> pl.DataFrame:
+    async def extract(self, sink_func, start_date: str, end_date: str) -> None:
         """
         Extrai o cabeçalho e os metadados das votações via streaming.
 

@@ -223,9 +223,20 @@ async def run_pipeline(
                     start_votacoes = state_store.get_watermark("votacoes", "data") or "1991-01-01"
                     end_votacoes = end_date or datetime.now().strftime("%Y-%m-%d")
 
+                logger.info(
+                    f"Sincronizando Votações a partir de "
+                    f"{start_votacoes} até {end_votacoes} via API..."
+                )
                 await votacoes_ext.extract(
                     sink.save, start_date=start_votacoes, end_date=end_votacoes
                 )
+
+                votacoes_ids = state_store.get_existing_ids("votacoes")
+                if votacoes_ids:
+                    logger.info(
+                        f"     ∟ Extraindo votos nominais para {len(votacoes_ids)} votações..."
+                    )
+                    await votacoes_ext.extract_votos(sink.save, votacoes_ids)
 
         logger.info("Pipeline finalizado com sucesso!")
 
@@ -309,5 +320,5 @@ async def main():
     logger.info(f"Tempo total: {time.perf_counter() - start_time:.2f}s")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     asyncio.run(main())

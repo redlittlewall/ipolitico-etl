@@ -109,3 +109,61 @@ async def test_extract_votos_simbolicos(extractor, mock_sink):
 
     # Como o DataFrame gerado é vazio, a pipeline NÃO deve chamar o sink
     mock_sink.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_fetch_votacoes_ano_logic(extractor):
+    """
+    [Cobre Linhas 45-63]
+    Como a função fetch_votacoes_ano está enclausurada dentro de extract(),
+    precisamos capturá-la no mock do pipeline para garantir que as regras
+    de negócio (corte de datas e filtro Polars) funcionam perfeitamente.
+    """
+    mock_sink = AsyncMock()
+    extractor.execute_pipeline = AsyncMock()
+
+    # Rodamos o extrator na janela de cruzamento de ano
+    await extractor.extract(sink_func=mock_sink, start_date="2025-11-01", end_date="2026-02-01")
+
+    # Interceptamos a função injetada no motor Producer-Consumer
+    kwargs = extractor.execute_pipeline.call_args.kwargs
+    fetch_func = kwargs["fetch_func"]
+
+    # Simulamos o retorno bruto (sujo) da API da Câmara para o ano de 2025
+    extractor.fetch_paginated.return_value = [
+        {"id": "VOT-1", "data": "2025-10-31T10:00:00"},  # Fora da janela (antes)
+        {"id": "VOT-2", "data": "2025-12-15T10:00:00"},  # Dentro da janela
+    ]
+
+    # Executamos o worker interno isoladamente
+    df_2025 = await fetch_func(2025)
+
+    # Validação da Blindagem de Dados: o Polars deve ter cortado o VOT-1
+    assert not df_2025.is_empty()
+    assert df_2025.height == 1
+    assert df_2025["id"][0] == "VOT-2"
+
+    # Garante que as datas enviadas na URL respeitam os limites daquele ano específico
+    api_params = extractor.fetch_paginated.call_args[0][1]
+    assert api_params["dataInicio"] == "2025-11-01"
+    assert api_params["dataFim"] == "2025-12-31"
+
+
+@pytest.mark.asyncio
+async def test_extract_votos_empty_ids(extractor):
+    """
+    [Cobre Linha 85]
+    Valida a quebra antecipada (early return) se a lista de votações enviada for vazia.
+    Testa o lixo de refatoração do return pl.DataFrame().
+    """
+    mock_sink = AsyncMock()
+    extractor.execute_pipeline = AsyncMock()
+
+    # Se passarmos uma lista vazia, ele deve abortar antes de acionar a concorrência
+    resultado = await extractor.extract_votos(sink_func=mock_sink, votacoes_ids=[])
+
+    assert isinstance(resultado, pl.DataFrame)
+    assert resultado.is_empty()
+
+    # O pipeline não pode ter sido chamado
+    extractor.execute_pipeline.assert_not_called()

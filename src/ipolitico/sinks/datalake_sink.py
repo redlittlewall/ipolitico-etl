@@ -68,8 +68,8 @@ class DataLakeSink:
         df = pl.read_parquet(file_path)
 
         df_filtered = df.filter(
-            (pl.col(date_column).cast(pl.String).str.slice(0, 10) < str(start_date))
-            | (pl.col(date_column).cast(pl.String).str.slice(0, 10) > str(end_date))
+            (pl.col(date_column).cast(pl.String).str.slice(0, 10) < start_date)
+            | (pl.col(date_column).cast(pl.String).str.slice(0, 10) > end_date)
         )
 
         deleted_rows = df.height - df_filtered.height

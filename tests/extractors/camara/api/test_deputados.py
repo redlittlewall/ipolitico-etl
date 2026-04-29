@@ -114,3 +114,53 @@ async def test_extract_detalhes_normalization(extractor, mock_sink):
     data_status = json.loads(df_salvo["ultimoStatus"][0])
     assert data_status["gabinete"] == "302"
     assert data_status["situacao"] == "Exercício"
+
+
+@pytest.mark.asyncio
+async def test_extract_with_filters_empty_result(extractor):
+    """
+    [Cobre Linhas 78-80]
+    Testa o 'early return' quando filtramos dados e a API da Câmara não devolve nada.
+    O sink_func NUNCA deve ser chamado com DataFrame vazio.
+    """
+    extractor.fetch_paginated.return_value = []
+    mock_sink = AsyncMock()
+
+    await extractor.extract(sink_func=mock_sink, start_date="2026-01-01", end_date="2026-01-31")
+
+    # Garante que não chamamos a gravação no banco atoa
+    mock_sink.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_extract_detalhes_empty_ids(extractor):
+    """
+    [Cobre Linha 106]
+    Garante que a extração de detalhes aborte imediatamente (sem disparar concorrência)
+    se não mandarmos nenhum ID de deputado.
+    """
+    mock_sink = AsyncMock()
+    extractor.execute_pipeline = AsyncMock()
+
+    await extractor.extract_detalhes(sink_func=mock_sink, deputados_ids=[])
+
+    # O pipeline não pode ter sido ativado
+    extractor.execute_pipeline.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_fetch_detalhe_empty_response(extractor):
+    """
+    [Cobre Linha 116]
+    Simula uma anomalia na API onde o detalhe do deputado retorna vazio (ou é um falso ID).
+    """
+    mock_sink = AsyncMock()
+    # A API não encontrou os detalhes daquele deputado
+    extractor.client.fetch.return_value = {}
+
+    # Rodamos o extrator para um deputado (ID 99)
+    await extractor.extract_detalhes(sink_func=mock_sink, deputados_ids=[99])
+
+    # Como a API retornou vazio, o worker interno descarta,
+    # e o banco de dados (sink_func) não deve receber nada.
+    mock_sink.assert_not_called()
