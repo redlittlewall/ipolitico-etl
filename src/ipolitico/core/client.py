@@ -1,5 +1,8 @@
 import asyncio
 import logging
+import os
+import urllib
+from datetime import time
 from typing import Any
 
 import httpx
@@ -102,37 +105,60 @@ class CamaraClient:
         Returns:
             bool: True se o download foi um sucesso, False se o arquivo não existir (404).
         """
-        async with httpx.AsyncClient(timeout=60.0, headers=self.headers) as client:
-            for attempt in range(1, self.max_retries + 1):
+
+        def sync_download():
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                " (KHTML ¨ike Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+
+            for attempt in range(self.max_retries):
+                # Verifica quanto do arquivo já sobreviveu no HD
+                downloaded = os.path.getsize(dest_path) if os.path.exists(dest_path) else 0
+
+                req = urllib.request.Request(url, headers=headers)
+
+                # Se já tem algo, pede para a Câmara mandar só o que falta
+                if downloaded > 0:
+                    req.add_header("Range", f"bytes={downloaded}-")
+
                 try:
-                    # Usamos stream para não sobrecarregar a RAM com arquivos de 2GB
-                    async with client.stream("GET", url) as response:
-                        if response.status_code in (429, 500, 502, 503, 504):
-                            logger.warning(
-                                f"Instabilidade ({response.status_code}) ao baixar {url}."
-                                f"Tentativa {attempt}/{self.max_retries}."
-                            )
-                            await self._backoff(attempt)
-                            continue
+                    with urllib.request.urlopen(req, timeout=60) as response:
+                        if response.getcode() == 200 and downloaded > 0:
+                            downloaded = 0
+                            mode = "wb"  # Sobrescreve tudo
+                        else:
+                            mode = "ab" if downloaded > 0 else "wb"
 
-                        if response.status_code == 404:
-                            logger.debug(f"Arquivo não encontrado (404): {url}")
-                            return False
-
-                        response.raise_for_status()
-
-                        with open(dest_path, "wb") as f:
-                            async for chunk in response.aiter_bytes(chunk_size=8192):
+                        with open(dest_path, mode) as f:
+                            while True:
+                                chunk = response.read(1024 * 1024)  # Puxa 1 Megabyte por vez
+                                if not chunk:
+                                    break
                                 f.write(chunk)
+
                         return True
 
-                except httpx.RequestError as e:
-                    logger.error(f"Falha de rede ao baixar arquivo: {e}")
-                    await self._backoff(attempt)
+                except urllib.error.HTTPError as e:
+                    if e.code == 404:
+                        return False
+                    if e.code == 416:
+                        # Range Not Satisfiable: Significa que o arquivo já foi 100% baixado!
+                        return True
 
-            raise CamaraAPIError(
-                f"Falha catastrófica ao baixar {url} após {self.max_retries} tentativas."
-            )
+                    time.sleep(2)
+
+                except Exception:
+                    logger.warning(f"Queda de conexão no byte {downloaded}. Retomando...")
+                    time.sleep(3)
+
+            return False
+
+        sucesso = await asyncio.to_thread(sync_download)
+        if not sucesso:
+            logger.error(f"Falha catastrófica ao baixar {url} após {self.max_retries} tentativas.")
+
+        return sucesso
 
     async def close(self) -> None:
         """
