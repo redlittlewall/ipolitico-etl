@@ -105,22 +105,23 @@ async def run_pipeline(
                     sink.save, start_date=actual_start, end_date=end_date, full_load=is_full
                 )
 
-        deputados_ids = state_store.get_existing_ids(DomainType.DEPUTADOS)
+            # time.sleep(1)
+            deputados_ids = sink.get_existing_ids(DomainType.DEPUTADOS.value)
 
-        # DETALHES CADASTRAIS (Sempre via API)
-        if DomainType.DEPUTADOS in domains and deputados_ids:
-            existent_ids = state_store.get_existing_ids("deputados_detalhes")
-            ids_to_load = [d for d in deputados_ids if d not in existent_ids]
-            if ids_to_load:
-                logger.info(
-                    f"     ∟ Baixando detalhes de {len(ids_to_load)} deputados (Via API)..."
-                )
-                detalhes_ext = CamaraExtractorFactory.get_extractor(
-                    DomainType.DEPUTADOS, SourceType.API, client, state_store
-                )
-                await detalhes_ext.extract_detalhes(sink.save, ids_to_load)
-            else:
-                logger.info("     ∟ Detalhes cadastrais já estão atualizados.")
+            # DETALHES CADASTRAIS (Sempre via API)
+            if deputados_ids:
+                existent_ids = sink.get_existing_ids("deputados_detalhes")
+                ids_to_load = [d for d in deputados_ids if d not in existent_ids]
+                if ids_to_load:
+                    logger.info(
+                        f"     ∟ Baixando detalhes de {len(ids_to_load)} deputados (Via API)..."
+                    )
+                    detalhes_ext = CamaraExtractorFactory.get_extractor(
+                        DomainType.DEPUTADOS, SourceType.API, client, state_store
+                    )
+                    await detalhes_ext.extract_detalhes(sink.save, ids_to_load)
+                else:
+                    logger.info("     ∟ Detalhes cadastrais já estão atualizados.")
 
         # ==========================================
         # 2. DESPESAS

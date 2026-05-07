@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 
@@ -99,6 +100,8 @@ class DeputadosExtractor(CamaraBaseExtractor):
             return
 
         async def fetch_detalhe(dep_id: int) -> pl.DataFrame:
+            await asyncio.sleep(0.2)
+
             endpoint = f"{ApiRoutes.DEPUTADOS.value}/{dep_id}"
             resp = await self.client.fetch(endpoint)
             if resp:
