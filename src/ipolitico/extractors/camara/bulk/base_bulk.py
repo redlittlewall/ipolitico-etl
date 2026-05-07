@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 import polars as pl
+import polars.selectors as cs
 
 from ipolitico.core.client import CamaraClient
 from ipolitico.extractors.camara.bulk.registry import BULK_REGISTRY
@@ -65,6 +66,14 @@ class BaseBulkExtractor:
                 return
 
             if dest_path.endswith(".zip"):
+                if not zipfile.is_zipfile(dest_path):
+                    with open(dest_path, "r", encoding="utf-8", errors="ignore") as f:
+                        conteudo_falso = f.read(150).replace("\n", " ")
+                    logger.error(
+                        f"O servidor enviou um arquivo corrompido/bloqueado em vez do ZIP:"
+                        f" '{conteudo_falso}...'"
+                    )
+                    return
                 try:
                     with zipfile.ZipFile(dest_path, "r") as zip_ref:
                         csv_filename = zip_ref.namelist()[0]
@@ -74,35 +83,34 @@ class BaseBulkExtractor:
                     logger.error(f"Arquivo ZIP corrompido baixado de {url}. Abortando.")
                     return
             try:
-                lazy_reader = pl.scan_csv(
+                df = pl.read_csv(
                     dest_path,
                     separator=";",
                     ignore_errors=True,
                     infer_schema_length=0,
-                    truncate_ragged_lines=True,
-                    quote_char='"',
                     encoding="utf8-lossy",
+                    truncate_ragged_lines=True,
+                    quote_char=None,
                 )
 
-                for df_chunk in lazy_reader.collect_batches():
-                    df_chunk = df_chunk.rename(
-                        {
-                            c: c.replace("ï»¿", "").replace("\ufeff", "").replace('"', "").strip()
-                            for c in df_chunk.columns
-                        }
-                    )
+                df = df.rename(
+                    {
+                        c: c.replace("ï»¿", "").replace("\ufeff", "").replace('"', "").strip()
+                        for c in df.columns
+                    }
+                )
+                df = df.with_columns(cs.string().str.replace_all('"', "").str.strip_chars())
 
-                    df_chunk = self._standardize_schema(df_chunk)
+                df = self._standardize_schema(df)
+                agora = datetime.now()
+                df = df.with_columns(
+                    [
+                        pl.lit(agora).cast(pl.Datetime).alias("captured_at"),
+                        pl.lit(agora).cast(pl.Datetime).alias("updated_at"),
+                    ]
+                )
 
-                    agora = datetime.now()
-                    df_chunk = df_chunk.with_columns(
-                        [
-                            pl.lit(agora).cast(pl.Datetime).alias("captured_at"),
-                            pl.lit(agora).cast(pl.Datetime).alias("updated_at"),
-                        ]
-                    )
-
-                    await sink_func(df_chunk, self.domain_name, unique_keys)
+                await sink_func(df, self.domain_name, unique_keys)
 
             except Exception as e:
                 logger.error(f"Falha crítica ao parsear o CSV de {self.domain_name}: {e}")

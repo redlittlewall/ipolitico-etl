@@ -13,9 +13,9 @@ class DeputadosBulkExtractor(BaseBulkExtractor):
 
         if uri_col and not id_col:
             df = df.with_columns(
-                pl.col(uri_col).str.split("/").list.last().cast(pl.Int64).alias("id")
+                pl.col(uri_col).str.split("/").list.get(-1).cast(pl.Int64, strict=False).alias("id")
             )
-        # Se já existir um "ID" ou "Id", padronizamos o nome
+            df = df.drop_nulls(subset=["id"])
         elif id_col and id_col != "id":
             df = df.rename({id_col: "id"})
 
