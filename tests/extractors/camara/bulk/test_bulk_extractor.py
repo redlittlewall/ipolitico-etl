@@ -4,8 +4,7 @@ Focado em validar o fluxo Disk-to-Database (Streaming),
 limpeza nuclear de cabeçalhos e a lógica de descompactação de ZIPs governamentais.
 """
 
-from unittest import mock
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import polars as pl
 import pytest
@@ -61,49 +60,43 @@ def mock_sink():
 
 
 @pytest.mark.asyncio
-@patch("ipolitico.extractors.camara.bulk.base_bulk.pl.scan_csv")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.pl.read_csv")
 @patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.ZipFile")
-async def test_base_bulk_extraction_flow(mock_zipfile, mock_scan_csv, mock_client, mock_sink):
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.is_zipfile")
+async def test_base_bulk_extraction_flow(
+    mock_is_zipfile, mock_zipfile, mock_read_csv, mock_client, mock_sink
+):
     """
     CRÍTICO: Testa o fluxo completo de um Dump ZIP.
-    Garante que o arquivo é descompactado, lido via Lazy API e que a
-    Limpeza Nuclear de BOM (Byte Order Mark) ocorre antes do Sink.
+    Adequado para a versão Eager (pl.read_csv) com bypass na validação de arquivo quebrado.
     """
-    # 1. Configurando o Mock do ZipFile
+    mock_is_zipfile.return_value = True
+
     mock_zip_instance = MagicMock()
     mock_zip_instance.namelist.return_value = ["dummy_extraido.csv"]
     mock_zipfile.return_value.__enter__.return_value = mock_zip_instance
 
-    # 2. Configurando o Mock do Polars (Simulando a leitura de um chunk "sujo" do governo)
     df_sujo = pl.DataFrame(
         {
-            'ï»¿"id"': [1, 2],  # BOM e aspas nojentas que vêm da Câmara
+            'ï»¿"id"': [1, 2],
             "nome": ["A", "B"],
         }
     )
-    mock_lazyframe = MagicMock()
-    # O collect_batches retorna um iterador de DataFrames (chunks)
-    mock_lazyframe.collect_batches.return_value = [df_sujo]
-    mock_scan_csv.return_value = mock_lazyframe
+    mock_read_csv.return_value = df_sujo
 
-    # 3. Execução
     ext = DummyBulkExtractor(mock_client)
     await ext.extract(sink_func=mock_sink, unique_keys="id")
 
-    # 4. Asserções de Descompactação
     mock_client.download_file.assert_called_once()
-    mock_zip_instance.extract.assert_called_once_with("dummy_extraido.csv", mock.ANY)
+    mock_zip_instance.extract.assert_called_once_with("dummy_extraido.csv", ANY)
 
-    # 5. Asserções de Limpeza e Streaming
     mock_sink.assert_called_once()
     df_limpo, table_name, unique_keys = mock_sink.call_args[0]
 
     assert table_name == "dummy"
-    # A Limpeza Nuclear tem que ter destruído o BOM e as aspas, sobrando só "id"
     assert "id" in df_limpo.columns
     assert 'ï»¿"id"' not in df_limpo.columns
 
-    # Valida se as colunas de auditoria foram injetadas
     assert "captured_at" in df_limpo.columns
     assert "updated_at" in df_limpo.columns
 
