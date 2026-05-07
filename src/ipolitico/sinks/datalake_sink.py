@@ -79,3 +79,16 @@ class DataLakeSink:
                 f"[{table}] FULL_LOAD (DataLake): {deleted_rows} registos "
                 f"eliminados no período {start_date} a {end_date}."
             )
+
+    def get_existing_ids(self, table: str, column: str = "id") -> list[int]:
+        """Recupera lista de chaves já persistidas no Parquet."""
+        file_path = self._get_file_path(table)
+        if not file_path.exists():
+            return []
+        try:
+            # O Polars lê apenas a coluna necessária, ignorando as outras 99% do arquivo
+            df = pl.read_parquet(file_path, columns=[column])
+            return df[column].to_list() if not df.is_empty() else []
+        except Exception as e:
+            logger.error(f"Erro ao ler IDs do DataLake na tabela {table}: {e}")
+            return []
