@@ -1,26 +1,35 @@
 import logging
 import sqlite3
 from datetime import datetime
-from typing import List, Union
+from typing import Any, List, Optional, Union
 
 import polars as pl
+
+from ipolitico.sinks.base import BaseSink
 
 logger = logging.getLogger(__name__)
 
 
-class SQLiteSink:
+class SQLiteSink(BaseSink):
     """
-    Storage e State Store oficial do pipeline local.
-    Implementa o contrato IStateStore implicitamente para injeção de dependência.
-    Utiliza padrão Staging Table para operações de UPSERT bulk.
+    Armazenamento e controle de estado (State Store) para pipelines locais.
+    Implementa o contrato BaseSink. Utiliza o padrão Staging Table para UPSERTs em lote.
     """
 
-    def __init__(self, db_path: str = "ipolitico.db"):
+    def __init__(self, db_path: str = "data/dbs/ipolitico_state.db"):
+        """
+        Inicializa o sink do SQLite.
+
+        Args:
+            db_path (str): Caminho para o arquivo do banco de dados SQLite.
+        """
         self.db_path = db_path
         self._uri = f"sqlite:///{self.db_path}"
 
-    def get_watermark(self, table: str, column: str) -> str | None:
-        """Recupera o teto temporal (high-water mark) de uma tabela para cargas incrementais."""
+    def get_watermark(self, table: str, column: str) -> Optional[str]:
+        """
+        Recupera o teto temporal (high-water mark) de uma tabela para cargas incrementais.
+        """
         query = f"SELECT max({column}) FROM {table}"
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -29,31 +38,49 @@ class SQLiteSink:
                 result = cursor.fetchone()[0]
                 return result.split("T")[0] if result else None
         except sqlite3.OperationalError:
-            # Tabela não existe (First Load)
             return None
 
-    def get_existing_ids(self, table: str, column: str = "id") -> list[int]:
+    def get_existing_ids(self, table: str, column: str = "id") -> List[Any]:
         """
-        Recupera lista de chaves primárias já persistidas no banco.
-        Evita chamadas HTTP desnecessárias para detalhamentos estáticos.
+        Recupera uma lista de chaves primárias já persistidas no banco de dados.
+        Evita consultas HTTP desnecessárias.
         """
         query = f"SELECT {column} FROM {table}"
         try:
             with sqlite3.connect(self.db_path) as conn:
-                df = pl.read_database(query, conn)
+                df = pl.read_database(query=query, connection=conn)
                 return df[column].to_list() if not df.is_empty() else []
         except Exception:
             return []
 
+    def read_columns(self, table_name: str, columns: List[str]) -> pl.DataFrame:
+        """
+        Lê colunas específicas de uma tabela de forma ágil para cruzamentos.
+        """
+        cols = ", ".join(columns)
+        query = f"SELECT {cols} FROM {table_name}"
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                return pl.read_database(query=query, connection=conn)
+        except Exception as e:
+            logger.error(f"Erro ao ler {columns} de {table_name}: {e}")
+            return pl.DataFrame()
+
     async def save(
-        self, df: pl.DataFrame, table_name: str, unique_keys: Union[str, List[str]] = None
+        self,
+        df: pl.DataFrame,
+        table_name: str,
+        layer: str = "bronze",
+        unique_keys: Optional[Union[str, List[str]]] = None,
+        **kwargs: Any,
     ) -> None:
         """
         Persiste o DataFrame no SQLite.
-        Utiliza UPSERT (Staging Table) se chaves únicas forem fornecidas, ou APPEND simples.
+        Utiliza UPSERT (Staging Table) se unique_keys
+        forem fornecidas, caso contrário realiza APPEND.
         """
         if df.is_empty():
-            logger.debug(f"ℹ[{table_name}] Nada para salvar (DataFrame vazio).")
+            logger.debug(f"[{table_name}] DataFrame vazio. Nada para salvar.")
             return
 
         df = df.with_columns(pl.lit(datetime.now().isoformat()).alias("captured_at"))
@@ -85,7 +112,6 @@ class SQLiteSink:
         )
         insert_query = f"INSERT INTO {table_name} SELECT * FROM {staging_table}"
 
-        # Criação dinâmica da query de indexação
         index_name = f"idx_{table_name}_{'_'.join(keys)}"
         index_cols = ", ".join(keys)
         index_query = f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} ({index_cols})"
@@ -99,9 +125,7 @@ class SQLiteSink:
                 target_exists = cursor.fetchone()
 
                 if target_exists:
-                    # Garante que o índice existe ANTES do DELETE para performance máxima
                     cursor.execute(index_query)
-
                     cursor.execute(delete_query)
                     deleted_rows = cursor.rowcount
                     cursor.execute(insert_query)
@@ -111,10 +135,9 @@ class SQLiteSink:
                     )
                 else:
                     cursor.execute(f"ALTER TABLE {staging_table} RENAME TO {table_name}")
-                    # Cria o índice logo após a primeira carga
                     cursor.execute(index_query)
                     logger.debug(
-                        f"[{table_name}] CREATE: {df.height} registros"
+                        f"[{table_name}] CREATE: {df.height} registros "
                         f"inseridos com índice ({index_cols})."
                     )
             finally:
@@ -122,34 +145,25 @@ class SQLiteSink:
 
             conn.commit()
 
-    async def delete_period(self, table: str, start_date: str, end_date: str, date_column: str):
+    async def delete_period(
+        self, table: str, start_date: str, end_date: str, date_column: str
+    ) -> None:
         """
-        Elimina registos numa janela temporal (Idempotência de FULL LOAD).
-        Inclui ativação estrita de Foreign Keys para deleção em cascata.
+        Remove registros dentro de uma janela de tempo (idempotência para FULL LOAD).
         """
         query = f"DELETE FROM {table} WHERE {date_column} >= ? AND {date_column} <= ?"
 
         try:
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute("PRAGMA foreign_keys = ON;")
-
                 cursor = conn.cursor()
                 cursor.execute(query, (start_date, end_date))
 
                 deleted_rows = cursor.rowcount
                 if deleted_rows > 0:
                     logger.warning(
-                        f"[{table}] FULL_LOAD: {deleted_rows} registos eliminados no período "
-                        f"{start_date} a {end_date}."
+                        f"[{table}] FULL_LOAD: {deleted_rows} registros apagados entre "
+                        f"{start_date} e {end_date}."
                     )
-
         except sqlite3.OperationalError as e:
             logger.debug(f"[{table}] Ignorando deleção. Tabela ainda não existe: {e}")
-
-    def get_deputados_legislaturas(self) -> dict:
-        query = "SELECT id, idLegislaturaInicial, idLegislaturaFinal FROM deputados"
-        try:
-            df = pl.read_database(query, self.conn)
-            return {row["id"]: row for row in df.to_dicts()}
-        except Exception:
-            return {}
