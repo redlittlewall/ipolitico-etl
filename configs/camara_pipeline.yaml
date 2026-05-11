@@ -1,11 +1,29 @@
-pipelines:
-  camara:
-    - domain: "despesas"
-      extractor_class: "DespesasBulkExtractor"
-      transformer_class: "CamaraDespesasTransformer"
-      sink_type: "DataLakeSink"
+# Mapeamento dinâmico de dependências (Inversion of Control)
+domain_configs:
+  deputados:
+    extractor: "ipolitico.extractors.camara.api.deputados.DeputadosExtractor"
+    transformer: "ipolitico.transformers.camara.deputados_transformer.CamaraDeputadosTransformer"
+    sinks:
+      sqlite: "ipolitico.sinks.sqlite_sink.SQLiteSink"
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
       
-    - domain: "deputados"
-      extractor_class: "DeputadosBulkExtractor"
-      transformer_class: "CamaraDeputadosTransformer"
-      sink_type: "SQLiteSink"
+  despesas:
+    extractor: "ipolitico.extractors.camara.api.despesas.DespesasExtractor"
+    transformer: "ipolitico.transformers.camara.despesas_transformer.CamaraDespesasTransformer"
+    sinks:
+      sqlite: "ipolitico.sinks.sqlite_sink.SQLiteSink"
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+      
+  proposicoes:
+    extractor: "ipolitico.extractors.camara.api.proposicoes.ProposicoesExtractor"
+    transformer: "ipolitico.transformers.camara.proposicoes_transformer.CamaraProposicoesTransformer"
+    sinks:
+      sqlite: "ipolitico.sinks.sqlite_sink.SQLiteSink"
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+      
+  votacoes:
+    extractor: "ipolitico.extractors.camara.api.votacoes.VotacoesExtractor"
+    transformer: "ipolitico.transformers.camara.votacoes_transformer.CamaraVotacoesTransformer"
+    sinks:
+      sqlite: "ipolitico.sinks.sqlite_sink.SQLiteSink"
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
