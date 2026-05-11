@@ -5,8 +5,15 @@ from datetime import datetime
 
 from ipolitico.core.client import CamaraClient
 from ipolitico.core.config import SQLITE_DB_PATH
-from ipolitico.core.constants import DomainType, LoadStrategy, SinkType, SourceType
+from ipolitico.core.constants import (
+    DOMAINS_EARLIEST_DATES,
+    DomainType,
+    LoadStrategy,
+    SinkType,
+    SourceType,
+)
 from ipolitico.core.logger import setup_logger
+from ipolitico.extractors.camara.bulk.base_bulk import BaseBulkExtractor
 from ipolitico.extractors.camara.bulk.factory import CamaraExtractorFactory
 from ipolitico.sinks.datalake_sink import DataLakeSink
 from ipolitico.sinks.sqlite_sink import SQLiteSink
@@ -18,13 +25,6 @@ Orquestrador Principal do ETL iPolitico.
 Responsável por gerir o ciclo de vida da extração de dados,
 garantindo tolerância a falhas através de processamento em lotes (chunking).
 """
-
-DOMAINS_EARLIEST_DATES = {
-    "deputados": "1826-04-29",
-    "proposicoes": "1988-01-01",
-    "votacoes": "1991-01-01",
-    "despesas": "2009-01-01",
-}
 
 
 def chunk_list(lst: list, n: int):
@@ -85,12 +85,12 @@ async def run_pipeline(
         is_full = strategy == LoadStrategy.FULL_LOAD
         actual_start = start_date
 
-        start_year = datetime.strptime(actual_start or "2023-01-01", "%Y-%m-%d").year
+        start_year = datetime.strptime(actual_start, "%Y-%m-%d").year
         end_year = datetime.strptime(
             end_date or datetime.now().strftime("%Y-%m-%d"), "%Y-%m-%d"
         ).year
         anos_alvo = list(range(start_year, end_year + 1))
-
+        deputados_ids = []
         # ==========================================
         # 1. DEPUTADOS
         # ==========================================
@@ -99,6 +99,12 @@ async def run_pipeline(
 
             if source == SourceType.BULK:
                 await deputados_ext.extract(sink.save, unique_keys="id")
+
+                logger.info("     ∟ Baixando Dumps Biográficos (Profissões e Ocupações)...")
+                for sub_domain in ["deputados_profissoes", "deputados_ocupacoes"]:
+                    sub_ext = BaseBulkExtractor(client)
+                    sub_ext.domain_name = sub_domain
+                    await sub_ext.extract(sink.save)
 
             else:
                 await deputados_ext.extract(
@@ -111,17 +117,78 @@ async def run_pipeline(
             # DETALHES CADASTRAIS (Sempre via API)
             if deputados_ids:
                 existent_ids = sink.get_existing_ids("deputados_detalhes")
+                deputados_api_ext = CamaraExtractorFactory.get_extractor(
+                    DomainType.DEPUTADOS, SourceType.API, client, state_store
+                )
                 ids_to_load = [d for d in deputados_ids if d not in existent_ids]
                 if ids_to_load:
                     logger.info(
                         f"     ∟ Baixando detalhes de {len(ids_to_load)} deputados (Via API)..."
                     )
-                    detalhes_ext = CamaraExtractorFactory.get_extractor(
-                        DomainType.DEPUTADOS, SourceType.API, client, state_store
-                    )
-                    await detalhes_ext.extract_detalhes(sink.save, ids_to_load)
+
+                    await deputados_api_ext.extract_detalhes(sink.save, ids_to_load)
                 else:
                     logger.info("     ∟ Detalhes cadastrais já estão atualizados.")
+
+                    # ==========================================
+                    # DADOS BIOGRÁFICOS (ESTÁTICOS)
+                    # ==========================================
+                    bio_endpoints = [
+                        ("deputados_profissoes", deputados_api_ext.extract_profissoes),
+                        ("deputados_ocupacoes", deputados_api_ext.extract_ocupacoes),
+                        (
+                            "deputados_mandatos_externos",
+                            deputados_api_ext.extract_mandatos_externos,
+                        ),
+                        ("deputados_frentes", deputados_api_ext.extract_frentes),
+                        ("deputados_historico", deputados_api_ext.extract_historico),
+                    ]
+
+                    for table_name, extract_method in bio_endpoints:
+                        existent_ids = set(sink.get_existing_ids(table_name, "id_deputado"))
+                        ids_to_load = (
+                            deputados_ids
+                            if is_full
+                            else [d for d in deputados_ids if d not in existent_ids]
+                        )
+
+                        if ids_to_load:
+                            await extract_method(sink.save, ids_to_load)
+                        else:
+                            logger.debug(
+                                f"     ∟ Tabela {table_name} atualizada. Pulando extração estática."
+                            )
+
+                    # ==========================================
+                    # ATIVIDADES (TEMPORAIS)
+                    # ==========================================
+                    end_ativ = end_date or datetime.now().strftime("%Y-%m-%d")
+                    earliest_dep = DOMAINS_EARLIEST_DATES["deputados"]
+
+                    dep_meta = sink.get_deputados_legislaturas()
+
+                    temporal_endpoints = [
+                        (
+                            "deputados_discursos",
+                            "dataHoraInicio",
+                            deputados_api_ext.extract_discursos,
+                        ),
+                        ("deputados_orgaos", "dataInicio", deputados_api_ext.extract_orgaos),
+                        ("deputados_eventos", "dataHoraInicio", deputados_api_ext.extract_eventos),
+                    ]
+
+                    for table_name, date_col, extract_method in temporal_endpoints:
+                        if is_full:
+                            start_val = start_date or earliest_dep
+                        else:
+                            watermark = state_store.get_watermark(table_name, date_col)
+                            start_val = start_date or (
+                                str(watermark).split("T")[0] if watermark else earliest_dep
+                            )
+
+                        await extract_method(
+                            sink.save, deputados_ids, start_val, end_ativ, dep_meta
+                        )
 
         # ==========================================
         # 2. DESPESAS
@@ -148,14 +215,19 @@ async def run_pipeline(
                         "despesas", start_despesas, end_despesas, date_column="dataDocumento"
                     )
                 else:
-                    start_despesas = (
-                        state_store.get_watermark("despesas", "dataDocumento") or "2023-02-01"
+                    start_despesas = start_date or (
+                        str(watermark).split("T")[0]
+                        if watermark
+                        else DOMAINS_EARLIEST_DATES["despesas"]
                     )
                     end_despesas = end_date or datetime.now().strftime("%Y-%m-%d")
                     logger.info(
                         f"Sincronizando Despesas a partir de "
                         f"{start_despesas} até {end_despesas} via API..."
                     )
+
+                if not deputados_ids:
+                    deputados_ids = sink.get_existing_ids(DomainType.DEPUTADOS.value)
 
                 await despesas_ext.extract(
                     sink.save,
@@ -183,8 +255,10 @@ async def run_pipeline(
                         "proposicoes", start_prop, end_prop, date_column="dataApresentacao"
                     )
                 else:
-                    start_prop = (
-                        state_store.get_watermark("proposicoes", "dataApresentacao") or "2023-02-01"
+                    start_prop = start_date or (
+                        str(watermark).split("T")[0]
+                        if watermark
+                        else DOMAINS_EARLIEST_DATES["proposicoes"]
                     )
                     end_prop = end_date or datetime.now().strftime("%Y-%m-%d")
 
