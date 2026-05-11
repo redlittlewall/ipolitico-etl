@@ -118,3 +118,266 @@ class DeputadosExtractor(CamaraBaseExtractor):
             table_name="deputados_detalhes",
             unique_keys="id",
         )
+
+    # ==========================================
+    # DADOS BIOGRÁFICOS (ESTÁTICOS)
+    # ==========================================
+
+    async def extract_profissoes(self, sink_func, deputados_ids: list) -> None:
+        """Extrai a lista de profissões declaradas pelos deputados."""
+        if not deputados_ids:
+            return
+        logger.info(f"     ∟ Extraindo profissões para {len(deputados_ids)} deputados...")
+
+        async def fetch_func(dep_id: int) -> pl.DataFrame:
+            await asyncio.sleep(0.1)
+            dados = await self.client.fetch(f"{ApiRoutes.DEPUTADOS.value}/{dep_id}/profissoes")
+            if dados:
+                df = pl.DataFrame(dados).with_columns(pl.all().cast(pl.String, strict=False))
+                return df.with_columns(pl.lit(dep_id).cast(pl.Int64).alias("id_deputado"))
+            return pl.DataFrame()
+
+        await self.execute_pipeline(
+            deputados_ids,
+            fetch_func,
+            sink_func,
+            "deputados_profissoes",
+            ["id_deputado", "codTipoProfissao"],
+        )
+
+    async def extract_ocupacoes(self, sink_func, deputados_ids: list) -> None:
+        """Extrai as ocupações (empregos e atividades) anteriores dos deputados."""
+        if not deputados_ids:
+            return
+        logger.info(f"     ∟ Extraindo ocupações para {len(deputados_ids)} deputados...")
+
+        async def fetch_func(dep_id: int) -> pl.DataFrame:
+            await asyncio.sleep(0.1)
+            dados = await self.client.fetch(f"{ApiRoutes.DEPUTADOS.value}/{dep_id}/ocupacoes")
+            if dados:
+                df = pl.DataFrame(dados).with_columns(pl.all().cast(pl.String, strict=False))
+                return df.with_columns(pl.lit(dep_id).cast(pl.Int64).alias("id_deputado"))
+            return pl.DataFrame()
+
+        await self.execute_pipeline(
+            deputados_ids,
+            fetch_func,
+            sink_func,
+            "deputados_ocupacoes",
+            ["id_deputado", "titulo", "entidade"],
+        )
+
+    async def extract_mandatos_externos(self, sink_func, deputados_ids: list) -> None:
+        """Extrai cargos eletivos externos (prefeito, vereador, etc) já exercidos."""
+        if not deputados_ids:
+            return
+        logger.info(f"     ∟ Extraindo mandatos externos para {len(deputados_ids)} deputados...")
+
+        async def fetch_func(dep_id: int) -> pl.DataFrame:
+            await asyncio.sleep(0.1)
+            dados = await self.client.fetch(
+                f"{ApiRoutes.DEPUTADOS.value}/{dep_id}/mandatosExternos"
+            )
+            if dados:
+                df = pl.DataFrame(dados).with_columns(pl.all().cast(pl.String, strict=False))
+                return df.with_columns(pl.lit(dep_id).cast(pl.Int64).alias("id_deputado"))
+            return pl.DataFrame()
+
+        await self.execute_pipeline(
+            deputados_ids,
+            fetch_func,
+            sink_func,
+            "deputados_mandatos_externos",
+            ["id_deputado", "cargo", "anoInicio"],
+        )
+
+    async def extract_frentes(self, sink_func, deputados_ids: list) -> None:
+        """Extrai as frentes parlamentares das quais os deputados são membros."""
+        if not deputados_ids:
+            return
+        logger.info(
+            f"     ∟ Extraindo frentes parlamentares para {len(deputados_ids)} deputados..."
+        )
+
+        async def fetch_func(dep_id: int) -> pl.DataFrame:
+            await asyncio.sleep(0.1)
+            dados = await self.client.fetch(f"{ApiRoutes.DEPUTADOS.value}/{dep_id}/frentes")
+            if dados:
+                df = pl.DataFrame(dados).with_columns(pl.all().cast(pl.String, strict=False))
+                return df.with_columns(pl.lit(dep_id).cast(pl.Int64).alias("id_deputado"))
+            return pl.DataFrame()
+
+        await self.execute_pipeline(
+            deputados_ids, fetch_func, sink_func, "deputados_frentes", ["id_deputado", "id"]
+        )
+
+    async def extract_historico(self, sink_func, deputados_ids: list) -> None:
+        """Extrai o histórico de mudanças no exercício parlamentar (licenças, trocas de partido)."""
+        if not deputados_ids:
+            return
+        logger.info(
+            f"     ∟ Extraindo histórico parlamentar para {len(deputados_ids)} deputados..."
+        )
+
+        async def fetch_func(dep_id: int) -> pl.DataFrame:
+            await asyncio.sleep(0.5)
+            dados = await self.client.fetch(f"{ApiRoutes.DEPUTADOS.value}/{dep_id}/historico")
+            if dados:
+                df = pl.DataFrame(dados).with_columns(pl.all().cast(pl.String, strict=False))
+                return df.with_columns(pl.lit(dep_id).cast(pl.Int64).alias("id_deputado"))
+            return pl.DataFrame()
+
+        await self.execute_pipeline(
+            deputados_ids,
+            fetch_func,
+            sink_func,
+            "deputados_historico",
+            ["id_deputado", "dataHora", "situacao"],
+            max_workers=3,
+        )
+
+    # ==========================================
+    # ATIVIDADES (TEMPORAIS E PAGINADAS)
+    # ==========================================
+
+    async def extract_discursos(
+        self, sink_func, deputados_ids: list, start_date: str, end_date: str, dep_meta: dict
+    ) -> None:
+        """
+        Extrai discursos aplicando o Filtro de Três Camadas (Otimização Extrema):
+        1. Poda Biográfica: Ignora anos em que o deputado não tinha mandato.
+        2. Sondagem HTTP (Probing): Verifica se o deputado tem qualquer discurso na base.
+        3. Window Slicing: Fatiamento de 4 anos para bypass do Erro 400 da Câmara.
+        """
+        if not start_date or not end_date or not deputados_ids:
+            return
+        logger.info(f"     ∟ [DISCURSOS] Gerando tarefas para {len(deputados_ids)} deputados...")
+
+        route_tmpl = f"{ApiRoutes.DEPUTADOS.value}/{{id}}/discursos"
+        jobs = await self.generate_temporal_jobs(
+            route_tmpl, deputados_ids, start_date, end_date, dep_meta
+        )
+
+        if not jobs:
+            return
+        logger.info(f"     ∟ Disparando {len(jobs)} fatias de extração de discursos...")
+
+        async def fetch_func(job: dict) -> pl.DataFrame:
+            await asyncio.sleep(0.1)
+            params = self.build_params(
+                {
+                    ApiParams.DATA_INICIO.value: job["start"],
+                    ApiParams.DATA_FIM.value: job["end"],
+                    ApiParams.ITENS.value: 100,
+                }
+            )
+            try:
+                dados = await self.fetch_paginated(route_tmpl.format(id=job["id"]), params)
+                if dados:
+                    df = pl.DataFrame(dados)
+                    if "transcricao" in df.columns:
+                        df = df.with_columns(pl.col("transcricao").cast(pl.String))
+                    return df.with_columns(pl.lit(job["id"]).cast(pl.Int64).alias("id_deputado"))
+            except Exception:
+                pass
+            return pl.DataFrame()
+
+        await self.execute_pipeline(
+            jobs,
+            fetch_func,
+            sink_func,
+            "deputados_discursos",
+            ["id_deputado", "dataHoraInicio"],
+            max_workers=3,
+        )
+
+    async def extract_orgaos(
+        self, sink_func, deputados_ids: list, start_date: str, end_date: str, dep_meta: dict
+    ) -> None:
+        """Extrai os órgãos (comissões) dos quais o deputado participou no período."""
+        if not start_date or not end_date or not deputados_ids:
+            return
+        logger.info(
+            f"     ∟ [ÓRGÃOS] Gerando tarefas com Poda e Probe para {len(deputados_ids)} "
+            "deputados..."
+        )
+
+        route_tmpl = f"{ApiRoutes.DEPUTADOS.value}/{{id}}/orgaos"
+        jobs = await self.generate_temporal_jobs(
+            route_tmpl, deputados_ids, start_date, end_date, dep_meta
+        )
+
+        if not jobs:
+            return
+        logger.info(f"     ∟ Disparando {len(jobs)} fatias de extração de órgãos...")
+
+        async def fetch_func(job: dict) -> pl.DataFrame:
+            await asyncio.sleep(0.1)
+            params = self.build_params(
+                {
+                    ApiParams.DATA_INICIO.value: job["start"],
+                    ApiParams.DATA_FIM.value: job["end"],
+                    ApiParams.ITENS.value: 100,
+                }
+            )
+            try:
+                dados = await self.fetch_paginated(route_tmpl.format(id=job["id"]), params)
+                if dados:
+                    return pl.DataFrame(dados).with_columns(
+                        pl.lit(job["id"]).cast(pl.Int64).alias("id_deputado")
+                    )
+            except Exception:
+                pass
+            return pl.DataFrame()
+
+        await self.execute_pipeline(
+            jobs,
+            fetch_func,
+            sink_func,
+            "deputados_orgaos",
+            ["id_deputado", "idOrgao", "dataInicio"],
+            max_workers=4,
+        )
+
+    async def extract_eventos(
+        self, sink_func, deputados_ids: list, start_date: str, end_date: str, dep_meta: dict
+    ) -> None:
+        """Extrai os eventos com previsão de participação do deputado."""
+        if not start_date or not end_date or not deputados_ids:
+            return
+        logger.info(
+            f"     ∟ [EVENTOS] Gerando tarefas com Poda e Probe para {len(deputados_ids)}"
+            " deputados..."
+        )
+
+        route_tmpl = f"{ApiRoutes.DEPUTADOS.value}/{{id}}/eventos"
+        jobs = await self.generate_temporal_jobs(
+            route_tmpl, deputados_ids, start_date, end_date, dep_meta
+        )
+
+        if not jobs:
+            return
+        logger.info(f"     ∟ Disparando {len(jobs)} fatias de extração de eventos...")
+
+        async def fetch_func(job: dict) -> pl.DataFrame:
+            await asyncio.sleep(0.1)
+            params = self.build_params(
+                {
+                    ApiParams.DATA_INICIO.value: job["start"],
+                    ApiParams.DATA_FIM.value: job["end"],
+                    ApiParams.ITENS.value: 100,
+                }
+            )
+            try:
+                dados = await self.fetch_paginated(route_tmpl.format(id=job["id"]), params)
+                if dados:
+                    return pl.DataFrame(dados).with_columns(
+                        pl.lit(job["id"]).cast(pl.Int64).alias("id_deputado")
+                    )
+            except Exception:
+                pass
+            return pl.DataFrame()
+
+        await self.execute_pipeline(
+            jobs, fetch_func, sink_func, "deputados_eventos", ["id_deputado", "id"], max_workers=4
+        )

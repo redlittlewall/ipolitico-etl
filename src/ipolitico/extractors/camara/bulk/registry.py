@@ -8,6 +8,14 @@ BULK_REGISTRY = {
         "url": "https://dadosabertos.camara.leg.br/arquivos/deputados/csv/deputados.csv",
         "requires_year": False,
     },
+    "deputados_profissoes": {
+        "url": "https://dadosabertos.camara.leg.br/arquivos/deputadosProfissoes/csv/deputadosProfissoes.csv",
+        "requires_year": False,
+    },
+    "deputados_ocupacoes": {
+        "url": "https://dadosabertos.camara.leg.br/arquivos/deputadosOcupacoes/csv/deputadosOcupacoes.csv",
+        "requires_year": False,
+    },
     "despesas": {
         "url": "https://www.camara.leg.br/cotas/Ano-{year}.csv.zip",
         "requires_year": True,

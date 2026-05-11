@@ -22,6 +22,7 @@ class DespesasBulkExtractor(BaseBulkExtractor):
             "txtCNPJCPF": "cnpjCpfFornecedor",
             "ideDocumento": "codDocumento",
             "txtNumero": "numDocumento",
+            "txtDescricao": "tipoDespesa",
         }
 
         df = df.rename({k: v for k, v in mapping.items() if k in df.columns})
