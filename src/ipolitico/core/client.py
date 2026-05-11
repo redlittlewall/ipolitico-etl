@@ -1,8 +1,10 @@
 import asyncio
 import logging
 import os
+import sqlite3
 import urllib
 from datetime import time
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -10,6 +12,8 @@ import httpx
 from ipolitico.core.config import CAMARA_API_BASE_URL
 
 logger = logging.getLogger(__name__)
+
+TELEMETRY_DB_PATH = Path("data/api_telemetry.db")
 
 
 class CamaraAPIError(Exception):
@@ -34,6 +38,36 @@ class CamaraClient:
             "Accept": "application/json",
             "User-Agent": "iPolitico-ETL-OpenSource/1.0",
         }
+        self._init_telemetry()
+
+    def _init_telemetry(self):
+        """Inicializa um banco SQLite super leve apenas para logs de requisições."""
+        TELEMETRY_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(TELEMETRY_DB_PATH) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS api_requests (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    endpoint TEXT,
+                    method TEXT,
+                    status_code INTEGER,
+                    response_time_ms REAL,
+                    success BOOLEAN
+                )
+            """)
+
+    def _log_api_call(self, endpoint: str, method: str, status: int, time_ms: float, success: bool):
+        """Salva a métrica da requisição no banco de dados isolado."""
+        try:
+            with sqlite3.connect(TELEMETRY_DB_PATH) as conn:
+                conn.execute(
+                    "INSERT INTO api_requests "
+                    "(endpoint, method, status_code, response_time_ms, success) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (endpoint, method, status, time_ms, success),
+                )
+        except Exception:
+            pass  # Nunca deixamos a telemetria quebrar o negócio principal
 
     async def fetch(
         self, endpoint: str, params: dict[str, Any] | None = None

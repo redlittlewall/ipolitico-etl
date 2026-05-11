@@ -1,11 +1,14 @@
 import asyncio
+import logging
 from abc import ABC, abstractmethod
 from typing import Protocol
 
 import polars as pl
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ipolitico.core.config import MAX_CONCURRENT_REQUESTS
+
+logger = logging.getLogger(__name__)
 
 
 class IStateStore(Protocol):
@@ -30,39 +33,6 @@ class BaseExtractor(ABC):
     async def extract(self, **kwargs) -> pl.DataFrame:
         pass
 
-    async def execute_concurrently(
-        self,
-        items: list,
-        fetch_func,
-        max_workers: int = MAX_CONCURRENT_REQUESTS,
-        desc: str = "",
-    ) -> pl.DataFrame:
-        """
-        Motor de concorrência genérico.
-        Executa tarefas em paralelo respeitando limites de requisição e implementando
-        retry automático para proteger contra instabilidades de rede.
-        """
-        if not items:
-            return pl.DataFrame()
-
-        semaforo = asyncio.Semaphore(max_workers)
-
-        @retry(
-            wait=wait_exponential(multiplier=1, min=2, max=16),
-            stop=stop_after_attempt(5),
-            retry=retry_if_exception_type(Exception),
-            reraise=True,
-        )
-        async def bounded_fetch(item):
-            async with semaforo:
-                return await fetch_func(item)
-
-        tarefas = [bounded_fetch(item) for item in items]
-        resultados = await asyncio.gather(*tarefas, return_exceptions=False)
-
-        frames = [r for r in resultados if isinstance(r, pl.DataFrame) and not r.is_empty()]
-        return pl.concat(frames, how="diagonal_relaxed") if frames else pl.DataFrame()
-
     async def execute_pipeline(
         self,
         items: list,
@@ -77,7 +47,8 @@ class BaseExtractor(ABC):
         Extrai da API e já salva no Banco de Dados em paralelo, sem acumular
         dados massivos na RAM.
         """
-        if not items:
+        total_items = len(items)
+        if total_items == 0:
             return
 
         job_queue = asyncio.Queue()
@@ -89,12 +60,16 @@ class BaseExtractor(ABC):
         # param de bater na API do governo automaticamente até esvaziar.
         df_queue = asyncio.Queue(maxsize=10)
 
+        processed_count = 0
+        log_threshold = max(1, total_items // 10)
+
         @retry(
             wait=wait_exponential(multiplier=1, min=2, max=16),
             stop=stop_after_attempt(5),
             reraise=True,
         )
         async def worker():
+            nonlocal processed_count
             while True:
                 try:
                     job = job_queue.get_nowait()
@@ -106,6 +81,13 @@ class BaseExtractor(ABC):
                         # O .put() é bloqueante se a fila atingir o maxsize
                         await df_queue.put(df)
                 finally:
+                    processed_count += 1
+                    if processed_count % log_threshold == 0 or processed_count == total_items:
+                        percent = (processed_count / total_items) * 100
+                        logger.info(
+                            f"       [Progresso - {table_name}] {processed_count}/{total_items}"
+                            f" ({percent:.1f}%) concluído."
+                        )
                     job_queue.task_done()
 
         async def consumer():
