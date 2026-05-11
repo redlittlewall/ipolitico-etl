@@ -92,3 +92,12 @@ class DataLakeSink:
         except Exception as e:
             logger.error(f"Erro ao ler IDs do DataLake na tabela {table}: {e}")
             return []
+
+    def get_deputados_legislaturas(self) -> dict:
+        file_path = self._get_file_path("deputados")
+        if not file_path.exists():
+            return {}
+        df = pl.read_parquet(
+            file_path, columns=["id", "idLegislaturaInicial", "idLegislaturaFinal"]
+        )
+        return {row["id"]: row for row in df.to_dicts()}

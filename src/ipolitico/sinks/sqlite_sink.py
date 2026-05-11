@@ -145,3 +145,11 @@ class SQLiteSink:
 
         except sqlite3.OperationalError as e:
             logger.debug(f"[{table}] Ignorando deleção. Tabela ainda não existe: {e}")
+
+    def get_deputados_legislaturas(self) -> dict:
+        query = "SELECT id, idLegislaturaInicial, idLegislaturaFinal FROM deputados"
+        try:
+            df = pl.read_database(query, self.conn)
+            return {row["id"]: row for row in df.to_dicts()}
+        except Exception:
+            return {}
