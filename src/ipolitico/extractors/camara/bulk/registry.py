@@ -1,9 +1,12 @@
 """
-Registro central de URLs para Dumps Estáticos (Bulk) da Câmara dos Deputados.
-Desacopla a infraestrutura de rede da regra de negócio de mapeamento de endpoints.
+Central registry of URLs for Static Dumps (Bulk) from the Chamber of Deputies.
+Decouples network infrastructure from the business rule of endpoint mapping.
 """
 
-BULK_REGISTRY = {
+from typing import Dict, Union
+
+# Define a tipagem estrita para o dicionário de rotas Bulk
+BULK_REGISTRY: Dict[str, Dict[str, Union[str, bool]]] = {
     "deputados": {
         "url": "https://dadosabertos.camara.leg.br/arquivos/deputados/csv/deputados.csv",
         "requires_year": False,

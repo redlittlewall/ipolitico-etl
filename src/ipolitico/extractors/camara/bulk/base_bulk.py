@@ -2,31 +2,49 @@ import logging
 import os
 import tempfile
 import zipfile
-from datetime import datetime
 from pathlib import Path
+from typing import Any, Optional
 
 import polars as pl
 import polars.selectors as cs
 
 from ipolitico.core.client import CamaraClient
+from ipolitico.extractors.base import BaseExtractor
 from ipolitico.extractors.camara.bulk.registry import BULK_REGISTRY
 
 logger = logging.getLogger(__name__)
 
 
-class BaseBulkExtractor:
+class BaseBulkExtractor(BaseExtractor):
     """
-    Classe base para extratores de Dumps massivos.
-    Implementa o Design Pattern 'Template Method': a extração é genérica,
-    mas a tradução de schema (padronização de colunas) é delegada aos filhos.
+    Classe base para extratores de arquivos massivos (Dumps/Bulk) da Câmara.
+
+    Garante o Princípio da Responsabilidade Única (SRP): foca estritamente
+    em baixar o arquivo (CSV/ZIP), descompactar e carregar o DataFrame bruto em
+    memória, sem aplicar padronizações de regras de negócio ou realizar persistência.
     """
 
     domain_name = ""  # Deve ser sobrescrito nas classes filhas (ex: "despesas")
 
     def __init__(self, client: CamaraClient):
+        """
+        Inicializa o extrator com seu cliente HTTP.
+
+        Args:
+            client (CamaraClient): Cliente HTTP configurado para requisições e retries.
+        """
         self.client = client
 
-    def _build_url(self, year: int = None) -> str:
+    def _build_url(self, year: Optional[int] = None) -> str:
+        """
+        Constrói a URL de download com base no domínio e ano fornecidos.
+
+        Args:
+            year (int, optional): Ano de referência para arquivos particionados.
+
+        Returns:
+            str: URL formatada para download.
+        """
         config = BULK_REGISTRY.get(self.domain_name)
         if not config:
             raise ValueError(f"Domínio Bulk não mapeado no registry: {self.domain_name}")
@@ -36,18 +54,18 @@ class BaseBulkExtractor:
 
         return config["url"].format(year=year) if config["requires_year"] else config["url"]
 
-    def _standardize_schema(self, df: pl.DataFrame) -> pl.DataFrame:
-        """Método de tradução. Retorna o DF intocado por padrão."""
-        return df
-
-    async def extract(
-        self, sink_func, unique_keys: str | list[str] | None = None, year: int = None
-    ) -> None:
+    async def extract(self, year: Optional[int] = None, **kwargs: Any) -> pl.DataFrame:
         """
-        Descarrega o Dump estático e processa-o via Disk-to-Database Streaming.
-        Lê o CSV em lotes (batches) para garantir consumo mínimo de RAM.
-        """
+        Descarrega o arquivo estático, descompacta (se aplicável) e lê o CSV.
 
+        Args:
+            year (int, optional): Ano para particionamento do arquivo.
+            **kwargs: Parâmetros contextuais adicionais.
+
+        Returns:
+            pl.DataFrame: DataFrame contendo os dados estritamente brutos.
+                          Retorna um DataFrame vazio em caso de falha ou arquivo inexistente.
+        """
         if not self.domain_name:
             raise NotImplementedError("domain_name deve ser definido na classe filha.")
 
@@ -57,23 +75,20 @@ class BaseBulkExtractor:
             file_name = url.split("/")[-1]
             dest_path = str(Path(tmpdir) / file_name)
 
-            logger.info(f"     ∟ Baixando Dump Estático ({self.domain_name} {year or ''})...")
+            logger.info(f"Baixando Dump Estático ({self.domain_name} {year or ''})...")
 
-            sucesso = await self.client.download_file(url, dest_path)
+            success = await self.client.download_file(url, dest_path)
 
-            if not sucesso:
+            if not success:
                 logger.warning(f"Dump de {self.domain_name} para {year} não existe no servidor.")
-                return
+                return pl.DataFrame()
 
             if dest_path.endswith(".zip"):
                 if not zipfile.is_zipfile(dest_path):
                     with open(dest_path, "r", encoding="utf-8", errors="ignore") as f:
-                        conteudo_falso = f.read(150).replace("\n", " ")
-                    logger.error(
-                        f"O servidor enviou um arquivo corrompido/bloqueado em vez do ZIP:"
-                        f" '{conteudo_falso}...'"
-                    )
-                    return
+                        fake_content = f.read(150).replace("\n", " ")
+                    logger.error(f"Arquivo corrompido recebido em vez de ZIP: '{fake_content}...'")
+                    return pl.DataFrame()
                 try:
                     with zipfile.ZipFile(dest_path, "r") as zip_ref:
                         csv_filename = zip_ref.namelist()[0]
@@ -81,7 +96,8 @@ class BaseBulkExtractor:
                         dest_path = os.path.join(tmpdir, csv_filename)
                 except zipfile.BadZipFile:
                     logger.error(f"Arquivo ZIP corrompido baixado de {url}. Abortando.")
-                    return
+                    return pl.DataFrame()
+
             try:
                 df = pl.read_csv(
                     dest_path,
@@ -101,16 +117,8 @@ class BaseBulkExtractor:
                 )
                 df = df.with_columns(cs.string().str.replace_all('"', "").str.strip_chars())
 
-                df = self._standardize_schema(df)
-                agora = datetime.now()
-                df = df.with_columns(
-                    [
-                        pl.lit(agora).cast(pl.Datetime).alias("captured_at"),
-                        pl.lit(agora).cast(pl.Datetime).alias("updated_at"),
-                    ]
-                )
-
-                await sink_func(df, self.domain_name, unique_keys)
+                return df
 
             except Exception as e:
-                logger.error(f"Falha crítica ao parsear o CSV de {self.domain_name}: {e}")
+                logger.error(f"Falha crítica ao realizar o parse do CSV de {self.domain_name}: {e}")
+                return pl.DataFrame()

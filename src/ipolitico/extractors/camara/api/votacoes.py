@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from typing import Any, Optional
 
 import polars as pl
 
@@ -11,105 +11,51 @@ logger = logging.getLogger(__name__)
 
 class VotacoesExtractor(CamaraBaseExtractor):
     """
-    Extrator responsável pelo domínio de Votações e Votos Nominais.
+    Extrator responsável pelo domínio de Votações e Votos Nominais na API.
 
-    Atenção Arquitetural: O volume de dados é massivo. O sistema opera via streaming,
-    processando e salvando metadados e votos em paralelo para manter um footprint
-    de memória baixo e constante, independente do volume da legislatura.
+    Remove qualquer manipulação estrutural de JSONs aninhados, fornecendo
+    a resposta HTTP exata no formato de DataFrame.
     """
 
-    async def extract(self, sink_func, start_date: str, end_date: str) -> None:
+    async def extract(
+        self, start_date: Optional[str] = None, end_date: Optional[str] = None, **kwargs: Any
+    ) -> pl.DataFrame:
         """
-        Extrai o cabeçalho e os metadados das votações via streaming.
+        Extrai o cabeçalho e os metadados brutos das votações.
 
         Args:
-            sink_func (callable): Função assíncrona de persistência.
-            start_date (str): Data inicial (YYYY-MM-DD).
-            end_date (str): Data final (YYYY-MM-DD).
+            start_date (str, optional): Data inicial (YYYY-MM-DD).
+            end_date (str, optional): Data final (YYYY-MM-DD).
+            **kwargs: Parâmetros adicionais.
 
         Returns:
-            None
+            pl.DataFrame: Metadados puros das votações.
         """
-        if not start_date or not end_date:
-            raise ValueError("O Extrator de Votações exige limites temporais explícitos.")
+        raw_params = {
+            ApiParams.DATA_INICIO: start_date,
+            ApiParams.DATA_FIM: end_date,
+            ApiParams.ORDEM: ApiParams.ORDEM_ASC.value,
+            ApiParams.ORDENAR_POR: "data",
+        }
 
-        clean_start = str(start_date).split("T")[0]
-        clean_end = str(end_date).split("T")[0]
-        ini_dt = datetime.strptime(clean_start, "%Y-%m-%d")
-        end_dt = datetime.strptime(clean_end, "%Y-%m-%d")
+        logger.debug(f"Fetching votacoes from {start_date} to {end_date}")
+        data = await self.fetch_paginated(ApiRoutes.VOTACOES.value, self.build_params(raw_params))
 
-        logger.debug(f"Sincronizando Votações: {clean_start} a {clean_end}")
-        anos = list(range(ini_dt.year, end_dt.year + 1))
+        return pl.DataFrame(data) if data else pl.DataFrame()
 
-        async def fetch_votacoes_ano(ano: int) -> pl.DataFrame:
-            current_start = f"{ano}-01-01" if ano > ini_dt.year else clean_start
-            current_end = f"{ano}-12-31" if ano < end_dt.year else clean_end
-
-            raw_params = {
-                ApiParams.DATA_INICIO: current_start,
-                ApiParams.DATA_FIM: current_end,
-                ApiParams.ORDEM: ApiParams.ORDEM_ASC.value,
-                ApiParams.ORDENAR_POR: "data",
-            }
-            dados = await self.fetch_paginated(
-                ApiRoutes.VOTACOES.value, self.build_params(raw_params)
-            )
-            df = pl.DataFrame(dados) if dados else pl.DataFrame()
-            if not df.is_empty():
-                df = df.filter(
-                    (pl.col("data").str.slice(0, 10) >= start_date)
-                    & (pl.col("data").str.slice(0, 10) <= end_date)
-                )
-            return df
-
-        await self.execute_pipeline(
-            items=anos,
-            fetch_func=fetch_votacoes_ano,
-            sink_func=sink_func,
-            table_name="votacoes",
-            unique_keys="id",
-        )
-
-    async def extract_votos(self, sink_func, votacoes_ids: list[str]) -> None:
+    async def extract_votos(self, votacao_id: str) -> pl.DataFrame:
         """
-        Extrai os votos nominais detalhados enviando-os para o sink em tempo real.
+        Extrai a lista de votos nominais de uma votação específica.
 
         Args:
-            sink_func (callable): Função assíncrona de persistência.
-            votacoes_ids (list[str]): Lista de IDs das votações alvo.
+            votacao_id (str): O ID único da votação.
 
         Returns:
-            None
+            pl.DataFrame: Dados brutos, preservando nós complexos como dicionários internos.
         """
-        if not votacoes_ids:
-            return pl.DataFrame()
+        endpoint = f"{ApiRoutes.VOTACOES.value}/{votacao_id}/{ApiRoutes.VOTOS.value}"
 
-        async def fetch_votos(votacao_id: str) -> pl.DataFrame:
-            endpoint = f"{ApiRoutes.VOTACOES.value}/{votacao_id}/votos"
+        logger.debug(f"Fetching votos for votacao_id: {votacao_id}")
+        data = await self.client.fetch(endpoint)
 
-            dados = await self.client.fetch(endpoint)
-
-            if dados:
-                for voto in dados:
-                    voto["idVotacao"] = votacao_id
-
-                    if "deputado_" in voto and isinstance(voto["deputado_"], dict):
-                        # Extrai as chaves relacionais para a raiz do registo
-                        voto["deputado_id"] = voto["deputado_"].get("id")
-                        voto["partido_no_voto"] = voto["deputado_"].get("siglaPartido")
-                        voto["uf_no_voto"] = voto["deputado_"].get("siglaUf")
-
-                        # Destrói o dicionário para que o SQLite não rejeite o INSERT
-                        del voto["deputado_"]
-
-                return pl.DataFrame(dados)
-
-            return pl.DataFrame()
-
-        await self.execute_pipeline(
-            items=votacoes_ids,
-            fetch_func=fetch_votos,
-            sink_func=sink_func,
-            table_name="votos",
-            unique_keys=["idVotacao", "deputado_id"],
-        )
+        return pl.DataFrame(data) if data else pl.DataFrame()
