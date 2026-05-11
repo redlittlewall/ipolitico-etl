@@ -2,6 +2,27 @@ from enum import Enum
 from typing import Dict
 
 
+class LoadStrategy(str, Enum):
+    """Estratégias de carga de dados gerenciadas pelo Orquestrador."""
+
+    FULL_LOAD = "full_load"
+    INCREMENTAL = "incremental"
+
+
+class SourceType(str, Enum):
+    """Tipos de fontes de origem dos dados suportadas pelo ETL."""
+
+    API = "api"
+    BULK = "bulk"
+
+
+class SinkType(str, Enum):
+    """Tipos de destinos de armazenamento (Sinks) para a persistência."""
+
+    SQLITE = "sqlite"
+    DATALAKE = "datalake"
+
+
 class ApiRoutes(str, Enum):
     """Mapeamento oficial dos endpoints raiz da API da Câmara."""
 
