@@ -1,0 +1,11 @@
+pipelines:
+  camara:
+    - domain: "despesas"
+      extractor_class: "DespesasBulkExtractor"
+      transformer_class: "CamaraDespesasTransformer"
+      sink_type: "DataLakeSink"
+      
+    - domain: "deputados"
+      extractor_class: "DeputadosBulkExtractor"
+      transformer_class: "CamaraDeputadosTransformer"
+      sink_type: "SQLiteSink"
