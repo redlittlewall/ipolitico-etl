@@ -70,3 +70,14 @@ class DomainType(str, Enum):
     PROPOSICOES = "proposicoes"
     VOTACOES = "votacoes"
     VOTOS = "votos"
+
+
+class MedallionLayer(str, Enum):
+    """
+    Define as camadas padronizadas da Arquitetura Medallion.
+    Herda de 'str' para garantir compatibilidade direta com rotinas de I/O.
+    """
+
+    BRONZE = "bronze"
+    SILVER = "silver"
+    GOLD = "gold"

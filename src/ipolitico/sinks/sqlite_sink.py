@@ -5,6 +5,7 @@ from typing import Any, List, Optional, Union
 
 import polars as pl
 
+from ipolitico.core.constants import MedallionLayer
 from ipolitico.sinks.base import BaseSink
 
 logger = logging.getLogger(__name__)
@@ -70,7 +71,7 @@ class SQLiteSink(BaseSink):
         self,
         df: pl.DataFrame,
         table_name: str,
-        layer: str = "bronze",
+        layer: MedallionLayer = MedallionLayer.BRONZE,
         unique_keys: Optional[Union[str, List[str]]] = None,
         **kwargs: Any,
     ) -> None:
