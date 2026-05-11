@@ -1,7 +1,8 @@
-# --- Python ---
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
 .venv/
 env/
 venv/
@@ -9,28 +10,25 @@ venv/
 .installed.cfg
 .eggs/
 
-# --- Banco de Dados (Dados locais gerados) ---
-# Ignoramos o arquivo .db para que o repositório fique neutro
-*.db
-*.sqlite3
-
-# --- Configurações Sensíveis ---
-# O .env pode conter caminhos locais ou chaves futuras
+# Configurações
 .env
 
-# --- IDEs ---
+# IDEs
 .vscode/
 .idea/
 
-# --- Testes e Cobertura ---
+# Testes e Cobertura
 .pytest_cache/
 .coverage
-htmlcov/ipolitico_etl.log
-ipolitico_etl.log
+htmlcov/
 
-# Bancos de Dados e Data Lake
+# iPolitico 
+data/*
+!data/**/.gitkeep
+ipolitico_etl.log
 datalake/
 *.db
+*.sqlite3
 *.db-journal
 *.parquet
 *.csv
