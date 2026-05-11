@@ -1,14 +1,5 @@
-import os
 from enum import Enum
-
-CAMARA_API_BASE_URL = os.getenv("CAMARA_API_BASE_URL", "https://dadosabertos.camara.leg.br/api/v2/")
-
-DOMAINS_EARLIEST_DATES = {
-    "deputados": "1826-04-29",
-    "proposicoes": "1988-01-01",
-    "votacoes": "1991-01-01",
-    "despesas": "2009-01-01",
-}
+from typing import Dict
 
 
 class ApiRoutes(str, Enum):
@@ -25,13 +16,10 @@ class ApiRoutes(str, Enum):
     PROPOSICOES = "proposicoes"
     VOTACOES = "votacoes"
     VOTOS = "votos"
-    REFERENCIAS = "referencias"
 
 
 class ApiParams(str, Enum):
-    """
-    Mapeamento oficial dos parâmetros da API de Dados Abertos da Câmara.
-    """
+    """Mapeamento oficial dos parâmetros e colunas da API."""
 
     ID = "id"
     DATA_INICIO = "dataInicio"
@@ -46,40 +34,48 @@ class ApiParams(str, Enum):
     SIGLA_UF = "siglaUf"
     SIGLA_PARTIDO = "siglaPartido"
     DATA_DOCUMENTO = "dataDocumento"
-    # Valores padrão da API
+    # Valores comuns de retorno (Ajudam nos Transformers)
+    DEPUTADO_ID = "id_deputado"
+    PARTIDO_NO_VOTO = "partido_no_voto"
+    UF_NO_VOTO = "uf_no_voto"
+    # Orquestração
     ORDEM_ASC = "ASC"
     ORDEM_DESC = "DESC"
 
 
-class LoadStrategy(str, Enum):
-    FULL_LOAD = "full_load"
-    INCREMENTAL = "incremental"
-
-
-class SourceType(str, Enum):
-    API = "api"
-    BULK = "bulk"
-
-
-class SinkType(str, Enum):
-    SQLITE = "sqlite"
-    DATALAKE = "datalake"
-
-
 class DomainType(str, Enum):
+    """Domínios principais suportados pelo iPolitico."""
+
     DEPUTADOS = "deputados"
     DESPESAS = "despesas"
     PROPOSICOES = "proposicoes"
     VOTACOES = "votacoes"
     VOTOS = "votos"
+    PROFISSÕES = "profissoes"
+    OCUPACOES = "ocupacoes"
 
 
 class MedallionLayer(str, Enum):
-    """
-    Define as camadas padronizadas da Arquitetura Medallion.
-    Herda de 'str' para garantir compatibilidade direta com rotinas de I/O.
-    """
+    """Camadas da Arquitetura Medallion[cite: 2]."""
 
     BRONZE = "bronze"
     SILVER = "silver"
     GOLD = "gold"
+
+
+class EarliestDates:
+    """Datas mínimas de dados por domínio para evitar loops infinitos."""
+
+    DEPUTADOS = "1826-04-29"
+    PROPOSICOES = "1988-01-01"
+    VOTACOES = "1991-01-01"
+    DESPESAS = "2009-01-01"
+
+
+# Facilita o acesso dinâmico: EarliestDateMap[DomainType.DESPESAS]
+EARLIEST_DATE_MAP: Dict[DomainType, str] = {
+    DomainType.DEPUTADOS: EarliestDates.DEPUTADOS,
+    DomainType.PROPOSICOES: EarliestDates.PROPOSICOES,
+    DomainType.VOTACOES: EarliestDates.VOTACOES,
+    DomainType.DESPESAS: EarliestDates.DESPESAS,
+}

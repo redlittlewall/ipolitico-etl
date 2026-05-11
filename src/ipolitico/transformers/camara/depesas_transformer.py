@@ -1,6 +1,7 @@
 from typing import Any
 
 import polars as pl
+from ipolitico.core.constants import ApiParams
 from ipolitico.transformers.base import BaseTransformer
 
 
@@ -30,23 +31,14 @@ class CamaraDespesasTransformer(BaseTransformer):
         )
 
     def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
-        """
-        Executa a limpeza e padronização do DataFrame de despesas.
-
-        Args:
-            df (pl.DataFrame): DataFrame bruto oriundo da camada Bronze.
-            **kwargs (Any): Parâmetros de contexto adicionais.
-
-        Returns:
-            pl.DataFrame: DataFrame transformado, pronto para a camada Silver.
-        """
         if df.is_empty():
             return df
 
         # 1. Padronização de Nomes (Resolve mismatch entre Bulk CSV e API JSON)
+        # As chaves são strings do CSV Bulk (temporárias), os valores são nosso schema oficial
         mapping = {
-            "nuDeputadoId": "id_deputado",
-            "datEmissao": "dataDocumento",
+            "nuDeputadoId": ApiParams.DEPUTADO_ID.value,
+            "datEmissao": ApiParams.DATA_DOCUMENTO.value,
             "vlrDocumento": "valorDocumento",
             "vlrLiquido": "valorLiquido",
             "txtFornecedor": "nomeFornecedor",
@@ -60,8 +52,10 @@ class CamaraDespesasTransformer(BaseTransformer):
         # 2. Transformações de Tipos e Limpeza
         transformations = []
 
-        if "dataDocumento" in df.columns:
-            transformations.append(pl.col("dataDocumento").str.to_datetime(strict=False))
+        if ApiParams.DATA_DOCUMENTO.value in df.columns:
+            transformations.append(
+                pl.col(ApiParams.DATA_DOCUMENTO.value).str.to_datetime(strict=False)
+            )
 
         if "valorLiquido" in df.columns:
             transformations.append(self._parse_br_currency("valorLiquido"))
@@ -69,8 +63,8 @@ class CamaraDespesasTransformer(BaseTransformer):
         if "valorDocumento" in df.columns:
             transformations.append(self._parse_br_currency("valorDocumento"))
 
-        if "id_deputado" in df.columns:
-            transformations.append(pl.col("id_deputado").cast(pl.Int64, strict=False))
+        if ApiParams.DEPUTADO_ID.value in df.columns:
+            transformations.append(pl.col(ApiParams.DEPUTADO_ID.value).cast(pl.Int64, strict=False))
 
         if transformations:
             df = df.with_columns(transformations)
