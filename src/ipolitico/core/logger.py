@@ -1,40 +1,41 @@
 import logging
-import os
-
-from rich.logging import RichHandler
+from pathlib import Path
 
 
-def setup_logger():
+def setup_logger(name: str) -> logging.Logger:
     """
-    Configura o padrão Dual-Logging:
-    1. RichHandler (Console): Formatação visual limpa, sem rastros verbosos.
-    2. FileHandler (Arquivo): Log persistente e detalhado para debug de infraestrutura.
-    """
-    log_format_file = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    log_format_console = "%(message)s"
+    Configura e retorna um logger padronizado para a aplicação.
 
-    logger = logging.getLogger()
+    Garante que os logs sejam salvos no diretório isolado de estado,
+    aplicando o princípio de Separação de Preocupações (arquivos físicos
+    isolados do código-fonte).
+
+    Args:
+        name (str): Nome do logger (geralmente __name__ do módulo).
+
+    Returns:
+        logging.Logger: Instância configurada do logger.
+    """
+    project_root = Path(__file__).resolve().parent.parent.parent.parent
+    log_dir = project_root / "data" / "logs"
+
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    log_file = log_dir / "ipolitico_etl.log"
+
+    logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
 
-    # Limpa handlers antigos se houver
-    if logger.hasHandlers():
-        logger.handlers.clear()
+    if not logger.handlers:
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
-    # Handler do Terminal (UX Rica)
-    console_handler = RichHandler(rich_tracebacks=True, show_path=False)
-    console_handler.setFormatter(logging.Formatter(log_format_console))
-    logger.addHandler(console_handler)
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler.setFormatter(formatter)
 
-    # Handler de Arquivo (Auditoria e Debug)
-    log_file = os.getenv("IPOLITICO_LOG_FILE", "ipolitico_etl.log")
-    file_handler = logging.FileHandler(log_file, encoding="utf-8")
-    file_handler.setFormatter(logging.Formatter(log_format_file))
-    # Para o arquivo, queremos capturar TUDO, inclusive nível DEBUG
-    file_handler.setLevel(logging.DEBUG)
-    logger.addHandler(file_handler)
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
 
-    # Silencia o barulho excessivo das bibliotecas HTTP base
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
 
     return logger
