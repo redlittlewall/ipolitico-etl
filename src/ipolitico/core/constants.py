@@ -24,6 +24,7 @@ class ApiRoutes(str, Enum):
     PARTIDOS = "partidos"
     PROPOSICOES = "proposicoes"
     VOTACOES = "votacoes"
+    VOTOS = "votos"
     REFERENCIAS = "referencias"
 
 
@@ -32,6 +33,7 @@ class ApiParams(str, Enum):
     Mapeamento oficial dos parâmetros da API de Dados Abertos da Câmara.
     """
 
+    ID = "id"
     DATA_INICIO = "dataInicio"
     DATA_FIM = "dataFim"
     ID_LEGISLATURA = "idLegislatura"
@@ -43,7 +45,7 @@ class ApiParams(str, Enum):
     MES = "mes"
     SIGLA_UF = "siglaUf"
     SIGLA_PARTIDO = "siglaPartido"
-
+    DATA_DOCUMENTO = "dataDocumento"
     # Valores padrão da API
     ORDEM_ASC = "ASC"
     ORDEM_DESC = "DESC"
