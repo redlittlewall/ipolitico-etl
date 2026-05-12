@@ -1,20 +1,20 @@
 import argparse
 import asyncio
+import logging
 import time
 from pathlib import Path
 
 import yaml
 
 from ipolitico.core.client import CamaraClient
-from ipolitico.core.config import SQLITE_DB_PATH
+from ipolitico.core.config import DB_PATH
 from ipolitico.core.constants import DomainType, LoadStrategy, SinkType
-from ipolitico.core.logger import setup_logger
 from ipolitico.pipeline.builder import PipelineBuilder
 from ipolitico.pipeline.manager import PipelineManager
 from ipolitico.pipeline.runner import PipelineRunner
 from ipolitico.sinks.sqlite_sink import SQLiteSink
 
-logger = setup_logger()
+logger = logging.getLogger(__name__)
 
 
 def load_config(file_path: Path) -> dict:
@@ -29,7 +29,7 @@ async def main():
     Lê os parâmetros do usuário, monta as peças e aciona o Gestor. Nenhuma
     regra de negócio ou IFs de domínio ocorrem aqui.
     """
-    parser = argparse.ArgumentParser(description="Motor ETL iPolitico Enterprise")
+    parser = argparse.ArgumentParser(description="Motor ETL iPolitico")
     parser.add_argument(
         "--source", type=str, default="api", help="Descontinuado - O YAML gerencia a origem."
     )
@@ -51,7 +51,7 @@ async def main():
     start_time = time.perf_counter()
     logger.info("=" * 60)
     logger.info(
-        f" iPolitico Enterprise ETL | Sink: {args.sink.value.upper()} |",
+        f" iPolitico ETL | Sink: {args.sink.value.upper()} |"
         f" Estratégia: {args.strategy.value.upper()}",
     )
     logger.info("=" * 60)
@@ -65,7 +65,7 @@ async def main():
     builder = PipelineBuilder(client)
     runner = PipelineRunner()
 
-    state_store = SQLiteSink(db_path=SQLITE_DB_PATH)
+    state_store = SQLiteSink(db_path=DB_PATH)
 
     manager = PipelineManager(builder, runner, pipeline_config, state_store)
 

@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from ipolitico.core.constants import (
     EARLIEST_DATE_MAP,
@@ -110,6 +110,59 @@ class PipelineManager:
 
         return actual_start, actual_end
 
+    def _generate_jobs(
+        self, domain: DomainType, start: str, end: str
+    ) -> Tuple[List[Dict[str, Any]], Callable[[Dict[str, Any]], Dict[str, Any]]]:
+        """
+        Gera os micro-lotes (jobs) baseados na regra de negócio da entidade.
+
+        Args:
+            domain (DomainType): O domínio sendo extraído.
+            start (str): Data inicial da janela de orquestração.
+            end (str): Data final da janela de orquestração.
+
+        Returns:
+            Tuple[List[Dict], Callable]: Uma tupla contendo a lista de jobs
+            e a função mapper que adapta as chaves para os kwargs do Extrator.
+        """
+        domain_val = domain.value if hasattr(domain, "value") else str(domain)
+
+        if domain_val == DomainType.DESPESAS.value:
+            # Regra Específica: Despesas exigem iteração por (Deputado, Ano)
+            deputados_ids = self.state_store.get_existing_ids(
+                DomainType.DEPUTADOS.value, ApiParams.ID.value
+            )
+
+            if not deputados_ids:
+                logger.warning(
+                    f"[{domain_val.upper()}] Nenhum deputado encontrado no State Store! "
+                    f"Execute o pipeline de '{DomainType.DEPUTADOS.value}' primeiro."
+                )
+                return [], lambda x: {}
+
+            start_year = int(start.split("-")[0])
+            end_year = int(end.split("-")[0])
+
+            jobs = []
+            for dep_id in deputados_ids:
+                for year in range(start_year, end_year + 1):
+                    jobs.append({"deputado_id": dep_id, "year": year})
+
+            logger.info(f"[{domain_val.upper()}] Criados {len(jobs)} micro-lotes (Deputado x Ano).")
+
+            def despesas_mapper(job: dict) -> dict:
+                return {"deputado_id": job["deputado_id"], "year": job["year"]}
+
+            return jobs, despesas_mapper
+
+        # Regra Padrão: Apenas envia o range de tempo
+        jobs = [{"start_date": start, "end_date": end}]
+
+        def default_mapper(job: dict) -> dict:
+            return {"start_date": job["start_date"], "end_date": job["end_date"]}
+
+        return jobs, default_mapper
+
     async def run_domain(
         self,
         domain: DomainType,
@@ -134,22 +187,24 @@ class PipelineManager:
         # Resolve as datas consultando o banco
         start, end = self._resolve_dates(domain, strategy, start_date, end_date)
 
-        # Define o trabalho (Jobs)
-        # O Runner processará as tarefas. Como nosso fluxo temporal não está quebrando a data
-        # ano a ano aqui, passamos a fatia inteira.
-        jobs = [{"start_date": start, "end_date": end}]
+        # Define o trabalho (Jobs) e o mapeador de parâmetros
+        jobs, extract_kwargs_mapper = self._generate_jobs(domain, start, end)
 
-        def extract_kwargs_mapper(job: dict) -> dict:
-            return {"start_date": job["start_date"], "end_date": job["end_date"]}
+        if not jobs:
+            return
 
-        # 4. Executa o fluxo assíncrono (Runner)
+        # Resolve Chaves Primárias para Upsert Seguro
+        unique_keys = ApiParams.ID.value
+        domain_val = domain.value if hasattr(domain, "value") else str(domain)
+        if domain_val == DomainType.DESPESAS.value:
+            unique_keys = [ApiParams.DEPUTADO_ID.value, "numDocumento", "codDocumento"]
+
+        # Executa o fluxo assíncrono (Runner)
         await self.runner.execute(
             components=components,
             items=jobs,
             extract_kwargs_mapper=extract_kwargs_mapper,
             table_name=domain.value,
             layer=MedallionLayer.SILVER,
-            unique_keys=ApiParams.ID.value
-            if domain != DomainType.DESPESAS
-            else [ApiParams.DEPUTADO_ID.value, "numDocumento", "codDocumento"],
+            unique_keys=unique_keys,
         )

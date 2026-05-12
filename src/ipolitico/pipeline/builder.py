@@ -104,7 +104,7 @@ class PipelineBuilder:
             sink_instance = sink_class()
 
         logger.info(
-            f"Pipeline montado com sucesso: [{extractor_class.__name__} -> ",
+            f"Pipeline montado com sucesso: [{extractor_class.__name__} -> "
             f"{transformer_class.__name__} -> {sink_class.__name__}]",
         )
 

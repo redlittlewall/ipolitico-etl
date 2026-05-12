@@ -1,6 +1,7 @@
 from typing import Any
 
 import polars as pl
+
 from ipolitico.core.constants import ApiParams
 from ipolitico.transformers.base import BaseTransformer
 

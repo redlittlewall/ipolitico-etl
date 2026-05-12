@@ -14,6 +14,7 @@ DATA_DIR = BASE_DIR / "data"
 DB_PATH = DATA_DIR / "dbs" / os.getenv("DB_NAME", "ipolitico_state.db")
 TELEMETRY_PATH = DATA_DIR / "dbs" / "api_telemetry.db"
 LOG_PATH = DATA_DIR / "logs" / "ipolitico_etl.log"
+DATALAKE_DIR = DATA_DIR / "datalake"
 
 # --- Configurações da Câmara ---
 CAMARA_API_BASE_URL = os.getenv("CAMARA_API_BASE_URL", "https://dadosabertos.camara.leg.br/api/v2")
