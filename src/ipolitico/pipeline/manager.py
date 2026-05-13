@@ -50,12 +50,12 @@ class PipelineManager:
     def _resolve_watermark_column(self, domain: DomainType) -> str:
         """Define a coluna oficial de Data/Tempo para ser usada como Watermark em cada domínio."""
         mapping = {
-            DomainType.DEPUTADOS: "dataHoraInicio",
+            # DomainType.DEPUTADOS: "id",
             DomainType.DESPESAS: "dataDocumento",
             DomainType.PROPOSICOES: "dataApresentacao",
             DomainType.VOTACOES: "data",
         }
-        return mapping.get(domain, "data")
+        return mapping.get(domain)
 
     def _resolve_dates(
         self,
@@ -66,6 +66,7 @@ class PipelineManager:
     ) -> Tuple[str, str]:
         """
         Calcula a janela de tempo real baseada na estratégia (Incremental vs Full Load).
+        Trata entidades dimensionais de forma isolada, forçando a janela completa.
 
         Args:
             domain (DomainType): O domínio sendo avaliado.
@@ -81,7 +82,8 @@ class PipelineManager:
         if start_date:
             return start_date, actual_end
 
-        earliest_possible = EARLIEST_DATE_MAP.get(domain, "1826-04-29")
+        # Busca a data mais antiga possível para o domínio (ex: 1826 para deputados)
+        earliest_possible = EARLIEST_DATE_MAP.get(domain.value, "1826-04-29")
 
         if strategy == LoadStrategy.FULL_LOAD:
             actual_start = earliest_possible
@@ -89,24 +91,36 @@ class PipelineManager:
                 f"[{domain.value.upper()}] Estratégia FULL LOAD."
                 f" Iniciando extração do zero a partir de {actual_start}."
             )
-        else:
-            # Estratégia INCREMENTAL: Consulta o State Store real
-            watermark_col = self._resolve_watermark_column(domain)
-            watermark = self.state_store.get_watermark(domain.value, watermark_col)
+            return actual_start, actual_end
 
-            if watermark:
-                # Retorna apenas a data crua do timestamp
-                actual_start = str(watermark).split("T")[0]
-                logger.info(
-                    f"[{domain.value.upper()}] Estratégia INCREMENTAL."
-                    f" Retomando da última marca d'água: {actual_start}."
-                )
-            else:
-                actual_start = earliest_possible
-                logger.info(
-                    f"[{domain.value.upper()}] Tabela sem histórico."
-                    f" Iniciando carga inicial a partir de {actual_start}."
-                )
+        watermark_col = self._resolve_watermark_column(domain)
+
+        # SRP e Defensive Programming:
+        # Se não há coluna de watermark configurada, é uma tabela dimensional (ex: Deputados).
+        # Assumimos a janela completa e deixamos o UPSERT do Sink atualizar o que mudou.
+        if not watermark_col:
+            logger.info(
+                f"[{domain.value.upper()}] Entidade dimensional detectada."
+                " Assumindo janela completa para atualização (UPSERT)."
+            )
+            return earliest_possible, actual_end
+
+        # Estratégia INCREMENTAL para Fatos: Consulta o State Store real
+        watermark = self.state_store.get_watermark(domain.value, watermark_col)
+
+        if watermark:
+            # Retorna apenas a data crua do timestamp
+            actual_start = str(watermark).split("T")[0]
+            logger.info(
+                f"[{domain.value.upper()}] Estratégia INCREMENTAL."
+                f" Retomando da última marca d'água: {actual_start}."
+            )
+        else:
+            actual_start = earliest_possible
+            logger.info(
+                f"[{domain.value.upper()}] Tabela sem histórico."
+                f" Iniciando carga inicial a partir de {actual_start}."
+            )
 
         return actual_start, actual_end
 

@@ -1,6 +1,7 @@
 from typing import Any
 
 import polars as pl
+
 from ipolitico.core.constants import ApiParams
 from ipolitico.transformers.base import BaseTransformer
 
@@ -17,7 +18,7 @@ class CamaraDeputadosTransformer(BaseTransformer):
         if df.is_empty():
             return df
 
-        # 1. Recuperação de ID a partir da URI
+        # Recuperação de ID a partir da URI
         uri_col = next((c for c in df.columns if c.lower() == "uri"), None)
         id_col = next((c for c in df.columns if c.lower() == ApiParams.ID.value), None)
 
@@ -33,7 +34,7 @@ class CamaraDeputadosTransformer(BaseTransformer):
         elif id_col and id_col != ApiParams.ID.value:
             df = df.rename({id_col: ApiParams.ID.value})
 
-        # 2. Tratamento de Chave Estrangeira (Injeção de Contexto via Orquestrador)
+        # Tratamento de Chave Estrangeira (Injeção de Contexto via Orquestrador)
         is_child_entity = kwargs.get("is_child_entity", False)
         target_id_col = ApiParams.DEPUTADO_ID.value if is_child_entity else ApiParams.ID.value
 
@@ -46,7 +47,7 @@ class CamaraDeputadosTransformer(BaseTransformer):
                 f"Colunas retornadas: {df.columns}."
             )
 
-        # 3. Tipagem Forte de IDs
+        # Tipagem Forte de IDs
         cols_to_int = [
             target_id_col,
             ApiParams.ID_LEGISLATURA.value,
@@ -57,11 +58,14 @@ class CamaraDeputadosTransformer(BaseTransformer):
             [pl.col(c).cast(pl.Int64, strict=False) for c in cols_to_int if c in df.columns]
         )
 
-        # 4. Achatamento (Flattening) Estrito de JSONs para Persistência
+        # Achatamento (Flattening) Estrito de JSONs para Persistência
         struct_or_list_cols = [
             col for col in df.columns if isinstance(df.schema[col], (pl.Struct, pl.List))
         ]
         if struct_or_list_cols:
             df = df.with_columns([pl.col(c).to_json().alias(c) for c in struct_or_list_cols])
 
-        return df
+        # Evita inserção de duplicatas
+        clean_df = df.unique(subset=[ApiParams.ID.value], keep="last")
+
+        return clean_df

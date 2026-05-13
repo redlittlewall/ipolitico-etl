@@ -27,31 +27,74 @@ class SQLiteSink(BaseSink):
         self.db_path = db_path
         self._uri = f"sqlite:///{self.db_path}"
 
-    def get_watermark(self, table: str, column: str) -> Optional[str]:
+    def get_watermark(self, table_name: str, watermark_column: str) -> Optional[str]:
         """
-        Recupera o teto temporal (high-water mark) de uma tabela para cargas incrementais.
+        Consulta o banco de dados para encontrar o maior valor (data mais recente)
+        de uma determinada coluna, servindo como marca d'água (watermark) para o ETL.
+
+        Args:
+            table_name (str): Nome da tabela destino (ex: 'deputados').
+            watermark_column (str): Nome da coluna de data (ex: 'dataHoraInicio').
+
+        Returns:
+            Optional[str]: O valor máximo encontrado (formato string ISO) ou None se
+                           a tabela não existir ou estiver vazia.
         """
-        query = f"SELECT max({column}) FROM {table}"
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
+
+                # Verifica se a tabela existe (Programação Defensiva)
+                cursor.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,)
+                )
+                if not cursor.fetchone():
+                    logger.debug(f"StateStore: Tabela '{table_name}' não existe. Retornando None.")
+                    return None
+
+                #  Busca a data máxima.
+
+                query = f"SELECT MAX({watermark_column}) FROM {table_name}"
                 cursor.execute(query)
-                result = cursor.fetchone()[0]
-                return result.split("T")[0] if result else None
-        except sqlite3.OperationalError:
+                result = cursor.fetchone()
+
+                if result and result[0]:
+                    logger.debug(
+                        f"StateStore: Watermark encontrado para '{table_name}': {result[0]}"
+                    )
+                    return str(result[0])
+
+                return None
+
+        except sqlite3.OperationalError as e:
+            # Captura erros como "no such column" caso o schema tenha mudado
+            logger.warning(
+                f"StateStore: Falha ao ler watermark da tabela '{table_name}'. Erro: {e}"
+            )
+            return None
+        except Exception as e:
+            logger.error(f"StateStore: Erro inesperado ao consultar watermark: {e}")
             return None
 
-    def get_existing_ids(self, table: str, column: str = "id") -> List[Any]:
+    def get_existing_ids(self, table_name: str, id_column: str) -> List[Any]:
         """
         Recupera uma lista de chaves primárias já persistidas no banco de dados.
         Evita consultas HTTP desnecessárias.
         """
-        query = f"SELECT {column} FROM {table}"
         try:
             with sqlite3.connect(self.db_path) as conn:
-                df = pl.read_database(query=query, connection=conn)
-                return df[column].to_list() if not df.is_empty() else []
-        except Exception:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,)
+                )
+                if not cursor.fetchone():
+                    return []
+
+                cursor.execute(f"SELECT DISTINCT {id_column} FROM {table_name}")
+                # Extrai os IDs das tuplas retornadas
+                return [row[0] for row in cursor.fetchall() if row[0] is not None]
+        except Exception as e:
+            logger.warning(f"StateStore: Falha ao recuperar IDs da tabela '{table_name}': {e}")
             return []
 
     def read_columns(self, table_name: str, columns: List[str]) -> pl.DataFrame:
@@ -115,7 +158,9 @@ class SQLiteSink(BaseSink):
 
         index_name = f"idx_{table_name}_{'_'.join(keys)}"
         index_cols = ", ".join(keys)
-        index_query = f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} ({index_cols})"
+        index_query = (
+            f"CREATE UNIQUE INDEX IF NOT EXISTS {index_name} ON {table_name} ({index_cols})"
+        )
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()

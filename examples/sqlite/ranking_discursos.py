@@ -1,8 +1,8 @@
 # examples/ranking_discursos.py
 import sqlite3
 
-import polars as pl
-from ipolitico.core.config import SQLITE_DB_PATH
+from duckdb import pl
+from ipolitico.core.config import DB_PATH
 from ipolitico.core.logger import setup_logger
 
 logger = setup_logger()
@@ -12,7 +12,7 @@ def main():
     logger.info("Auditando a tabela de atividades temporais (Discursos)...")
 
     try:
-        conn = sqlite3.connect(SQLITE_DB_PATH)
+        conn = sqlite3.connect(DB_PATH)
 
         # Query 1: Quem falou mais vezes no período capturado?
         query_volume = """

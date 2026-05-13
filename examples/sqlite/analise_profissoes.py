@@ -2,7 +2,7 @@
 import sqlite3
 
 import polars as pl
-from ipolitico.core.config import SQLITE_DB_PATH
+from ipolitico.core.config import DB_PATH
 from ipolitico.core.logger import setup_logger
 
 logger = setup_logger()
@@ -12,7 +12,7 @@ def main():
     logger.info("Conectando ao banco de dados...")
 
     try:
-        conn = sqlite3.connect(SQLITE_DB_PATH)
+        conn = sqlite3.connect(DB_PATH)
 
         # Query: Junta a tabela de deputados com a tabela biográfica de profissões
         query = """
