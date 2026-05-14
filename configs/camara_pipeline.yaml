@@ -4,26 +4,28 @@ domain_configs:
     extractor: "ipolitico.extractors.camara.api.deputados.DeputadosExtractor"
     transformer: "ipolitico.transformers.camara.deputados_transformer.CamaraDeputadosTransformer"
     sinks:
-      sqlite: "ipolitico.sinks.sqlite_sink.SQLiteSink"
       datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
       
   despesas:
     extractor: "ipolitico.extractors.camara.api.despesas.DespesasExtractor"
     transformer: "ipolitico.transformers.camara.despesas_transformer.CamaraDespesasTransformer"
     sinks:
-      sqlite: "ipolitico.sinks.sqlite_sink.SQLiteSink"
       datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
       
   proposicoes:
     extractor: "ipolitico.extractors.camara.api.proposicoes.ProposicoesExtractor"
     transformer: "ipolitico.transformers.camara.proposicoes_transformer.CamaraProposicoesTransformer"
     sinks:
-      sqlite: "ipolitico.sinks.sqlite_sink.SQLiteSink"
       datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
       
   votacoes:
     extractor: "ipolitico.extractors.camara.api.votacoes.VotacoesExtractor"
     transformer: "ipolitico.transformers.camara.votacoes_transformer.CamaraVotacoesTransformer"
     sinks:
-      sqlite: "ipolitico.sinks.sqlite_sink.SQLiteSink"
       datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  votos:
+      extractor: "ipolitico.extractors.camara.api.votos.VotosExtractor"
+      transformer: "ipolitico.transformers.camara.votacoes_transformer.CamaraVotacoesTransformer"
+      sinks:
+        datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"

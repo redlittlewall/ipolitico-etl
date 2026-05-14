@@ -39,6 +39,7 @@ class CamaraClient:
             "User-Agent": "iPolitico-ETL-OpenSource/1.0",
         }
         self._init_telemetry()
+        self._semaphore = asyncio.Semaphore(2)
 
     def _init_telemetry(self):
         """Inicializa um banco SQLite super leve apenas para logs de requisições."""
@@ -86,46 +87,48 @@ class CamaraClient:
             CamaraAPIError: Se esgotar as tentativas de conexão ou receber erros de servidor.
         """
         url = f"{self.BASE_URL}/{endpoint.lstrip('/')}"
+        async with self._semaphore:
+            async with httpx.AsyncClient(timeout=30.0, headers=self.headers) as client:
+                for attempt in range(1, self.max_retries + 1):
+                    try:
+                        response = await client.get(url, params=params)
 
-        async with httpx.AsyncClient(timeout=30.0, headers=self.headers) as client:
-            for attempt in range(1, self.max_retries + 1):
-                try:
-                    response = await client.get(url, params=params)
+                        # Defesa contra Throttling (Erros Transientes)
+                        if response.status_code in (429, 500, 502, 503, 504):
+                            logger.warning(
+                                f"Throttling detectado ({response.status_code}) em {url}. "
+                                f"Tentativa {attempt}/{self.max_retries}."
+                            )
+                            await self._backoff(attempt)
+                            continue
 
-                    # Defesa contra Throttling (Erros Transientes)
-                    if response.status_code in (429, 500, 502, 503, 504):
-                        logger.warning(
-                            f"Throttling detectado ({response.status_code}) em {url}. "
-                            f"Tentativa {attempt}/{self.max_retries}."
+                        # Defesa contra Falsos Positivos da API - Aborta tentativa
+                        if response.status_code == 404:
+                            logger.debug(
+                                f"Recurso inexistente (404) em {url}. Assumindo lista vazia."
+                            )
+                            return []
+
+                        response.raise_for_status()
+                        payload = response.json()
+
+                        # Isola os dados úteis da casca de metadados da Câmara
+                        if "dados" in payload:
+                            return payload["dados"]
+
+                        return payload
+
+                    except httpx.RequestError as e:
+                        logger.error(
+                            f"Erro de rede ao conectar com a infraestrutura governamental: {e}"
                         )
                         await self._backoff(attempt)
-                        continue
 
-                    # Defesa contra Falsos Positivos da API - Aborta tentativa
-                    if response.status_code == 404:
-                        logger.debug(f"Recurso inexistente (404) em {url}. Assumindo lista vazia.")
-                        return []
-
-                    response.raise_for_status()
-                    payload = response.json()
-
-                    # Isola os dados úteis da casca de metadados da Câmara
-                    if "dados" in payload:
-                        return payload["dados"]
-
-                    return payload
-
-                except httpx.RequestError as e:
-                    logger.error(
-                        f"Erro de rede ao conectar com a infraestrutura governamental: {e}"
-                    )
-                    await self._backoff(attempt)
-
-            # Esgotadas as tentativas, estouramos o erro para o Extrator/Orquestrador agir
-            raise CamaraAPIError(
-                f"Falha catastrófica ao acessar {url} após "
-                f"{self.max_retries} tentativas com backoff."
-            )
+                # Esgotadas as tentativas, estouramos o erro para o Extrator/Orquestrador agir
+                raise CamaraAPIError(
+                    f"Falha catastrófica ao acessar {url} após "
+                    f"{self.max_retries} tentativas com backoff."
+                )
 
     async def download_file(self, url: str, dest_path: str) -> bool:
         """

@@ -7,12 +7,12 @@ from pathlib import Path
 import yaml
 
 from ipolitico.core.client import CamaraClient
-from ipolitico.core.config import DB_PATH
 from ipolitico.core.constants import DomainType, LoadStrategy, SinkType
 from ipolitico.pipeline.builder import PipelineBuilder
 from ipolitico.pipeline.manager import PipelineManager
+from ipolitico.pipeline.optimizer import DataLakeOptimizer
 from ipolitico.pipeline.runner import PipelineRunner
-from ipolitico.sinks.sqlite_sink import SQLiteSink
+from ipolitico.sinks.datalake_sink import DataLakeSink
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,11 @@ async def main():
     parser.add_argument(
         "--source", type=str, default="api", help="Descontinuado - O YAML gerencia a origem."
     )
-    parser.add_argument("--sink", type=SinkType, choices=list(SinkType), default=SinkType.SQLITE)
+    parser.add_argument(
+        "--optimize",
+        action="store_true",
+        help="Executa a consolidação (Camada Gold) via DuckDB após a ingestão.",
+    )
     parser.add_argument(
         "--strategy",
         type=LoadStrategy,
@@ -51,7 +55,7 @@ async def main():
     start_time = time.perf_counter()
     logger.info("=" * 60)
     logger.info(
-        f" iPolitico ETL | Sink: {args.sink.value.upper()} |"
+        f" iPolitico ETL (Ingestão) | Destino: DATALAKE  |"
         f" Estratégia: {args.strategy.value.upper()}",
     )
     logger.info("=" * 60)
@@ -65,7 +69,7 @@ async def main():
     builder = PipelineBuilder(client)
     runner = PipelineRunner()
 
-    state_store = SQLiteSink(db_path=DB_PATH)
+    state_store = DataLakeSink()
 
     manager = PipelineManager(builder, runner, pipeline_config, state_store)
 
@@ -74,11 +78,16 @@ async def main():
         for domain in args.domains:
             await manager.run_domain(
                 domain=domain,
-                sink_type=args.sink,
+                sink_type=SinkType.DATALAKE,
                 strategy=args.strategy,
                 start_date=args.start_date,
                 end_date=args.end_date,
             )
+
+            if args.optimize and args.sink == SinkType.DATALAKE:
+                logger.info(f"=== Otimizando Camada Gold para {domain.value.upper()} ===")
+                optimizer = DataLakeOptimizer()
+                optimizer.compact_and_deduplicate(domain.value)
     except Exception as e:
         logger.error(f"Falha catastrófica no ETL: {e}")
     finally:

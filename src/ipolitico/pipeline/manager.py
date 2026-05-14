@@ -141,10 +141,37 @@ class PipelineManager:
         """
         domain_val = domain.value if hasattr(domain, "value") else str(domain)
 
+        if domain_val == DomainType.DEPUTADOS.value:
+            # Em vez de datas, iteramos pelas legislaturas recentes.
+            # 50 = ~1995; 57 = 2023-2027
+            start_year = int(start.split("-")[0])
+            end_year = int(end.split("-")[0])
+
+            leg_start = 57 - ((2023 - start_year) // 4)
+            leg_end = 57 - ((2023 - end_year) // 4)
+
+            # Garante range mínimo (Legislatura 50 em diante como discutimos)
+            LEGISLATURAS_ALVO = list(range(max(1, leg_start), min(58, leg_end + 1)))
+
+            jobs = [{"idLegislatura": leg} for leg in LEGISLATURAS_ALVO]
+
+            logger.info(
+                f"[{domain_val.upper()}] Entidade Dimensional."
+                f"Iterando sobre {len(jobs)} legislaturas."
+            )
+
+            def deputados_mapper(job: dict) -> dict:
+                # Mapeia o parâmetro esperado pela API (e pelo seu Extractor)
+                return {"idLegislatura": job["idLegislatura"]}
+
+            return jobs, deputados_mapper
+
         if domain_val == DomainType.DESPESAS.value:
             # Regra Específica: Despesas exigem iteração por (Deputado, Ano)
             deputados_ids = self.state_store.get_existing_ids(
-                DomainType.DEPUTADOS.value, ApiParams.ID.value
+                table_name=DomainType.DEPUTADOS.value,
+                layer=MedallionLayer.SILVER.value,
+                column="id",
             )
 
             if not deputados_ids:
@@ -168,6 +195,53 @@ class PipelineManager:
                 return {"deputado_id": job["deputado_id"], "year": job["year"]}
 
             return jobs, despesas_mapper
+
+        if domain_val in [DomainType.PROPOSICOES.value, DomainType.VOTACOES.value]:
+            start_year = int(start.split("-")[0])
+            start_month = int(start.split("-")[1])
+            end_year = int(end.split("-")[0])
+            end_month = int(end.split("-")[1])
+
+            jobs = []
+            # Gera lotes de 1 mês para não estourar a API
+            for y in range(start_year, end_year + 1):
+                m_start = start_month if y == start_year else 1
+                m_end = end_month if y == end_year else 12
+                for m in range(m_start, m_end + 1):
+                    # Formata datas como "YYYY-MM-01" até o fim do mês
+                    first_day = f"{y}-{m:02d}-01"
+                    # Lógica simplificada (use a lib calendar para o último dia exato na prática)
+                    last_day = f"{y}-{m:02d}-28"
+                    jobs.append({"start_date": first_day, "end_date": last_day})
+
+            logger.info(f"[{domain_val.upper()}] Criados {len(jobs)} micro-lotes mensais.")
+
+            def time_mapper(job: dict) -> dict:
+                return {"start_date": job["start_date"], "end_date": job["end_date"]}
+
+            return jobs, time_mapper
+
+        if domain_val == "votos":
+            votacoes_ids = self.state_store.get_existing_ids(
+                table_name=DomainType.VOTACOES.value, layer=MedallionLayer.SILVER.value, column="id"
+            )
+
+            if not votacoes_ids:
+                logger.error("[VOTOS] Abortando. Pasta silver/votacoes vazia ou inexistente.")
+                return [], lambda x: {}
+
+            BATCH_SIZE = 20
+            jobs = [
+                {"votacao_ids": votacoes_ids[i : i + BATCH_SIZE]}
+                for i in range(0, len(votacoes_ids), BATCH_SIZE)
+            ]
+
+            logger.info(f"[VOTOS] Orquestrando {len(votacoes_ids)} votações em {len(jobs)} lotes.")
+
+            def votos_mapper(job: dict) -> dict:
+                return {"votacao_ids": job["votacao_ids"]}
+
+            return jobs, votos_mapper
 
         # Regra Padrão: Apenas envia o range de tempo
         jobs = [{"start_date": start, "end_date": end}]
@@ -210,8 +284,15 @@ class PipelineManager:
         # Resolve Chaves Primárias para Upsert Seguro
         unique_keys = ApiParams.ID.value
         domain_val = domain.value if hasattr(domain, "value") else str(domain)
+        t_kwargs = {}
+
         if domain_val == DomainType.DESPESAS.value:
             unique_keys = [ApiParams.DEPUTADO_ID.value, "numDocumento", "codDocumento"]
+        elif domain_val == DomainType.VOTOS.value:
+            unique_keys = [ApiParams.DEPUTADO_ID.value, "votacao_id"]
+            t_kwargs["sub_domain"] = "votos"
+        elif domain_val == "votacoes":
+            t_kwargs["sub_domain"] = "votacoes"
 
         # Executa o fluxo assíncrono (Runner)
         await self.runner.execute(
@@ -221,4 +302,5 @@ class PipelineManager:
             table_name=domain.value,
             layer=MedallionLayer.SILVER,
             unique_keys=unique_keys,
+            transform_kwargs=t_kwargs,
         )

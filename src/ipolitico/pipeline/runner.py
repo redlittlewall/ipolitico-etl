@@ -120,13 +120,12 @@ class PipelineRunner:
                     break
 
                 try:
-                    # CARGA (I/O de Gravação)
+                    # CARGA (I/O de Gravação Append-Only)
                     await components.sink.save(
                         df=df, table_name=table_name, layer=layer.value, unique_keys=unique_keys
                     )
                 except Exception as e:
                     logger.error(f"Erro ao salvar dados no Sink da tabela {table_name}: {e}")
-                    raise
                 finally:
                     df_queue.task_done()
 
