@@ -3,12 +3,11 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-# Ajuste conforme o seu diretório real
-DATALAKE_PATH = Path("datalake")
+DATALAKE_PATH = Path("data/datalake/bronze")
 
 
 def main():
-    parquet_file = DATALAKE_PATH / "despesas_old.parquet"
+    parquet_file = DATALAKE_PATH / "despesas.parquet"
     if not parquet_file.exists():
         print(f"Erro: Arquivo não encontrado em {parquet_file}")
         return

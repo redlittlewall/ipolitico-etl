@@ -1,11 +1,10 @@
-# examples/analise_profissoes.py
+import logging
 import sqlite3
 
 import polars as pl
 from ipolitico.core.config import DB_PATH
-from ipolitico.core.logger import setup_logger
 
-logger = setup_logger()
+logger = logging.getLogger(__name__)
 
 
 def main():
