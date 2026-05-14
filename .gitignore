@@ -32,4 +32,4 @@ datalake/
 *.db-journal
 *.parquet
 *.csv
-*.zip
+*.zipdata_backup_*/
