@@ -47,4 +47,12 @@ class DespesasExtractor(CamaraBaseExtractor):
         logger.debug(f"Fetching despesas for dep {deputado_id} ({year}/{month})")
         data = await self.fetch_paginated(endpoint, self.build_params(raw_params))
 
-        return pl.DataFrame(data) if data else pl.DataFrame()
+        if not data:
+            return pl.DataFrame()
+
+        df = pl.DataFrame(data)
+
+        if not df.is_empty():
+            df = df.with_columns(pl.lit(deputado_id).alias(ApiParams.DEPUTADO_ID.value))
+
+        return df

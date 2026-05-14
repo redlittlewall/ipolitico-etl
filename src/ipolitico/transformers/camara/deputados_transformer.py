@@ -1,9 +1,11 @@
-from typing import Any
+import logging
+from typing import Any, Dict
 
 import polars as pl
 
-from ipolitico.core.constants import ApiParams
 from ipolitico.transformers.base import BaseTransformer
+
+logger = logging.getLogger(__name__)
 
 
 class CamaraDeputadosTransformer(BaseTransformer):
@@ -14,58 +16,47 @@ class CamaraDeputadosTransformer(BaseTransformer):
     em URIs e serialização de estruturas complexas para salvar no banco/DataLake.
     """
 
-    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+    def transform(self, df: pl.DataFrame, **kwargs: Dict[str, Any]) -> pl.DataFrame:
         if df.is_empty():
             return df
 
-        # Recuperação de ID a partir da URI
-        uri_col = next((c for c in df.columns if c.lower() == "uri"), None)
-        id_col = next((c for c in df.columns if c.lower() == ApiParams.ID.value), None)
+        # Padronização de Nomes
+        mapping = {
+            "uri": "url_perfil",
+            "urlFoto": "url_foto",
+            "siglaUf": "uf",
+            "siglaPartido": "partido",
+        }
+        df = df.rename({k: v for k, v in mapping.items() if k in df.columns})
 
-        if uri_col and not id_col:
-            df = df.with_columns(
-                pl.col(uri_col)
-                .str.split("/")
-                .list.get(-1)
-                .cast(pl.Int64, strict=False)
-                .alias(ApiParams.ID.value)
+        # =====================================================================
+        # BLINDAGEM ESTRITA DE SCHEMA (Data Contract)
+        # =====================================================================
+        FINAL_SCHEMA = {
+            "id": pl.Int64,
+            "nome": pl.String,
+            "partido": pl.String,
+            "uf": pl.String,
+            "idLegislatura": pl.Int64,
+            "url_foto": pl.String,
+            "email": pl.String,
+        }
+
+        try:
+            missing_cols = [col for col in FINAL_SCHEMA.keys() if col not in df.columns]
+            if missing_cols:
+                for missing in missing_cols:
+                    if missing == "email":
+                        df = df.with_columns(pl.lit(None).alias("email"))
+                    else:
+                        raise ValueError(f"Coluna obrigatória omitida pela API: {missing}")
+
+            df = df.select(
+                [pl.col(col).cast(dtype, strict=True) for col, dtype in FINAL_SCHEMA.items()]
             )
-            df = df.drop_nulls(subset=[ApiParams.ID.value])
-        elif id_col and id_col != ApiParams.ID.value:
-            df = df.rename({id_col: ApiParams.ID.value})
 
-        # Tratamento de Chave Estrangeira (Injeção de Contexto via Orquestrador)
-        is_child_entity = kwargs.get("is_child_entity", False)
-        target_id_col = ApiParams.DEPUTADO_ID.value if is_child_entity else ApiParams.ID.value
+        except Exception as e:
+            logger.error(f"[ALERTA CÍVICO - DEPUTADOS] Quebra de Contrato da API: {e}")
+            return pl.DataFrame()
 
-        if ApiParams.ID.value in df.columns and is_child_entity:
-            df = df.rename({ApiParams.ID.value: ApiParams.DEPUTADO_ID.value})
-
-        if target_id_col not in df.columns:
-            raise ValueError(
-                f"[ERRO DE CONTRATO] Coluna identificadora '{target_id_col}' ausente. "
-                f"Colunas retornadas: {df.columns}."
-            )
-
-        # Tipagem Forte de IDs
-        cols_to_int = [
-            target_id_col,
-            ApiParams.ID_LEGISLATURA.value,
-            "idLegislaturaInicial",
-            "idLegislaturaFinal",
-        ]
-        df = df.with_columns(
-            [pl.col(c).cast(pl.Int64, strict=False) for c in cols_to_int if c in df.columns]
-        )
-
-        # Achatamento (Flattening) Estrito de JSONs para Persistência
-        struct_or_list_cols = [
-            col for col in df.columns if isinstance(df.schema[col], (pl.Struct, pl.List))
-        ]
-        if struct_or_list_cols:
-            df = df.with_columns([pl.col(c).to_json().alias(c) for c in struct_or_list_cols])
-
-        # Evita inserção de duplicatas
-        clean_df = df.unique(subset=[ApiParams.ID.value], keep="last")
-
-        return clean_df
+        return df

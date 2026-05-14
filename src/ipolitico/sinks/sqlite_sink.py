@@ -114,7 +114,7 @@ class SQLiteSink(BaseSink):
         self,
         df: pl.DataFrame,
         table_name: str,
-        layer: MedallionLayer = MedallionLayer.BRONZE,
+        layer: MedallionLayer = MedallionLayer.SILVER,
         unique_keys: Optional[Union[str, List[str]]] = None,
         **kwargs: Any,
     ) -> None:

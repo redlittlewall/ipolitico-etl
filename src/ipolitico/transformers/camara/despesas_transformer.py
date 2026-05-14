@@ -1,9 +1,12 @@
+import logging
 from typing import Any, Dict
 
 import polars as pl
 
 from ipolitico.core.constants import ApiParams
 from ipolitico.transformers.base import BaseTransformer
+
+logger = logging.getLogger(__name__)
 
 
 class CamaraDespesasTransformer(BaseTransformer):
@@ -28,16 +31,6 @@ class CamaraDespesasTransformer(BaseTransformer):
         """
         if df.is_empty():
             return df
-
-        deputado_id = kwargs.get("deputado_id")
-        target_col = ApiParams.DEPUTADO_ID.value
-
-        if (
-            deputado_id is not None
-            and "nuDeputadoId" not in df.columns
-            and target_col not in df.columns
-        ):
-            df = df.with_columns(pl.lit(deputado_id).alias(target_col))
 
         # Padronização de Nomes (Resolve mismatch entre Bulk CSV e API JSON)
         mapping = {
@@ -85,14 +78,45 @@ class CamaraDespesasTransformer(BaseTransformer):
         if "valorDocumento" in df.columns:
             transformations.append(self._parse_br_currency(df, "valorDocumento"))
 
-        # if ApiParams.DEPUTADO_ID.value in df.columns:
-        # transformations.append(pl.col(ApiParams.DEPUTADO_ID.value).cast(pl.Int64, strict=False))
-
-        if target_col in df.columns:
-            transformations.append(pl.col(target_col).cast(pl.Int64, strict=False))
-
         if transformations:
             df = df.with_columns(transformations)
+
+        # =====================================================================
+        # BLINDAGEM ESTrita DE SCHEMA (Data Contract)
+        # =====================================================================
+        target_col = ApiParams.DEPUTADO_ID.value
+
+        # Define as colunas exatas e seus tipos obrigatórios
+        EXPECTED_SCHEMA = {
+            target_col: pl.Int64,
+            "ano": pl.Int64,
+            "mes": pl.Int64,
+            "codDocumento": pl.String,
+            "numDocumento": pl.String,
+            "tipoDespesa": pl.String,
+            "parcela": pl.Int64,
+            ApiParams.DATA_DOCUMENTO.value: pl.Datetime,
+            "valorDocumento": pl.Float64,
+            "valorLiquido": pl.Float64,
+            "nomeFornecedor": pl.String,
+            "cnpjCpfFornecedor": pl.String,
+        }
+
+        try:
+            # Valida se todas as colunas existem
+            missing_cols = [col for col in EXPECTED_SCHEMA.keys() if col not in df.columns]
+            if missing_cols:
+                raise ValueError(f"A API omitiu colunas obrigatórias: {missing_cols}")
+
+            # Força a seleção estrita e o cast. Se a API mudou tipos, isso quebra.
+            df = df.select(
+                [pl.col(col).cast(dtype, strict=True) for col, dtype in EXPECTED_SCHEMA.items()]
+            )
+
+        except Exception as e:
+            logger.error(f"[ALERTA CÍVICO] Quebra de Contrato da API detectada: {e}")
+            # Retorna Vazio. O Consumer não salvará lixo no Data Lake.
+            return pl.DataFrame()
 
         return df
 

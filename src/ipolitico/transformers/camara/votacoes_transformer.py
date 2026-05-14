@@ -1,8 +1,12 @@
+import logging
 from typing import Any
 
 import polars as pl
+
 from ipolitico.core.constants import ApiParams, DomainType
 from ipolitico.transformers.base import BaseTransformer
+
+logger = logging.getLogger(__name__)
 
 
 class CamaraVotacoesTransformer(BaseTransformer):
@@ -10,7 +14,8 @@ class CamaraVotacoesTransformer(BaseTransformer):
     Transformer responsável pelo domínio de Votações e Votos.
 
     Lida com o achatamento (flattening) de estruturas JSON aninhadas da API
-    e renomeação de colunas do Bulk para um schema único e coeso na camada Silver.
+    e renomeação de colunas. Aplica o contrato de dados estrito para garantir
+    a governança do Data Lake.
     """
 
     def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
@@ -28,11 +33,14 @@ class CamaraVotacoesTransformer(BaseTransformer):
         if df.is_empty():
             return df
 
-        # Uso de Enum para evitar Magic Strings
-        sub_domain = kwargs.get("sub_domain", DomainType.VOTACOES)
+        # Uso de Enum para evitar Magic Strings e separar as lógicas
+        sub_domain = kwargs.get("sub_domain", DomainType.VOTACOES.value)
 
-        if sub_domain == DomainType.VOTACOES:
-            # Lógica do cabeçalho da votação
+        # =====================================================================
+        # LÓGICA 1: CABEÇALHOS DAS VOTAÇÕES
+        # =====================================================================
+        if sub_domain == DomainType.VOTACOES.value:
+            # 1. Tratamento de Datas (Robustez contra a string suja da API)
             date_cols = ["data", "dataHoraRegistro"]
             transformations = [
                 pl.col(c).str.to_datetime(strict=False) for c in date_cols if c in df.columns
@@ -40,30 +48,96 @@ class CamaraVotacoesTransformer(BaseTransformer):
             if transformations:
                 df = df.with_columns(transformations)
 
-        elif sub_domain == DomainType.VOTOS:
-            # 1. Tratamento da API: Achatamento do Struct (Substitui loops Python lentos)
+            # 2. Contrato de Dados (Schema Enforcement)
+            EXPECTED_SCHEMA_VOTACOES = {
+                "id": pl.String,  # A API costuma mandar ID alfanumérico para votações
+                "uri": pl.String,
+                "data": pl.Datetime,
+                "dataHoraRegistro": pl.Datetime,
+                "siglaOrgao": pl.String,
+                "uriOrgao": pl.String,
+                "uriEvento": pl.String,
+                "proposicaoObjeto": pl.String,
+                "descricao": pl.String,
+                "aprovacao": pl.Int64,  # Pode vir nulo se a votação não foi concluída
+            }
+
+            try:
+                missing_cols = [
+                    col for col in EXPECTED_SCHEMA_VOTACOES.keys() if col not in df.columns
+                ]
+                if missing_cols:
+                    # A API frequentemente omite a uriEvento se não houver gravação em vídeo/áudio
+                    # Resiliência controlada:
+                    for missing in missing_cols:
+                        if missing in ["uriEvento", "aprovacao"]:
+                            df = df.with_columns(pl.lit(None).alias(missing))
+                        else:
+                            raise ValueError(f"Coluna obrigatória omitida na Votação: {missing}")
+
+                df = df.select(
+                    [
+                        pl.col(col).cast(dtype, strict=True)
+                        for col, dtype in EXPECTED_SCHEMA_VOTACOES.items()
+                    ]
+                )
+
+            except Exception as e:
+                logger.error(f"[ALERTA CÍVICO - VOTACOES] Quebra de Contrato: {e}")
+                return pl.DataFrame()
+
+        # =====================================================================
+        # LÓGICA 2: VOTOS NOMINAIS (O Problema N+1)
+        # =====================================================================
+        if sub_domain == DomainType.VOTOS.value:
+            if "votacao_id" not in df.columns:
+                logger.error(
+                    "[ALERTA CÍVICO - VOTOS] Coluna 'votacao_id' ausente no DataFrame bruto."
+                    " Extrator falhou."
+                )
+                return pl.DataFrame()
+
+            # 2. Achatamento do Struct da API (Substitui loops Python lentos)
             dep_col = "deputado_"
             if dep_col in df.columns and isinstance(df.schema[dep_col], pl.Struct):
                 df = df.with_columns(
                     [
                         pl.col(dep_col).struct.field("id").alias(ApiParams.DEPUTADO_ID.value),
-                        pl.col(dep_col)
-                        .struct.field(ApiParams.SIGLA_PARTIDO.value)
-                        .alias(ApiParams.PARTIDO_NO_VOTO.value),
-                        pl.col(dep_col)
-                        .struct.field(ApiParams.SIGLA_UF.value)
-                        .alias(ApiParams.UF_NO_VOTO.value),
+                        pl.col(dep_col).struct.field("siglaPartido").alias("partido"),
+                        pl.col(dep_col).struct.field("siglaUf").alias("uf"),
                     ]
                 ).drop(dep_col)
 
-            # 2. Tratamento do Bulk: Tradução de Schema para padrão Silver
+            # 3. Tratamento do Bulk: Tradução de Schema
             mapping = {"idDeputado": ApiParams.DEPUTADO_ID.value}
             df = df.rename({k: v for k, v in mapping.items() if k in df.columns})
 
-            # 3. Tipagem forte da Chave Estrangeira
-            if ApiParams.DEPUTADO_ID.value in df.columns:
-                df = df.with_columns(
-                    pl.col(ApiParams.DEPUTADO_ID.value).cast(pl.Int64, strict=False)
+            # 4. Contrato de Dados Estrito (Schema Enforcement)
+            EXPECTED_SCHEMA_VOTOS = {
+                "tipoVoto": pl.String,
+                "dataRegistroVoto": pl.String,
+                ApiParams.DEPUTADO_ID.value: pl.Int64,
+                "partido": pl.String,
+                "uf": pl.String,
+                "votacao_id": pl.String,
+            }
+
+            try:
+                missing_cols = [
+                    col for col in EXPECTED_SCHEMA_VOTOS.keys() if col not in df.columns
+                ]
+                if missing_cols:
+                    raise ValueError(f"A API omitiu dados essenciais do Voto: {missing_cols}")
+
+                df = df.select(
+                    [
+                        pl.col(col).cast(dtype, strict=True)
+                        for col, dtype in EXPECTED_SCHEMA_VOTOS.items()
+                    ]
                 )
+
+            except Exception as e:
+                logger.error(f"[ALERTA CÍVICO - VOTOS] Quebra de Contrato no Voto Nominal: {e}")
+                return pl.DataFrame()
 
         return df

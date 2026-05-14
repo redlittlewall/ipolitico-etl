@@ -1,7 +1,11 @@
+import logging
 from typing import Any
 
 import polars as pl
+
 from ipolitico.transformers.base import BaseTransformer
+
+logger = logging.getLogger(__name__)
 
 
 class CamaraProposicoesTransformer(BaseTransformer):
@@ -26,12 +30,39 @@ class CamaraProposicoesTransformer(BaseTransformer):
         if df.is_empty():
             return df
 
-        date_cols = ["dataApresentacao"]
-        transformations = [
-            pl.col(c).str.to_datetime(strict=False) for c in date_cols if c in df.columns
-        ]
+        if "dataApresentacao" in df.columns:
+            df = df.with_columns(pl.col("dataApresentacao").str.to_datetime(strict=False))
 
-        if transformations:
-            df = df.with_columns(transformations)
+        # =====================================================================
+        # BLINDAGEM ESTRITA DE SCHEMA (Data Contract)
+        # =====================================================================
+        EXPECTED_SCHEMA = {
+            "id": pl.Int64,
+            "uri": pl.String,
+            "siglaTipo": pl.String,
+            "numero": pl.Int64,
+            "ano": pl.Int64,
+            "ementa": pl.String,
+            "dataApresentacao": pl.Datetime,
+            "uriOrgaoNumerador": pl.String,
+        }
+
+        try:
+            missing_cols = [col for col in EXPECTED_SCHEMA.keys() if col not in df.columns]
+            if missing_cols:
+                # O órgão numerador às vezes é nulo para propostas muito antigas
+                for missing in missing_cols:
+                    if missing == "uriOrgaoNumerador":
+                        df = df.with_columns(pl.lit(None).alias("uriOrgaoNumerador"))
+                    else:
+                        raise ValueError(f"Coluna obrigatória omitida: {missing}")
+
+            df = df.select(
+                [pl.col(col).cast(dtype, strict=True) for col, dtype in EXPECTED_SCHEMA.items()]
+            )
+
+        except Exception as e:
+            logger.error(f"[ALERTA CÍVICO - PROPOSIÇÕES] Quebra de Contrato da API: {e}")
+            return pl.DataFrame()
 
         return df
