@@ -56,6 +56,12 @@ Ideal para criar o banco analítico inicial. Baixa os "Dumps" CSV do governo e c
 python -m ipolitico.main --source bulk --sink datalake --strategy full_load --start-date 2023-01-01 --end-date 2023-12-31
 ```
 
+## Ordem sugerida (smoke local)
+
+1. Instale dependências (`pip install -e .`).
+2. Rode `bash examples/smoke_e2e.sh` (imports + `--help` sem rede).
+3. Para ETL real contra a API, use janelas curtas e rode `deputados` antes de domínios dependentes (ex.: `votos` após `votacoes`).
+
 ## Testes
 Garantimos a integridade do pipeline através de testes de integração com mocks de API:
 ```bash
