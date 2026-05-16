@@ -177,4 +177,4 @@ async def test_sqlite_delete_period_success_logging(temp_sqlite, caplog):
         assert res == [(2,)]
 
     # 4. Validação da Auditoria: O log deve conter a mensagem de 1 registro eliminado
-    assert "FULL_LOAD: 1 registos eliminados no período" in caplog.text
+    assert "FULL_LOAD: 1 registros apagados entre 2026-02-01 e 2026-02-28" in caplog.text
