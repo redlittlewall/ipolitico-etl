@@ -50,7 +50,7 @@ class DespesasExtractor(CamaraBaseExtractor):
         if not data:
             return pl.DataFrame()
 
-        df = pl.DataFrame(data)
+        df = pl.DataFrame(data, infer_schema_length=None)
 
         if not df.is_empty():
             df = df.with_columns(pl.lit(deputado_id).alias(ApiParams.DEPUTADO_ID.value))

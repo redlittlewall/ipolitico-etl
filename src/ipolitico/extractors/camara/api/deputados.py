@@ -3,7 +3,6 @@ from typing import Any, Optional
 
 import polars as pl
 
-from ipolitico.core.config import CAMARA_PAGE_SIZE
 from ipolitico.core.constants import ApiParams, ApiRoutes
 from ipolitico.extractors.camara.api.camara_base import CamaraBaseExtractor
 
@@ -46,7 +45,7 @@ class DeputadosExtractor(CamaraBaseExtractor):
         logger.debug(f"Fetching deputados from API with params: {raw_params}")
         data = await self.fetch_paginated(ApiRoutes.DEPUTADOS.value, self.build_params(raw_params))
 
-        return pl.DataFrame(data) if data else pl.DataFrame()
+        return pl.DataFrame(data, infer_schema_length=None) if data else pl.DataFrame()
 
     async def extract_detalhes(self, deputado_id: int) -> pl.DataFrame:
         """
@@ -99,7 +98,6 @@ class DeputadosExtractor(CamaraBaseExtractor):
         raw_params = {
             ApiParams.DATA_INICIO.value: start_date,
             ApiParams.DATA_FIM.value: end_date,
-            ApiParams.ITENS.value: CAMARA_PAGE_SIZE,
         }
 
         data = await self.fetch_paginated(endpoint, self.build_params(raw_params))

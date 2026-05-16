@@ -59,6 +59,11 @@ class CamaraBaseExtractor(BaseExtractor):
         Returns:
             List[Dict[str, Any]]: Todos os registros acumulados das múltiplas páginas.
         """
+        page_limit_key = ApiParams.ITENS.value
+        if params.get(page_limit_key) is None:
+            params[page_limit_key] = CAMARA_PAGE_SIZE
+        page_limit = int(params[page_limit_key])
+
         all_data = []
         page = 1
 
@@ -72,7 +77,7 @@ class CamaraBaseExtractor(BaseExtractor):
 
             all_data.extend(data)
 
-            if len(data) < CAMARA_PAGE_SIZE:
+            if len(data) < page_limit:
                 break
 
             page += 1

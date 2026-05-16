@@ -18,7 +18,7 @@ DATALAKE_DIR = DATA_DIR / "datalake"
 
 # --- Configurações da Câmara ---
 CAMARA_API_BASE_URL = os.getenv("CAMARA_API_BASE_URL", "https://dadosabertos.camara.leg.br/api/v2")
-CAMARA_PAGE_SIZE = int(os.getenv("CAMARA_PAGE_SIZE", 100))
+CAMARA_PAGE_SIZE = int(os.getenv("CAMARA_PAGE_SIZE", 1000))
 LEGISLATURA_ATUAL = int(os.getenv("LEGISLATURA_ATUAL", 57))
 
 # --- Tuning de Performance ---
