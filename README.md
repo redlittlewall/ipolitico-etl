@@ -40,20 +40,30 @@ pip install -e .
 ```
 
 ## Execução via CLI (Command Line Interface)
-O orquestrador é totalmente parametrizável. Você pode escolher a origem dos dados (--source), o destino (--sink), a estratégia (--strategy) e os limites temporais.
 
-1. Atualização Diária (Incremental via API)
+Parâmetros principais: `--strategy`, `--domains`, `--start-date`, `--end-date`, `--optimize`.
+A origem (API vs Bulk) é escolhida pelo `SourceRouter`; o destino é o Data Lake (Parquet).
 
-Ideal para rodar via cron todos os dias. Lê a última data do banco e puxa apenas o que falta:
+1. Incremental (janela explícita)
+
 ```bash
-python -m ipolitico.main --source api --sink sqlite --strategy incremental
+python -m ipolitico.main --strategy incremental \
+  --domains deputados --start-date 2025-01-01 --end-date 2025-01-31
 ```
 
-2. Criação do Data Lake Histórico (Bulk Load)
+2. Full load multi-ano (Bulk automático em despesas/proposições/votações quando aplicável)
 
-Ideal para criar o banco analítico inicial. Baixa os "Dumps" CSV do governo e converte para Parquet particionado:
 ```bash
-python -m ipolitico.main --source bulk --sink datalake --strategy full_load --start-date 2023-01-01 --end-date 2023-12-31
+python -m ipolitico.main --strategy full_load \
+  --domains despesas --start-date 2023-01-01 --end-date 2024-12-31
+```
+
+3. Ordem recomendada: `deputados` → `despesas` → `proposicoes` → `votacoes` → `votos` (votos exige IDs em silver/gold de votações).
+
+```bash
+python -m ipolitico.main --strategy incremental \
+  --domains proposicoes votacoes votos \
+  --start-date 2025-01-01 --end-date 2025-01-31 --optimize
 ```
 
 ## Ordem sugerida (smoke local)

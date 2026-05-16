@@ -32,16 +32,25 @@ class VotacoesExtractor(CamaraBaseExtractor):
             pl.DataFrame: Metadados puros das votações.
         """
         raw_params = {
-            ApiParams.DATA_INICIO: start_date,
-            ApiParams.DATA_FIM: end_date,
-            ApiParams.ORDEM: ApiParams.ORDEM_ASC.value,
-            ApiParams.ORDENAR_POR: "data",
+            ApiParams.DATA_INICIO.value: start_date,
+            ApiParams.DATA_FIM.value: end_date,
+            ApiParams.ORDEM.value: ApiParams.ORDEM_ASC.value,
+            ApiParams.ORDENAR_POR.value: "data",
         }
 
         logger.debug(f"Fetching votacoes from {start_date} to {end_date}")
         data = await self.fetch_paginated(ApiRoutes.VOTACOES.value, self.build_params(raw_params))
 
-        return pl.DataFrame(data) if data else pl.DataFrame()
+        if not data:
+            logger.info(
+                "Nenhuma votação retornada pela API para o período %s a %s.",
+                start_date,
+                end_date,
+            )
+            return pl.DataFrame()
+
+        logger.info("API votações: %s registros brutos no período.", len(data))
+        return pl.DataFrame(data, infer_schema_length=None)
 
     async def extract_votos(self, votacao_id: str) -> pl.DataFrame:
         """

@@ -146,14 +146,21 @@ class CamaraJobPlanner:
             return jobs, time_mapper
 
         if domain_val == DomainType.VOTOS.value:
-            votacoes_ids = self._state_store.get_existing_ids(
-                table_name=DomainType.VOTACOES.value,
-                layer=MedallionLayer.SILVER.value,
-                column="id",
-            )
+            if self._lake is not None:
+                votacoes_ids = self._lake.list_votacao_ids_silver_or_gold()
+            else:
+                votacoes_ids = self._state_store.get_existing_ids(
+                    table_name=DomainType.VOTACOES.value,
+                    layer=MedallionLayer.SILVER.value,
+                    column="id",
+                )
 
             if not votacoes_ids:
-                logger.error("[VOTOS] Abortando. Pasta silver/votacoes vazia ou inexistente.")
+                logger.error(
+                    "[VOTOS] Abortando: nenhum ID em silver/votacoes (ou gold). "
+                    "Rode votacoes no mesmo período antes e confira logs de transformação "
+                    "(linhas brutas descartadas = contrato Silver)."
+                )
                 return [], lambda x: {}
 
             batch_size = 20

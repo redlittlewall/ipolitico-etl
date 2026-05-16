@@ -2,6 +2,7 @@ from pathlib import Path
 
 import duckdb
 import pandas as pd
+from ipolitico.core.schemas import DESPESAS_PARTITION_KEYS
 
 # Aponta para o diretório Gold que o Optimizer gerou
 GOLD_DIR = Path("data/datalake/gold")
@@ -39,12 +40,13 @@ def validar_camada_gold():
     # ---------------------------------------------------------
     # 2. TESTE DE DEDUPLICAÇÃO (INTEGRIDADE)
     # ---------------------------------------------------------
-    print("\n[2] 🔍 Teste de Integridade (Duplicatas):")
+    print("\n[2] 🔍 Teste de Integridade (Duplicatas — PK Gold):")
+    pk_cols = ", ".join(DESPESAS_PARTITION_KEYS)
     query_duplicatas = f"""
-        SELECT codDocumento, numDocumento, id_deputado, COUNT(*) as qtd
+        SELECT {pk_cols}, COUNT(*) as qtd
         FROM '{despesas_path}'
         WHERE codDocumento IS NOT NULL
-        GROUP BY 1, 2, 3
+        GROUP BY {pk_cols}
         HAVING COUNT(*) > 1
     """
     duplicatas = conn.execute(query_duplicatas).df()

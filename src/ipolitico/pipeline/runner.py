@@ -92,11 +92,16 @@ class PipelineRunner:
                     raw_df = await components.extractor.extract(**extract_args)
 
                     if raw_df is not None and not raw_df.is_empty():
-                        # TRANSFORMAÇÃO (Camada "Inteligente" em Memória)
                         clean_df = components.transformer.transform(raw_df, **t_kwargs)
 
-                        if clean_df is not None and not clean_df.is_empty():
-                            # O .put() bloqueia a corrotina se a fila atingir o maxsize
+                        if clean_df is None or clean_df.is_empty():
+                            logger.warning(
+                                "[%s] %s linhas brutas descartadas na transformação "
+                                "(contrato Silver ou filtro temporal).",
+                                table_name,
+                                raw_df.height,
+                            )
+                        else:
                             await df_queue.put(clean_df)
 
                 except Exception as e:

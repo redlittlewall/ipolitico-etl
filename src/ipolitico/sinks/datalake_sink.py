@@ -78,9 +78,9 @@ class DataLakeSink:
             return []
 
         try:
-            # scan_parquet lê apenas os metadados e a coluna específica
             lazy_df = pl.scan_parquet(layer_dir / "*.parquet")
-            return lazy_df.select(column).unique().collect()[column].to_list()
+            series = lazy_df.select(column).unique().collect()[column].drop_nulls()
+            return [v for v in series.to_list() if v is not None and v != ""]
         except Exception as e:
             logger.error(f"Erro ao ler IDs do DataLake ({layer}/{table_name}): {e}")
             return []

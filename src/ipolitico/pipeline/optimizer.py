@@ -24,13 +24,21 @@ class DataLakeOptimizer:
         source_layer: str = MedallionLayer.SILVER,
         target_layer: str = MedallionLayer.GOLD,
     ):
-        source_path = self.base_dir / source_layer / table_name / "*.parquet"
+        source_dir = self.base_dir / source_layer / table_name
+        if not source_dir.exists() or not list(source_dir.glob("*.parquet")):
+            logger.warning(
+                "[%s] Sem arquivos em %s; Gold não gerado (rode ingestão antes).",
+                table_name.upper(),
+                source_dir,
+            )
+            return
+
+        source_path = source_dir / "*.parquet"
         target_dir = self.base_dir / target_layer / table_name
         target_dir.mkdir(parents=True, exist_ok=True)
 
         target_file = target_dir / f"{table_name}.parquet"
 
-        # Conexão na memória RAM (DuckDB faz swap no disco se faltar RAM)
         con = duckdb.connect(database=":memory:")
 
         logger.info(f"[{table_name.upper()}] Iniciando compactação e deduplicação Out-of-Core...")

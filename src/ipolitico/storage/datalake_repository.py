@@ -68,3 +68,54 @@ class DataLakeRepository:
                 e,
             )
             return silver_fallback_ids
+
+    def list_ids(self, table_name: str, layer: str, column: str = "id") -> List[Any]:
+        """IDs distintos em silver/<tabela> ou gold/<tabela>/<tabela>.parquet."""
+        import polars as pl
+
+        layer_dir = self.base_dir / layer / table_name
+        if not layer_dir.exists():
+            return []
+
+        gold_file = layer_dir / f"{table_name}.parquet"
+        if gold_file.exists():
+            try:
+                series = pl.scan_parquet(gold_file).select(column).unique().collect()[column]
+                return [v for v in series.drop_nulls().to_list() if v is not None and v != ""]
+            except Exception as e:
+                logger.error(
+                    "[DataLakeRepository] Falha ao ler %s de %s: %s",
+                    column,
+                    gold_file,
+                    e,
+                )
+                return []
+
+        if not list(layer_dir.glob("*.parquet")):
+            return []
+
+        try:
+            series = (
+                pl.scan_parquet(layer_dir / "*.parquet").select(column).unique().collect()[column]
+            )
+            return [v for v in series.drop_nulls().to_list() if v is not None and v != ""]
+        except Exception as e:
+            logger.error(
+                "[DataLakeRepository] Falha ao listar %s em %s/%s: %s",
+                column,
+                layer,
+                table_name,
+                e,
+            )
+            return []
+
+    def list_votacao_ids_silver_or_gold(self) -> List[Any]:
+        """IDs de votações para enfileirar votos (silver, depois gold)."""
+        ids = self.list_ids(DomainType.VOTACOES.value, "silver", "id")
+        if ids:
+            logger.info("[DataLakeRepository] %s IDs de votações na Silver.", len(ids))
+            return ids
+        ids = self.list_ids(DomainType.VOTACOES.value, "gold", "id")
+        if ids:
+            logger.info("[DataLakeRepository] %s IDs de votações na Gold (fallback).", len(ids))
+        return ids

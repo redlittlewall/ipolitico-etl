@@ -17,7 +17,8 @@ BULK_REGISTRY: dict[str, dict] = {
     },
     "despesas": {
         "requires_year": True,
-        "url": "https://www.camara.leg.br/cotas/Ano-{year}.zip",
+        # Padrão CEAP documentado: http://www.camara.leg.br/cotas/Ano-{ano}.csv.zip
+        "url": "http://www.camara.leg.br/cotas/Ano-{year}.csv.zip",
         "bulk_granularity": "year",
         "bulk_filter_date_column": "dataDocumento",
     },
