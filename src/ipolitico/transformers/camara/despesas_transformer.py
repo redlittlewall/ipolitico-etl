@@ -3,7 +3,8 @@ from typing import Any, Dict
 
 import polars as pl
 
-from ipolitico.core.constants import ApiParams
+from ipolitico.core.constants import ApiParams, DomainType
+from ipolitico.core.schemas import SILVER_SCHEMAS
 from ipolitico.transformers.base import BaseTransformer
 
 logger = logging.getLogger(__name__)
@@ -32,90 +33,63 @@ class CamaraDespesasTransformer(BaseTransformer):
         if df.is_empty():
             return df
 
-        # Padronização de Nomes (Resolve mismatch entre Bulk CSV e API JSON)
-        mapping = {
-            "nuDeputadoId": ApiParams.DEPUTADO_ID.value,
+        bulk_aliases = {
+            "nuDeputadoId": "id_deputado",
             "datEmissao": ApiParams.DATA_DOCUMENTO.value,
-            "vlrDocumento": "valorDocumento",
             "vlrLiquido": "valorLiquido",
+            "vlrDocumento": "valorDocumento",
+            "vlrGlosa": "valorGlosa",
             "txtFornecedor": "nomeFornecedor",
-            "txtCNPJCPF": "cnpjCpfFornecedor",
-            "cnpjCpf": "cnpjCpfFornecedor",
-            "ideDocumento": "codDocumento",
-            "txtNumero": "numDocumento",
-            "txtDescricao": "tipoDespesa",
         }
-        df = df.rename({k: v for k, v in mapping.items() if k in df.columns})
-
-        # BLINDAGEM DE SCHEMA:
-        # Essas colunas podem conter apenas números em alguns lotes, induzindo o Polars ao erro.
-        string_columns = [
-            "cnpjCpfFornecedor",
-            "numDocumento",
-            "codDocumento",
-            "numLote",
-            "parcela",
-            "idDocumento",
-        ]
-
-        existing_str_cols = [c for c in string_columns if c in df.columns]
-        if existing_str_cols:
-            df = df.with_columns(
-                [pl.col(c).cast(pl.String, strict=False) for c in existing_str_cols]
-            )
-
-        # Transformações de Tipos (Datas, Moedas e Inteiros)
-        transformations = []
+        df = df.rename({k: v for k, v in bulk_aliases.items() if k in df.columns})
 
         if ApiParams.DATA_DOCUMENTO.value in df.columns:
-            transformations.append(
-                pl.col(ApiParams.DATA_DOCUMENTO.value).str.to_datetime(strict=False)
+            df = df.with_columns(
+                pl.col(ApiParams.DATA_DOCUMENTO.value)
+                .str.slice(0, 10)
+                .alias(ApiParams.DATA_DOCUMENTO.value)
             )
 
-        if "valorLiquido" in df.columns:
-            transformations.append(self._parse_br_currency(df, "valorLiquido"))
+        flt = kwargs.get("bulk_temporal_filter")
+        if flt:
+            from ipolitico.transformers.bulk_window import apply_bulk_temporal_filter
 
-        if "valorDocumento" in df.columns:
-            transformations.append(self._parse_br_currency(df, "valorDocumento"))
+            fc, lo, hi = flt
+            df = apply_bulk_temporal_filter(df, fc, lo, hi)
+            if df.is_empty():
+                return df
 
-        if transformations:
-            df = df.with_columns(transformations)
+        for col_moeda in ["valorLiquido", "valorDocumento", "valorGlosa"]:
+            if col_moeda in df.columns and df.schema[col_moeda] == pl.String:
+                df = df.with_columns(
+                    pl.col(col_moeda)
+                    .str.replace_all(r"\.", "")
+                    .str.replace(r",", ".")
+                    .alias(col_moeda)
+                )
 
-        # =====================================================================
-        # BLINDAGEM ESTrita DE SCHEMA (Data Contract)
-        # =====================================================================
-        target_col = ApiParams.DEPUTADO_ID.value
-
-        # Define as colunas exatas e seus tipos obrigatórios
-        EXPECTED_SCHEMA = {
-            target_col: pl.Int64,
-            "ano": pl.Int64,
-            "mes": pl.Int64,
-            "codDocumento": pl.String,
-            "numDocumento": pl.String,
-            "tipoDespesa": pl.String,
-            "parcela": pl.Int64,
-            ApiParams.DATA_DOCUMENTO.value: pl.Datetime,
-            "valorDocumento": pl.Float64,
-            "valorLiquido": pl.Float64,
-            "nomeFornecedor": pl.String,
-            "cnpjCpfFornecedor": pl.String,
-        }
+        contract = SILVER_SCHEMAS[DomainType.DESPESAS.value]
 
         try:
-            # Valida se todas as colunas existem
-            missing_cols = [col for col in EXPECTED_SCHEMA.keys() if col not in df.columns]
-            if missing_cols:
-                raise ValueError(f"A API omitiu colunas obrigatórias: {missing_cols}")
+            # Filtra colunas indesejadas (lixo da API)
+            cols_to_keep = [c for c in contract.keys() if c in df.columns]
+            df = df.select(cols_to_keep)
 
-            # Força a seleção estrita e o cast. Se a API mudou tipos, isso quebra.
+            # Injeta Nulos para colunas do contrato que a API omitiu (ex: valorGlosa)
+            for expected_col, dtype in contract.items():
+                if expected_col not in df.columns:
+                    df = df.with_columns(pl.lit(None).alias(expected_col))
+
+            # Cast em massa otimizado (strict=False para converter strings numéricas limpadas)
             df = df.select(
-                [pl.col(col).cast(dtype, strict=True) for col, dtype in EXPECTED_SCHEMA.items()]
+                [pl.col(col).cast(dtype, strict=False) for col, dtype in contract.items()]
             )
+
+            # Filtro Cívico: Remove notas sem código (corrompidas) e com valor zero
+            df = df.filter((pl.col("codDocumento").is_not_null()) & (pl.col("valorLiquido") != 0.0))
 
         except Exception as e:
             logger.error(f"[ALERTA CÍVICO] Quebra de Contrato da API detectada: {e}")
-            # Retorna Vazio. O Consumer não salvará lixo no Data Lake.
             return pl.DataFrame()
 
         return df

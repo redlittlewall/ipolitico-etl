@@ -3,6 +3,8 @@ from typing import Any
 
 import polars as pl
 
+from ipolitico.core.constants import DomainType
+from ipolitico.core.schemas import SILVER_SCHEMAS
 from ipolitico.transformers.base import BaseTransformer
 
 logger = logging.getLogger(__name__)
@@ -30,27 +32,26 @@ class CamaraProposicoesTransformer(BaseTransformer):
         if df.is_empty():
             return df
 
+        flt = kwargs.get("bulk_temporal_filter")
+        if flt:
+            from ipolitico.transformers.bulk_window import apply_bulk_temporal_filter
+
+            fc, lo, hi = flt
+            df = apply_bulk_temporal_filter(df, fc, lo, hi)
+            if df.is_empty():
+                return df
+
         if "dataApresentacao" in df.columns:
             df = df.with_columns(pl.col("dataApresentacao").str.to_datetime(strict=False))
 
         # =====================================================================
         # BLINDAGEM ESTRITA DE SCHEMA (Data Contract)
         # =====================================================================
-        EXPECTED_SCHEMA = {
-            "id": pl.Int64,
-            "uri": pl.String,
-            "siglaTipo": pl.String,
-            "numero": pl.Int64,
-            "ano": pl.Int64,
-            "ementa": pl.String,
-            "dataApresentacao": pl.Datetime,
-            "uriOrgaoNumerador": pl.String,
-        }
+        contract = SILVER_SCHEMAS[DomainType.PROPOSICOES.value]
 
         try:
-            missing_cols = [col for col in EXPECTED_SCHEMA.keys() if col not in df.columns]
+            missing_cols = [col for col in contract.keys() if col not in df.columns]
             if missing_cols:
-                # O órgão numerador às vezes é nulo para propostas muito antigas
                 for missing in missing_cols:
                     if missing == "uriOrgaoNumerador":
                         df = df.with_columns(pl.lit(None).alias("uriOrgaoNumerador"))
@@ -58,7 +59,7 @@ class CamaraProposicoesTransformer(BaseTransformer):
                         raise ValueError(f"Coluna obrigatória omitida: {missing}")
 
             df = df.select(
-                [pl.col(col).cast(dtype, strict=True) for col, dtype in EXPECTED_SCHEMA.items()]
+                [pl.col(col).cast(dtype, strict=True) for col, dtype in contract.items()]
             )
 
         except Exception as e:

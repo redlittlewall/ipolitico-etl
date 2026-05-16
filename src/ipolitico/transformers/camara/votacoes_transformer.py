@@ -4,6 +4,7 @@ from typing import Any
 import polars as pl
 
 from ipolitico.core.constants import ApiParams, DomainType
+from ipolitico.core.schemas import SILVER_SCHEMAS
 from ipolitico.transformers.base import BaseTransformer
 
 logger = logging.getLogger(__name__)
@@ -48,24 +49,20 @@ class CamaraVotacoesTransformer(BaseTransformer):
             if transformations:
                 df = df.with_columns(transformations)
 
+            bf = kwargs.get("bulk_temporal_filter")
+            if bf:
+                from ipolitico.transformers.bulk_window import apply_bulk_temporal_filter
+
+                fc, lo, hi = bf
+                df = apply_bulk_temporal_filter(df, fc, lo, hi)
+                if df.is_empty():
+                    return pl.DataFrame()
+
             # 2. Contrato de Dados (Schema Enforcement)
-            EXPECTED_SCHEMA_VOTACOES = {
-                "id": pl.String,  # A API costuma mandar ID alfanumérico para votações
-                "uri": pl.String,
-                "data": pl.Datetime,
-                "dataHoraRegistro": pl.Datetime,
-                "siglaOrgao": pl.String,
-                "uriOrgao": pl.String,
-                "uriEvento": pl.String,
-                "proposicaoObjeto": pl.String,
-                "descricao": pl.String,
-                "aprovacao": pl.Int64,  # Pode vir nulo se a votação não foi concluída
-            }
+            schema_vot = SILVER_SCHEMAS[DomainType.VOTACOES.value]
 
             try:
-                missing_cols = [
-                    col for col in EXPECTED_SCHEMA_VOTACOES.keys() if col not in df.columns
-                ]
+                missing_cols = [col for col in schema_vot.keys() if col not in df.columns]
                 if missing_cols:
                     # A API frequentemente omite a uriEvento se não houver gravação em vídeo/áudio
                     # Resiliência controlada:
@@ -76,10 +73,7 @@ class CamaraVotacoesTransformer(BaseTransformer):
                             raise ValueError(f"Coluna obrigatória omitida na Votação: {missing}")
 
                 df = df.select(
-                    [
-                        pl.col(col).cast(dtype, strict=True)
-                        for col, dtype in EXPECTED_SCHEMA_VOTACOES.items()
-                    ]
+                    [pl.col(col).cast(dtype, strict=True) for col, dtype in schema_vot.items()]
                 )
 
             except Exception as e:
@@ -113,27 +107,15 @@ class CamaraVotacoesTransformer(BaseTransformer):
             df = df.rename({k: v for k, v in mapping.items() if k in df.columns})
 
             # 4. Contrato de Dados Estrito (Schema Enforcement)
-            EXPECTED_SCHEMA_VOTOS = {
-                "tipoVoto": pl.String,
-                "dataRegistroVoto": pl.String,
-                ApiParams.DEPUTADO_ID.value: pl.Int64,
-                "partido": pl.String,
-                "uf": pl.String,
-                "votacao_id": pl.String,
-            }
+            schema_votos = SILVER_SCHEMAS[DomainType.VOTOS.value]
 
             try:
-                missing_cols = [
-                    col for col in EXPECTED_SCHEMA_VOTOS.keys() if col not in df.columns
-                ]
+                missing_cols = [col for col in schema_votos.keys() if col not in df.columns]
                 if missing_cols:
                     raise ValueError(f"A API omitiu dados essenciais do Voto: {missing_cols}")
 
                 df = df.select(
-                    [
-                        pl.col(col).cast(dtype, strict=True)
-                        for col, dtype in EXPECTED_SCHEMA_VOTOS.items()
-                    ]
+                    [pl.col(col).cast(dtype, strict=True) for col, dtype in schema_votos.items()]
                 )
 
             except Exception as e:
