@@ -5,7 +5,7 @@ from typing import Any, Dict
 
 from ipolitico.core.client import CamaraClient
 from ipolitico.core.config import DATA_DIR, DB_PATH
-from ipolitico.core.constants import SinkType
+from ipolitico.core.constants import SinkType, SourceType
 from ipolitico.extractors.base import BaseExtractor
 from ipolitico.sinks.base import BaseSink
 from ipolitico.transformers.base import BaseTransformer
@@ -64,7 +64,12 @@ class PipelineBuilder:
             logger.error(f"Falha catastrófica ao carregar classe dinamicamente: {class_path}")
             raise ImportError(f"Não foi possível importar {class_path}: {e}")
 
-    def build(self, domain_config: Dict[str, str], sink_type: SinkType) -> PipelineComponents:
+    def build(
+        self,
+        domain_config: Dict[str, Any],
+        sink_type: SinkType,
+        source_type: SourceType = SourceType.API,
+    ) -> PipelineComponents:
         """
         Instancia Extractor, Transformer e Sink, injetando suas dependências.
 
@@ -78,8 +83,12 @@ class PipelineBuilder:
         """
         logger.debug("Construindo blocos do pipeline via injeção dinâmica...")
 
-        # Instancia o Extrator injetando o Client
-        extractor_class = self._import_class(domain_config["extractor"])
+        extractor_path_key = (
+            "extractor_bulk"
+            if source_type == SourceType.BULK and domain_config.get("extractor_bulk")
+            else "extractor"
+        )
+        extractor_class = self._import_class(domain_config[extractor_path_key])
         extractor_instance = extractor_class(client=self.client)
 
         # Instancia o Transformer (Puro, sem dependências de I/O)

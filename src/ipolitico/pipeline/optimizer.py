@@ -4,6 +4,7 @@ from pathlib import Path
 import duckdb
 
 from ipolitico.core.constants import ApiParams, DomainType, MedallionLayer
+from ipolitico.core.schemas import despesas_optimizer_partition_sql
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ class DataLakeOptimizer:
 
         try:
             if table_name == DomainType.DESPESAS.value:
-                pk_cols = f"{ApiParams.DEPUTADO_ID.value},numDocumento, codDocumento, parcela, valorLiquido"  # noqa: E501
+                pk_cols = despesas_optimizer_partition_sql()
             elif table_name in [
                 DomainType.DEPUTADOS.value,
                 DomainType.PROPOSICOES.value,
