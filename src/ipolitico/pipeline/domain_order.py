@@ -19,6 +19,8 @@ FULL_CAMARA_PIPELINE: tuple[DomainType, ...] = (
 DOMAIN_UPSTREAM_REQUIREMENTS: dict[DomainType, frozenset[DomainType]] = {
     DomainType.DESPESAS: frozenset({DomainType.DEPUTADOS}),
     DomainType.VOTOS: frozenset({DomainType.VOTACOES}),
+    DomainType.PROFISSÕES: frozenset({DomainType.DEPUTADOS}),
+    DomainType.OCUPACOES: frozenset({DomainType.DEPUTADOS}),
 }
 
 

@@ -15,6 +15,7 @@ class DomainSpec:
     watermark_column: str | None
     earliest_iso: str
     depends_on: FrozenSet[DomainType]
+    bulk_granularity: str | None = None
 
 
 def _spec(
@@ -22,11 +23,13 @@ def _spec(
     wm: str | None,
     deps: FrozenSet[DomainType] = frozenset(),
 ) -> DomainSpec:
+    meta = BULK_REGISTRY.get(domain.value, {})
     return DomainSpec(
         domain=domain,
         watermark_column=wm,
         earliest_iso=EARLIEST_DATE_MAP.get(domain, "1826-04-29"),
         depends_on=deps,
+        bulk_granularity=meta.get("bulk_granularity"),
     )
 
 
@@ -40,8 +43,22 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
     DomainType.PROPOSICOES: _spec(DomainType.PROPOSICOES, "dataApresentacao"),
     DomainType.VOTACOES: _spec(DomainType.VOTACOES, "data"),
     DomainType.VOTOS: _spec(DomainType.VOTOS, None, frozenset({DomainType.VOTACOES})),
+    DomainType.PROFISSÕES: _spec(
+        DomainType.PROFISSÕES,
+        None,
+        frozenset({DomainType.DEPUTADOS}),
+    ),
+    DomainType.OCUPACOES: _spec(
+        DomainType.OCUPACOES,
+        None,
+        frozenset({DomainType.DEPUTADOS}),
+    ),
 }
 
 
 def bulk_meta_for_domain(domain: DomainType) -> dict:
     return BULK_REGISTRY.get(domain.value, {})
+
+
+def spec_for(domain: DomainType) -> DomainSpec | None:
+    return DOMAIN_SPECS.get(domain)

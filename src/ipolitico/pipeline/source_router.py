@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from ipolitico.core.constants import DomainType, LoadStrategy, SourceType
+from ipolitico.core.domain_spec import bulk_meta_for_domain, spec_for
 from ipolitico.pipeline.effective_window import resolve_calendar_years
 
 
@@ -44,7 +45,11 @@ class SourceRouter:
         effective_start_iso: str,
         effective_end_iso: str,
     ) -> ExtractionPlan:
-        if domain not in _BULK_YEARLY_DOMAINS:
+        spec = spec_for(domain)
+        meta = bulk_meta_for_domain(domain)
+        granularity = (spec.bulk_granularity if spec else None) or meta.get("bulk_granularity")
+
+        if domain not in _BULK_YEARLY_DOMAINS or granularity != "year":
             return ExtractionPlan(SourceType.API)
 
         if strategy != LoadStrategy.FULL_LOAD:
@@ -54,9 +59,6 @@ class SourceRouter:
         if ey - sy < 1:
             return ExtractionPlan(SourceType.API)
 
-        from ipolitico.extractors.camara.bulk.registry import BULK_REGISTRY
-
-        meta = BULK_REGISTRY.get(domain.value, {})
         col = meta.get("bulk_filter_date_column")
         return ExtractionPlan(
             SourceType.BULK,

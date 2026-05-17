@@ -58,7 +58,7 @@ python -m ipolitico.main --strategy full_load \
   --domains despesas --start-date 2023-01-01 --end-date 2024-12-31
 ```
 
-3. Ordem recomendada: `deputados` → `despesas` → `proposicoes` → `votacoes` → `votos` (votos exige IDs em silver/gold de votações).
+3. Ordem recomendada: `deputados` → `despesas` → `proposicoes` → `votacoes` → `votos` (votos exige IDs em silver/gold de votações no **mesmo período**). Opcional: `profissoes` / `ocupacoes` após `deputados`.
 
 ```bash
 python -m ipolitico.main --strategy incremental \

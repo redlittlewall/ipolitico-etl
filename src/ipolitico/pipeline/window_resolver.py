@@ -4,7 +4,8 @@ import logging
 from datetime import datetime
 from typing import Optional, Tuple
 
-from ipolitico.core.constants import EARLIEST_DATE_MAP, DomainType, LoadStrategy
+from ipolitico.core.constants import DomainType, LoadStrategy
+from ipolitico.core.domain_spec import spec_for
 from ipolitico.sinks.base import BaseSink
 
 logger = logging.getLogger(__name__)
@@ -18,12 +19,8 @@ class WindowResolver:
 
     @staticmethod
     def watermark_column(domain: DomainType) -> Optional[str]:
-        mapping = {
-            DomainType.DESPESAS: "dataDocumento",
-            DomainType.PROPOSICOES: "dataApresentacao",
-            DomainType.VOTACOES: "data",
-        }
-        return mapping.get(domain)
+        spec = spec_for(domain)
+        return spec.watermark_column if spec else None
 
     def resolve(
         self,
@@ -33,7 +30,8 @@ class WindowResolver:
         end_date: Optional[str] = None,
     ) -> Tuple[str, str]:
         actual_end = end_date or datetime.now().strftime("%Y-%m-%d")
-        earliest_possible = EARLIEST_DATE_MAP.get(domain, "1826-04-29")
+        spec = spec_for(domain)
+        earliest_possible = spec.earliest_iso if spec else "1826-04-29"
 
         if start_date:
             actual_start = max(start_date, earliest_possible)

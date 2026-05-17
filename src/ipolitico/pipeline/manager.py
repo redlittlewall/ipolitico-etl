@@ -134,6 +134,9 @@ class PipelineManager:
             t_kwargs["sub_domain"] = "votos"
         elif domain_val == DomainType.VOTACOES.value:
             t_kwargs["sub_domain"] = "votacoes"
+        elif domain_val in (DomainType.PROFISSÕES.value, DomainType.OCUPACOES.value):
+            unique_keys = ["id_deputado", "titulo", "entidade", "anoInicio"]
+            t_kwargs["sub_domain"] = domain_val
 
         if (
             extraction_plan.source_type == SourceType.BULK

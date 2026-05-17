@@ -73,4 +73,18 @@ SILVER_SCHEMAS = {
         "uf": pl.String,
         "votacao_id": pl.String,
     },
+    DomainType.PROFISSÕES.value: {
+        "id_deputado": pl.Int64,
+        "titulo": pl.String,
+        "entidade": pl.String,
+        "anoInicio": pl.Int64,
+        "anoFim": pl.Int64,
+    },
+    DomainType.OCUPACOES.value: {
+        "id_deputado": pl.Int64,
+        "titulo": pl.String,
+        "entidade": pl.String,
+        "anoInicio": pl.Int64,
+        "anoFim": pl.Int64,
+    },
 }

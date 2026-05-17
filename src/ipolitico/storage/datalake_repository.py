@@ -109,8 +109,36 @@ class DataLakeRepository:
             )
             return []
 
-    def list_votacao_ids_silver_or_gold(self) -> List[Any]:
-        """IDs de votações para enfileirar votos (silver, depois gold)."""
+    def list_votacao_ids_silver_or_gold(
+        self,
+        start_iso: str | None = None,
+        end_iso: str | None = None,
+    ) -> List[Any]:
+        """
+        IDs de votações para enfileirar votos (silver, depois gold).
+
+        Com start_iso/end_iso, restringe pela coluna ``data`` à janela efetiva.
+        """
+        if start_iso and end_iso:
+            ids = self._list_votacao_ids_in_window("silver", start_iso, end_iso)
+            if ids:
+                logger.info(
+                    "[DataLakeRepository] %s votações na Silver na janela %s..%s.",
+                    len(ids),
+                    start_iso[:10],
+                    end_iso[:10],
+                )
+                return ids
+            ids = self._list_votacao_ids_in_window("gold", start_iso, end_iso)
+            if ids:
+                logger.info(
+                    "[DataLakeRepository] %s votações na Gold na janela %s..%s.",
+                    len(ids),
+                    start_iso[:10],
+                    end_iso[:10],
+                )
+            return ids
+
         ids = self.list_ids(DomainType.VOTACOES.value, "silver", "id")
         if ids:
             logger.info("[DataLakeRepository] %s IDs de votações na Silver.", len(ids))
@@ -119,3 +147,62 @@ class DataLakeRepository:
         if ids:
             logger.info("[DataLakeRepository] %s IDs de votações na Gold (fallback).", len(ids))
         return ids
+
+    def _list_votacao_ids_in_window(self, layer: str, start_iso: str, end_iso: str) -> List[Any]:
+        import polars as pl
+
+        lo, hi = start_iso[:10], end_iso[:10]
+        table = DomainType.VOTACOES.value
+        layer_dir = self.base_dir / layer / table
+        if not layer_dir.exists():
+            return []
+
+        gold_file = layer_dir / f"{table}.parquet"
+        paths = [gold_file] if gold_file.exists() else list(layer_dir.glob("*.parquet"))
+        if not paths:
+            return []
+
+        try:
+            lazy = pl.scan_parquet(paths)
+            schema = lazy.collect_schema()
+            if "data" not in schema.names():
+                return self.list_ids(table, layer, "id")
+
+            dtype = schema["data"]
+            is_dt = dtype == pl.Datetime or str(dtype).lower().startswith("datetime")
+            day_col = (
+                pl.col("data").dt.strftime("%Y-%m-%d")
+                if is_dt
+                else pl.col("data").cast(pl.Utf8, strict=False).str.slice(0, 10)
+            )
+            series = (
+                lazy.filter((day_col >= lo) & (day_col <= hi)).select("id").unique().collect()["id"]
+            )
+            return [v for v in series.drop_nulls().to_list() if v is not None and v != ""]
+        except Exception as e:
+            logger.error(
+                "[DataLakeRepository] Falha ao filtrar votações por janela em %s: %s",
+                layer,
+                e,
+            )
+            return []
+
+    def list_deputy_expense_year_pairs(self) -> set[tuple[Any, int]]:
+        """Pares (id_deputado, ano) já materializados na Silver de despesas."""
+        import polars as pl
+
+        layer_dir = self.base_dir / "silver" / DomainType.DESPESAS.value
+        if not layer_dir.exists() or not list(layer_dir.glob("*.parquet")):
+            return set()
+
+        try:
+            df = (
+                pl.scan_parquet(layer_dir / "*.parquet")
+                .select("id_deputado", "ano")
+                .unique()
+                .collect()
+            )
+            return {(row[0], int(row[1])) for row in df.iter_rows() if row[0] is not None}
+        except Exception as e:
+            logger.warning("[DataLakeRepository] Não foi possível listar pares despesas: %s", e)
+            return set()

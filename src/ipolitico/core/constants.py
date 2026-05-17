@@ -99,4 +99,6 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.PROPOSICOES: EarliestDates.PROPOSICOES,
     DomainType.VOTACOES: EarliestDates.VOTACOES,
     DomainType.DESPESAS: EarliestDates.DESPESAS,
+    DomainType.PROFISSÕES: EarliestDates.DEPUTADOS,
+    DomainType.OCUPACOES: EarliestDates.DEPUTADOS,
 }

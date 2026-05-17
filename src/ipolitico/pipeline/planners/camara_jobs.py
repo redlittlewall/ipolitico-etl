@@ -10,6 +10,7 @@ from ipolitico.core.constants import (
 )
 from ipolitico.core.legislature import legislature_id_bounds_for_calendar_years
 from ipolitico.pipeline.effective_window import resolve_calendar_years
+from ipolitico.pipeline.job_resume import filter_despesas_api_jobs
 from ipolitico.pipeline.source_router import ExtractionPlan
 from ipolitico.storage.datalake_repository import DataLakeRepository
 
@@ -101,6 +102,10 @@ class CamaraJobPlanner:
                 for year in range(start_year, end_year + 1):
                     jobs.append({"deputado_id": dep_id, "year": year})
 
+            if self._lake is not None:
+                covered = self._lake.list_deputy_expense_year_pairs()
+                jobs = filter_despesas_api_jobs(jobs, covered)
+
             logger.info(
                 f"[{domain_val.upper()}] Criados {len(jobs)} micro-lotes "
                 f"(legs ~{leg_start}..{leg_end}, anos {start_year}..{end_year})."
@@ -145,9 +150,42 @@ class CamaraJobPlanner:
 
             return jobs, time_mapper
 
+        if domain_val in (DomainType.PROFISSÕES.value, DomainType.OCUPACOES.value):
+            silver_fallback = self._state_store.get_existing_ids(
+                table_name=DomainType.DEPUTADOS.value,
+                layer=MedallionLayer.SILVER.value,
+                column="id",
+            )
+            if self._lake is not None:
+                deputados_ids = self._lake.list_ids(
+                    DomainType.DEPUTADOS.value, "gold", "id"
+                ) or self._lake.list_ids(DomainType.DEPUTADOS.value, "silver", "id")
+            else:
+                deputados_ids = silver_fallback
+
+            if not deputados_ids:
+                logger.error(
+                    "[%s] Abortando: nenhum deputado no lake. Rode '%s' antes.",
+                    domain_val.upper(),
+                    DomainType.DEPUTADOS.value,
+                )
+                return [], lambda x: {}
+
+            jobs = [{"deputado_id": dep_id} for dep_id in deputados_ids]
+            logger.info(
+                "[%s] %s jobs (1 requisição por deputado).",
+                domain_val.upper(),
+                len(jobs),
+            )
+
+            def child_mapper(job: dict) -> dict:
+                return {"deputado_id": job["deputado_id"]}
+
+            return jobs, child_mapper
+
         if domain_val == DomainType.VOTOS.value:
             if self._lake is not None:
-                votacoes_ids = self._lake.list_votacao_ids_silver_or_gold()
+                votacoes_ids = self._lake.list_votacao_ids_silver_or_gold(start, end)
             else:
                 votacoes_ids = self._state_store.get_existing_ids(
                     table_name=DomainType.VOTACOES.value,
