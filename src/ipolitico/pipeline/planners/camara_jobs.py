@@ -53,6 +53,29 @@ _EVENTO_CHILDREN = frozenset(
         DomainType.EVENTOS_PAUTA.value,
     }
 )
+_ORGAO_NESTED = frozenset(
+    {
+        DomainType.ORGAOS_MEMBROS.value,
+        DomainType.ORGAOS_EVENTOS.value,
+        DomainType.ORGAOS_VOTACOES.value,
+    }
+)
+_GRUPO_CHILDREN = frozenset({DomainType.GRUPOS_MEMBROS.value, DomainType.GRUPOS_HISTORICO.value})
+_LEGISLATURA_CHILDREN = frozenset(
+    {DomainType.LEGISLATURAS_LIDERES.value, DomainType.LEGISLATURAS_MESA.value}
+)
+_DETAIL_DOMAINS = frozenset(
+    {
+        DomainType.DEPUTADOS_DETALHE.value,
+        DomainType.ORGAOS_DETALHE.value,
+        DomainType.EVENTOS_DETALHE.value,
+        DomainType.VOTACOES_DETALHE.value,
+        DomainType.FRENTES_DETALHE.value,
+        DomainType.PARTIDOS_DETALHE.value,
+        DomainType.GRUPOS_DETALHE.value,
+        DomainType.LEGISLATURAS_DETALHE.value,
+    }
+)
 
 
 class CamaraJobPlanner:
@@ -61,6 +84,18 @@ class CamaraJobPlanner:
     def __init__(self, state_store: Any, lake_repository: Optional[DataLakeRepository]) -> None:
         self._state_store = state_store
         self._lake = lake_repository
+
+    @staticmethod
+    def _batch_jobs(
+        ids: List[Any],
+        batch_key: str,
+        batch_size: int,
+        extra: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict[str, Any]]:
+        extra = extra or {}
+        return [
+            {batch_key: ids[i : i + batch_size], **extra} for i in range(0, len(ids), batch_size)
+        ]
 
     def build(
         self,
@@ -327,7 +362,7 @@ class CamaraJobPlanner:
 
             return jobs, orgaos_mapper
 
-        if domain_val == DomainType.ORGAOS_MEMBROS.value:
+        if domain_val in _ORGAO_NESTED:
             if self._lake is not None:
                 orgao_ids = self._lake.list_orgao_ids_silver_or_gold()
             else:
@@ -336,43 +371,42 @@ class CamaraJobPlanner:
                     layer=MedallionLayer.SILVER.value,
                     column="id",
                 )
-
             if not orgao_ids:
                 logger.error(
-                    "[ORGAOS_MEMBROS] Abortando: nenhum órgão no lake. Rode '%s' antes.",
+                    "[%s] Abortando: nenhum órgão no lake. Rode '%s' antes.",
+                    domain_val.upper(),
                     DomainType.ORGAOS.value,
                 )
                 return [], lambda x: {}
 
+            parent_col = "id_orgao"
             if self._lake is not None:
-                covered = self._lake.list_entity_ids_with_child_materialized(domain_val, "id_orgao")
+                covered = self._lake.list_entity_ids_with_child_materialized(domain_val, parent_col)
                 orgao_ids = filter_entity_ids_pending_child(
                     orgao_ids, covered, domain_val, "órgãos"
                 )
-
             if not orgao_ids:
-                logger.info("[ORGAOS_MEMBROS] Todos os órgãos já possuem membros materializados.")
+                logger.info("[%s] Órgãos já materializados.", domain_val.upper())
                 return [], lambda x: {}
 
-            batch_size = 15
-            jobs = [
-                {
-                    "orgao_ids": orgao_ids[i : i + batch_size],
-                    "start_date": start,
-                    "end_date": end,
-                }
-                for i in range(0, len(orgao_ids), batch_size)
-            ]
-            logger.info("[ORGAOS_MEMBROS] %s órgãos em %s lotes.", len(orgao_ids), len(jobs))
+            jobs = self._batch_jobs(
+                orgao_ids,
+                "orgao_ids",
+                15,
+                {"start_date": start, "end_date": end},
+            )
+            logger.info(
+                "[%s] %s órgãos em %s lotes.", domain_val.upper(), len(orgao_ids), len(jobs)
+            )
 
-            def orgaos_membros_mapper(job: dict) -> dict:
+            def orgao_nested_mapper(job: dict) -> dict:
                 return {
                     "orgao_ids": job["orgao_ids"],
                     "start_date": job["start_date"],
                     "end_date": job["end_date"],
                 }
 
-            return jobs, orgaos_membros_mapper
+            return jobs, orgao_nested_mapper
 
         if domain_val == DomainType.PARTIDOS.value:
             jobs = [
@@ -632,6 +666,98 @@ class CamaraJobPlanner:
 
             return jobs, blocos_partidos_mapper
 
+        if domain_val in _DETAIL_DOMAINS:
+            entity_ids, upstream = self._resolve_detail_entity_ids(
+                domain_val, start, end, current_leg, anchor_year
+            )
+            if not entity_ids:
+                logger.error(
+                    "[%s] Abortando: nenhum ID no lake. Rode '%s' antes.",
+                    domain_val.upper(),
+                    upstream,
+                )
+                return [], lambda x: {}
+
+            if self._lake is not None:
+                covered = self._lake.list_entity_ids_with_child_materialized(domain_val, "id")
+                entity_ids = filter_entity_ids_pending_child(
+                    entity_ids, covered, domain_val, "entidades"
+                )
+            if not entity_ids:
+                logger.info("[%s] Detalhes já materializados.", domain_val.upper())
+                return [], lambda x: {}
+
+            jobs = self._batch_jobs(entity_ids, "entity_ids", 25)
+            logger.info("[%s] %s IDs em %s lotes.", domain_val.upper(), len(entity_ids), len(jobs))
+
+            def detail_mapper(job: dict) -> dict:
+                return {"entity_ids": job["entity_ids"]}
+
+            return jobs, detail_mapper
+
+        if domain_val in _GRUPO_CHILDREN:
+            if self._lake is not None:
+                grupo_ids = self._lake.list_grupo_ids_silver_or_gold()
+            else:
+                grupo_ids = self._state_store.get_existing_ids(
+                    table_name=DomainType.GRUPOS.value,
+                    layer=MedallionLayer.SILVER.value,
+                    column="id",
+                )
+            if not grupo_ids:
+                logger.error(
+                    "[%s] Abortando: nenhum grupo no lake. Rode '%s' antes.",
+                    domain_val.upper(),
+                    DomainType.GRUPOS.value,
+                )
+                return [], lambda x: {}
+
+            if self._lake is not None:
+                covered = self._lake.list_entity_ids_with_child_materialized(domain_val, "id_grupo")
+                grupo_ids = filter_entity_ids_pending_child(
+                    grupo_ids, covered, domain_val, "grupos"
+                )
+            if not grupo_ids:
+                return [], lambda x: {}
+
+            jobs = self._batch_jobs(grupo_ids, "grupo_ids", 20)
+            logger.info(
+                "[%s] %s grupos em %s lotes.", domain_val.upper(), len(grupo_ids), len(jobs)
+            )
+
+            def grupo_child_mapper(job: dict) -> dict:
+                return {"grupo_ids": job["grupo_ids"]}
+
+            return jobs, grupo_child_mapper
+
+        if domain_val in _LEGISLATURA_CHILDREN:
+            if start == EARLIEST_DATE_MAP[DomainType.LEGISLATURAS]:
+                leg_ids = list(range(1, current_leg + 1))
+            else:
+                leg_ids = [current_leg]
+            if self._lake is not None:
+                covered = self._lake.list_entity_ids_with_child_materialized(
+                    domain_val, "id_legislatura"
+                )
+                leg_ids = filter_entity_ids_pending_child(
+                    leg_ids, covered, domain_val, "legislaturas"
+                )
+            if not leg_ids:
+                return [], lambda x: {}
+
+            jobs = self._batch_jobs(leg_ids, "legislatura_ids", 10)
+            logger.info(
+                "[%s] %s legislaturas em %s lotes.",
+                domain_val.upper(),
+                len(leg_ids),
+                len(jobs),
+            )
+
+            def legislatura_child_mapper(job: dict) -> dict:
+                return {"legislatura_ids": job["legislatura_ids"]}
+
+            return jobs, legislatura_child_mapper
+
         if domain_val == DomainType.REFERENCIAS.value:
             from ipolitico.extractors.camara.api.referencias import REFERENCE_ROUTES
 
@@ -649,3 +775,67 @@ class CamaraJobPlanner:
             return {"start_date": job["start_date"], "end_date": job["end_date"]}
 
         return jobs, default_mapper
+
+    def _resolve_detail_entity_ids(
+        self,
+        domain_val: str,
+        start: str,
+        end: str,
+        current_leg: int,
+        anchor_year: int,
+    ) -> Tuple[List[Any], str]:
+        if domain_val == DomainType.DEPUTADOS_DETALHE.value:
+            ids = resolve_deputy_ids_for_calendar_window(
+                start_iso=start,
+                end_iso=end,
+                current_legislature_id=current_leg,
+                anchor_year=anchor_year,
+                lake=self._lake,
+                state_store=self._state_store,
+            )
+            return ids, DomainType.DEPUTADOS.value
+        if domain_val == DomainType.ORGAOS_DETALHE.value:
+            if self._lake:
+                return self._lake.list_orgao_ids_silver_or_gold(), DomainType.ORGAOS.value
+            return (
+                self._state_store.get_existing_ids(
+                    table_name=DomainType.ORGAOS.value,
+                    layer=MedallionLayer.SILVER.value,
+                    column="id",
+                ),
+                DomainType.ORGAOS.value,
+            )
+        if domain_val == DomainType.EVENTOS_DETALHE.value:
+            if self._lake:
+                return (
+                    self._lake.list_evento_ids_silver_or_gold(start, end),
+                    DomainType.EVENTOS.value,
+                )
+            return [], DomainType.EVENTOS.value
+        if domain_val == DomainType.VOTACOES_DETALHE.value:
+            if self._lake:
+                return (
+                    self._lake.list_votacao_ids_silver_or_gold(start, end),
+                    DomainType.VOTACOES.value,
+                )
+            return [], DomainType.VOTACOES.value
+        if domain_val == DomainType.FRENTES_DETALHE.value:
+            if self._lake:
+                return (
+                    self._lake.list_frente_ids_silver_or_gold(current_leg),
+                    DomainType.FRENTES.value,
+                )
+            return [], DomainType.FRENTES.value
+        if domain_val == DomainType.PARTIDOS_DETALHE.value:
+            if self._lake:
+                return self._lake.list_partido_ids_silver_or_gold(), DomainType.PARTIDOS.value
+            return [], DomainType.PARTIDOS.value
+        if domain_val == DomainType.GRUPOS_DETALHE.value:
+            if self._lake:
+                return self._lake.list_grupo_ids_silver_or_gold(), DomainType.GRUPOS.value
+            return [], DomainType.GRUPOS.value
+        if domain_val == DomainType.LEGISLATURAS_DETALHE.value:
+            if start == EARLIEST_DATE_MAP[DomainType.LEGISLATURAS]:
+                return list(range(1, current_leg + 1)), DomainType.LEGISLATURAS.value
+            return [current_leg], DomainType.LEGISLATURAS.value
+        return [], ""

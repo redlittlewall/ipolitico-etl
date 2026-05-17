@@ -134,6 +134,48 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         DomainType.BLOCOS_PARTIDOS, None, frozenset({DomainType.BLOCOS})
     ),
     DomainType.REFERENCIAS: _spec(DomainType.REFERENCIAS, None),
+    DomainType.DEPUTADOS_DETALHE: _spec(
+        DomainType.DEPUTADOS_DETALHE, None, frozenset({DomainType.DEPUTADOS})
+    ),
+    DomainType.ORGAOS_DETALHE: _spec(
+        DomainType.ORGAOS_DETALHE, None, frozenset({DomainType.ORGAOS})
+    ),
+    DomainType.EVENTOS_DETALHE: _spec(
+        DomainType.EVENTOS_DETALHE, None, frozenset({DomainType.EVENTOS})
+    ),
+    DomainType.VOTACOES_DETALHE: _spec(
+        DomainType.VOTACOES_DETALHE, None, frozenset({DomainType.VOTACOES})
+    ),
+    DomainType.FRENTES_DETALHE: _spec(
+        DomainType.FRENTES_DETALHE, None, frozenset({DomainType.FRENTES})
+    ),
+    DomainType.PARTIDOS_DETALHE: _spec(
+        DomainType.PARTIDOS_DETALHE, None, frozenset({DomainType.PARTIDOS})
+    ),
+    DomainType.GRUPOS_DETALHE: _spec(
+        DomainType.GRUPOS_DETALHE, None, frozenset({DomainType.GRUPOS})
+    ),
+    DomainType.LEGISLATURAS_DETALHE: _spec(
+        DomainType.LEGISLATURAS_DETALHE, None, frozenset({DomainType.LEGISLATURAS})
+    ),
+    DomainType.ORGAOS_EVENTOS: _spec(
+        DomainType.ORGAOS_EVENTOS, None, frozenset({DomainType.ORGAOS})
+    ),
+    DomainType.ORGAOS_VOTACOES: _spec(
+        DomainType.ORGAOS_VOTACOES, None, frozenset({DomainType.ORGAOS})
+    ),
+    DomainType.GRUPOS_MEMBROS: _spec(
+        DomainType.GRUPOS_MEMBROS, None, frozenset({DomainType.GRUPOS})
+    ),
+    DomainType.GRUPOS_HISTORICO: _spec(
+        DomainType.GRUPOS_HISTORICO, None, frozenset({DomainType.GRUPOS})
+    ),
+    DomainType.LEGISLATURAS_LIDERES: _spec(
+        DomainType.LEGISLATURAS_LIDERES, None, frozenset({DomainType.LEGISLATURAS})
+    ),
+    DomainType.LEGISLATURAS_MESA: _spec(
+        DomainType.LEGISLATURAS_MESA, None, frozenset({DomainType.LEGISLATURAS})
+    ),
 }
 
 

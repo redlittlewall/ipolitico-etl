@@ -23,8 +23,15 @@ class CamaraEventoChildTransformer(BaseTransformer):
         if not contract:
             return df
 
-        if sub == DomainType.EVENTOS_VOTACOES.value and "data" in df.columns:
-            df = df.with_columns(pl.col("data").str.to_datetime(strict=False))
+        if sub in (
+            DomainType.EVENTOS_VOTACOES.value,
+            DomainType.ORGAOS_EVENTOS.value,
+            DomainType.ORGAOS_VOTACOES.value,
+        ):
+            if "dataHoraInicio" in df.columns:
+                df = df.with_columns(pl.col("dataHoraInicio").str.to_datetime(strict=False))
+            if "data" in df.columns:
+                df = df.with_columns(pl.col("data").str.to_datetime(strict=False))
         if sub == DomainType.EVENTOS_VOTACOES.value and "id" in df.columns:
             df = df.with_columns(pl.col("id").cast(pl.String, strict=False))
 

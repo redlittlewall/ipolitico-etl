@@ -101,6 +101,20 @@ class DomainType(str, Enum):
     PROPOSICOES_VOTACOES = "proposicoes_votacoes"
     BLOCOS_PARTIDOS = "blocos_partidos"
     REFERENCIAS = "referencias"
+    DEPUTADOS_DETALHE = "deputados_detalhe"
+    ORGAOS_DETALHE = "orgaos_detalhe"
+    EVENTOS_DETALHE = "eventos_detalhe"
+    VOTACOES_DETALHE = "votacoes_detalhe"
+    FRENTES_DETALHE = "frentes_detalhe"
+    PARTIDOS_DETALHE = "partidos_detalhe"
+    GRUPOS_DETALHE = "grupos_detalhe"
+    LEGISLATURAS_DETALHE = "legislaturas_detalhe"
+    ORGAOS_EVENTOS = "orgaos_eventos"
+    ORGAOS_VOTACOES = "orgaos_votacoes"
+    GRUPOS_MEMBROS = "grupos_membros"
+    GRUPOS_HISTORICO = "grupos_historico"
+    LEGISLATURAS_LIDERES = "legislaturas_lideres"
+    LEGISLATURAS_MESA = "legislaturas_mesa"
 
 
 class MedallionLayer(str, Enum):
@@ -159,4 +173,18 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.PROPOSICOES_VOTACOES: EarliestDates.PROPOSICOES,
     DomainType.BLOCOS_PARTIDOS: EarliestDates.DEPUTADOS,
     DomainType.REFERENCIAS: EarliestDates.DEPUTADOS,
+    DomainType.DEPUTADOS_DETALHE: EarliestDates.DEPUTADOS,
+    DomainType.ORGAOS_DETALHE: EarliestDates.ORGAOS,
+    DomainType.EVENTOS_DETALHE: EarliestDates.EVENTOS,
+    DomainType.VOTACOES_DETALHE: EarliestDates.VOTACOES,
+    DomainType.FRENTES_DETALHE: EarliestDates.FRENTES,
+    DomainType.PARTIDOS_DETALHE: EarliestDates.PARTIDOS,
+    DomainType.GRUPOS_DETALHE: EarliestDates.DEPUTADOS,
+    DomainType.LEGISLATURAS_DETALHE: EarliestDates.DEPUTADOS,
+    DomainType.ORGAOS_EVENTOS: EarliestDates.ORGAOS,
+    DomainType.ORGAOS_VOTACOES: EarliestDates.ORGAOS,
+    DomainType.GRUPOS_MEMBROS: EarliestDates.DEPUTADOS,
+    DomainType.GRUPOS_HISTORICO: EarliestDates.DEPUTADOS,
+    DomainType.LEGISLATURAS_LIDERES: EarliestDates.DEPUTADOS,
+    DomainType.LEGISLATURAS_MESA: EarliestDates.DEPUTADOS,
 }

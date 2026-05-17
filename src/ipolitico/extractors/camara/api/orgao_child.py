@@ -1,4 +1,4 @@
-"""Rotas filhas de /orgaos/{id}/membros."""
+"""Rotas filhas de /orgaos/{id}/<suffix>."""
 
 from __future__ import annotations
 
@@ -13,7 +13,9 @@ from ipolitico.extractors.camara.api.camara_base import CamaraBaseExtractor
 logger = logging.getLogger(__name__)
 
 
-class OrgaoMembrosExtractor(CamaraBaseExtractor):
+class OrgaoChildRouteExtractor(CamaraBaseExtractor):
+    route_suffix: str = ""
+
     async def extract(
         self,
         orgao_ids: list[int] | None = None,
@@ -32,13 +34,25 @@ class OrgaoMembrosExtractor(CamaraBaseExtractor):
         params = self.build_params(raw_params)
 
         for oid in orgao_ids:
-            endpoint = f"{ApiRoutes.ORGAOS.value}/{oid}/membros"
+            endpoint = f"{ApiRoutes.ORGAOS.value}/{oid}/{self.route_suffix}"
             try:
                 data = await self.fetch_paginated(endpoint, params)
                 for item in data:
                     if isinstance(item, dict):
                         rows.append({**item, "id_orgao": int(oid)})
             except Exception as e:
-                logger.error("Erro em membros do órgão %s: %s", oid, e)
+                logger.error("Erro em %s do órgão %s: %s", self.route_suffix, oid, e)
 
         return pl.DataFrame(rows, infer_schema_length=None) if rows else pl.DataFrame()
+
+
+class OrgaoMembrosExtractor(OrgaoChildRouteExtractor):
+    route_suffix = "membros"
+
+
+class OrgaoEventosExtractor(OrgaoChildRouteExtractor):
+    route_suffix = "eventos"
+
+
+class OrgaoVotacoesExtractor(OrgaoChildRouteExtractor):
+    route_suffix = "votacoes"

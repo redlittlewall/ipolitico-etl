@@ -399,6 +399,11 @@ class DataLakeRepository:
             DomainType.PARTIDOS.value, "gold", "id"
         )
 
+    def list_grupo_ids_silver_or_gold(self) -> List[Any]:
+        return self.list_ids(DomainType.GRUPOS.value, "silver", "id") or self.list_ids(
+            DomainType.GRUPOS.value, "gold", "id"
+        )
+
     def list_bloco_ids_silver_or_gold(self, legislatura_id: int | None = None) -> List[Any]:
         import polars as pl
 
