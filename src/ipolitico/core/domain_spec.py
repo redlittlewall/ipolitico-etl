@@ -75,6 +75,31 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         None,
         frozenset({DomainType.PROPOSICOES}),
     ),
+    DomainType.ORIENTACOES: _spec(
+        DomainType.ORIENTACOES,
+        None,
+        frozenset({DomainType.VOTACOES}),
+    ),
+    DomainType.ORGAOS_MEMBROS: _spec(
+        DomainType.ORGAOS_MEMBROS,
+        None,
+        frozenset({DomainType.ORGAOS}),
+    ),
+    DomainType.FRENTES_MEMBROS: _spec(
+        DomainType.FRENTES_MEMBROS,
+        None,
+        frozenset({DomainType.FRENTES}),
+    ),
+    DomainType.RELACIONADAS: _spec(
+        DomainType.RELACIONADAS,
+        None,
+        frozenset({DomainType.PROPOSICOES}),
+    ),
+    DomainType.TEMAS: _spec(
+        DomainType.TEMAS,
+        None,
+        frozenset({DomainType.PROPOSICOES}),
+    ),
 }
 
 

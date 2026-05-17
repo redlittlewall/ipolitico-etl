@@ -42,3 +42,11 @@ class TramitacoesExtractor(ProposicaoChildRouteExtractor):
 
 class AutoresExtractor(ProposicaoChildRouteExtractor):
     route_suffix = "autores"
+
+
+class RelacionadasExtractor(ProposicaoChildRouteExtractor):
+    route_suffix = "relacionadas"
+
+
+class TemasExtractor(ProposicaoChildRouteExtractor):
+    route_suffix = "temas"

@@ -72,6 +72,27 @@ def filter_deputado_child_jobs(
     return kept
 
 
+def filter_entity_ids_pending_child(
+    entity_ids: List[Any],
+    covered: set[Any],
+    domain_label: str,
+    id_label: str = "entidades",
+) -> List[Any]:
+    if not covered:
+        return entity_ids
+    pending = [e for e in entity_ids if e not in covered]
+    skipped = len(entity_ids) - len(pending)
+    if skipped:
+        logger.info(
+            "[%s] Resume: %s %s já materializadas; %s pendentes.",
+            domain_label.upper(),
+            skipped,
+            id_label,
+            len(pending),
+        )
+    return pending
+
+
 def filter_proposicao_ids_pending_child(
     proposicao_ids: List[Any],
     covered: set[Any],

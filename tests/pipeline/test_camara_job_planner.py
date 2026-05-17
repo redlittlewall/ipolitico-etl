@@ -132,3 +132,43 @@ def test_blocos_full_load_one_job_per_legislature():
     )
     assert len(jobs) == 57
     assert mapper(jobs[0]) == {"legislatura_id": 1}
+
+
+def test_orientacoes_planner_batches_votacao_ids():
+    store = MagicMock()
+    lake = MagicMock()
+    lake.list_votacao_ids_silver_or_gold.return_value = ["v1", "v2"]
+    lake.list_votacao_ids_with_orientacoes_materialized.return_value = set()
+    planner = CamaraJobPlanner(store, lake)
+    plan = ExtractionPlan(source_type=SourceType.API)
+    jobs, mapper = planner.build(
+        DomainType.ORIENTACOES,
+        "2024-03-01",
+        "2024-03-31",
+        current_leg=57,
+        anchor_year=2023,
+        extraction_plan=plan,
+    )
+    assert len(jobs) == 1
+    assert mapper(jobs[0]) == {"votacao_ids": ["v1", "v2"]}
+
+
+def test_orgaos_membros_planner_passes_window():
+    store = MagicMock()
+    lake = MagicMock()
+    lake.list_orgao_ids_silver_or_gold.return_value = [10, 20]
+    lake.list_entity_ids_with_child_materialized.return_value = set()
+    planner = CamaraJobPlanner(store, lake)
+    plan = ExtractionPlan(source_type=SourceType.API)
+    jobs, mapper = planner.build(
+        DomainType.ORGAOS_MEMBROS,
+        "2024-01-01",
+        "2024-06-30",
+        current_leg=57,
+        anchor_year=2023,
+        extraction_plan=plan,
+    )
+    m = mapper(jobs[0])
+    assert m["orgao_ids"] == [10, 20]
+    assert m["start_date"] == "2024-01-01"
+    assert m["end_date"] == "2024-06-30"

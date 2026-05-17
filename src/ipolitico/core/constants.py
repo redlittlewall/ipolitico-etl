@@ -84,6 +84,11 @@ class DomainType(str, Enum):
     DISCURSOS = "discursos"
     TRAMITACOES = "tramitacoes"
     AUTORES = "autores"
+    ORIENTACOES = "orientacoes"
+    ORGAOS_MEMBROS = "orgaos_membros"
+    FRENTES_MEMBROS = "frentes_membros"
+    RELACIONADAS = "relacionadas"
+    TEMAS = "temas"
 
 
 class MedallionLayer(str, Enum):
@@ -125,4 +130,9 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.DISCURSOS: EarliestDates.DEPUTADOS,
     DomainType.TRAMITACOES: EarliestDates.PROPOSICOES,
     DomainType.AUTORES: EarliestDates.PROPOSICOES,
+    DomainType.ORIENTACOES: EarliestDates.VOTACOES,
+    DomainType.ORGAOS_MEMBROS: EarliestDates.ORGAOS,
+    DomainType.FRENTES_MEMBROS: EarliestDates.FRENTES,
+    DomainType.RELACIONADAS: EarliestDates.PROPOSICOES,
+    DomainType.TEMAS: EarliestDates.PROPOSICOES,
 }

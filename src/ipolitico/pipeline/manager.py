@@ -145,6 +145,21 @@ class PipelineManager:
         elif domain_val == DomainType.AUTORES.value:
             unique_keys = ["id_proposicao", "ordemAssinatura", "nome"]
             t_kwargs["sub_domain"] = domain_val
+        elif domain_val == DomainType.ORIENTACOES.value:
+            unique_keys = ["votacao_id", "codPartidoBloco", "codTipoLideranca"]
+        elif domain_val == DomainType.ORGAOS_MEMBROS.value:
+            unique_keys = ["id_orgao", "id", "codTitulo", "dataInicio"]
+            t_kwargs["sub_domain"] = domain_val
+        elif domain_val == DomainType.FRENTES_MEMBROS.value:
+            unique_keys = ["id_frente", "id", "codTitulo", "dataInicio"]
+            t_kwargs["sub_domain"] = domain_val
+        elif domain_val in (DomainType.RELACIONADAS.value, DomainType.TEMAS.value):
+            unique_keys = (
+                ["id_proposicao", "id"]
+                if domain_val == DomainType.RELACIONADAS.value
+                else ["id_proposicao", "tema"]
+            )
+            t_kwargs["sub_domain"] = domain_val
 
         if (
             extraction_plan.source_type == SourceType.BULK

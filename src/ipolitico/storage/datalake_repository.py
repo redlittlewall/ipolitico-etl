@@ -297,6 +297,54 @@ class DataLakeRepository:
             self.list_ids(table_name, "gold", "id_proposicao")
         )
 
+    def list_orgao_ids_silver_or_gold(self) -> List[Any]:
+        return self.list_ids(DomainType.ORGAOS.value, "silver", "id") or self.list_ids(
+            DomainType.ORGAOS.value, "gold", "id"
+        )
+
+    def list_frente_ids_silver_or_gold(self, legislatura_id: int | None = None) -> List[Any]:
+        import polars as pl
+
+        table = DomainType.FRENTES.value
+        for layer in ("silver", "gold"):
+            layer_dir = self.base_dir / layer / table
+            if not layer_dir.exists():
+                continue
+            gold_file = layer_dir / f"{table}.parquet"
+            paths = [gold_file] if gold_file.exists() else list(layer_dir.glob("*.parquet"))
+            if not paths:
+                continue
+            try:
+                lazy = pl.scan_parquet(paths)
+                schema = lazy.collect_schema()
+                if legislatura_id is not None and "idLegislatura" in schema.names():
+                    series = (
+                        lazy.filter(pl.col("idLegislatura") == legislatura_id)
+                        .select("id")
+                        .unique()
+                        .collect()["id"]
+                    )
+                else:
+                    series = lazy.select("id").unique().collect()["id"]
+                ids = [v for v in series.drop_nulls().to_list() if v is not None]
+                if ids:
+                    return ids
+            except Exception as e:
+                logger.error("[DataLakeRepository] Falha ao listar frentes: %s", e)
+        return []
+
+    def list_votacao_ids_with_orientacoes_materialized(self) -> set[Any]:
+        return set(self.list_ids(DomainType.ORIENTACOES.value, "silver", "votacao_id")) | set(
+            self.list_ids(DomainType.ORIENTACOES.value, "gold", "votacao_id")
+        )
+
+    def list_entity_ids_with_child_materialized(
+        self, table_name: str, parent_id_column: str
+    ) -> set[Any]:
+        return set(self.list_ids(table_name, "silver", parent_id_column)) | set(
+            self.list_ids(table_name, "gold", parent_id_column)
+        )
+
     def list_deputy_expense_year_pairs(self) -> set[tuple[Any, int]]:
         """Pares (id_deputado, ano) já materializados na Silver de despesas."""
         import polars as pl

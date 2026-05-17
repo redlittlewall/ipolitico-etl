@@ -106,3 +106,33 @@ domain_configs:
     transformer: "ipolitico.transformers.camara.proposicao_child_transformer.CamaraProposicaoChildTransformer"
     sinks:
       datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  orientacoes:
+    extractor: "ipolitico.extractors.camara.api.votacao_child.OrientacoesExtractor"
+    transformer: "ipolitico.transformers.camara.votacao_child_transformer.CamaraOrientacoesTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  orgaos_membros:
+    extractor: "ipolitico.extractors.camara.api.orgao_child.OrgaoMembrosExtractor"
+    transformer: "ipolitico.transformers.camara.membros_transformer.CamaraMembrosTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  frentes_membros:
+    extractor: "ipolitico.extractors.camara.api.frente_child.FrenteMembrosExtractor"
+    transformer: "ipolitico.transformers.camara.membros_transformer.CamaraMembrosTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  relacionadas:
+    extractor: "ipolitico.extractors.camara.api.proposicao_child.RelacionadasExtractor"
+    transformer: "ipolitico.transformers.camara.proposicao_child_transformer.CamaraProposicaoChildTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  temas:
+    extractor: "ipolitico.extractors.camara.api.proposicao_child.TemasExtractor"
+    transformer: "ipolitico.transformers.camara.proposicao_child_transformer.CamaraProposicaoChildTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
