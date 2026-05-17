@@ -8,9 +8,13 @@ from ipolitico.core.constants import (
     MedallionLayer,
     SourceType,
 )
-from ipolitico.core.legislature import legislature_id_bounds_for_calendar_years
+from ipolitico.pipeline.deputy_universe import resolve_deputy_ids_for_calendar_window
 from ipolitico.pipeline.effective_window import resolve_calendar_years
-from ipolitico.pipeline.job_resume import filter_despesas_api_jobs
+from ipolitico.pipeline.job_resume import (
+    filter_deputado_child_jobs,
+    filter_despesas_api_jobs,
+    filter_votacao_ids_pending_votos,
+)
 from ipolitico.pipeline.source_router import ExtractionPlan
 from ipolitico.storage.datalake_repository import DataLakeRepository
 
@@ -68,27 +72,14 @@ class CamaraJobPlanner:
                 )
                 return jobs, despesas_bulk_mapper
 
-            leg_start, leg_end = legislature_id_bounds_for_calendar_years(
-                start_year,
-                end_year,
+            deputados_ids = resolve_deputy_ids_for_calendar_window(
+                start_iso=start,
+                end_iso=end,
                 current_legislature_id=current_leg,
-                anchor_year_current_legislature=anchor_year,
+                anchor_year=anchor_year,
+                lake=self._lake,
+                state_store=self._state_store,
             )
-
-            silver_fallback = self._state_store.get_existing_ids(
-                table_name=DomainType.DEPUTADOS.value,
-                layer=MedallionLayer.SILVER.value,
-                column="id",
-            )
-
-            if self._lake is None:
-                deputados_ids = silver_fallback
-            else:
-                deputados_ids = self._lake.list_deputy_ids_for_legislature_bounds(
-                    leg_start,
-                    leg_end,
-                    silver_fallback_ids=silver_fallback,
-                )
 
             if not deputados_ids:
                 logger.warning(
@@ -108,7 +99,7 @@ class CamaraJobPlanner:
 
             logger.info(
                 f"[{domain_val.upper()}] Criados {len(jobs)} micro-lotes "
-                f"(legs ~{leg_start}..{leg_end}, anos {start_year}..{end_year})."
+                f"(deputados na janela: {len(deputados_ids)}, anos {start_year}..{end_year})."
             )
 
             def despesas_mapper(job: dict) -> dict:
@@ -116,7 +107,11 @@ class CamaraJobPlanner:
 
             return jobs, despesas_mapper
 
-        if domain_val in [DomainType.PROPOSICOES.value, DomainType.VOTACOES.value]:
+        if domain_val in [
+            DomainType.PROPOSICOES.value,
+            DomainType.VOTACOES.value,
+            DomainType.EVENTOS.value,
+        ]:
             start_year = int(start.split("-")[0])
             start_month = int(start.split("-")[1])
             end_year = int(end.split("-")[0])
@@ -151,17 +146,14 @@ class CamaraJobPlanner:
             return jobs, time_mapper
 
         if domain_val in (DomainType.PROFISSÕES.value, DomainType.OCUPACOES.value):
-            silver_fallback = self._state_store.get_existing_ids(
-                table_name=DomainType.DEPUTADOS.value,
-                layer=MedallionLayer.SILVER.value,
-                column="id",
+            deputados_ids = resolve_deputy_ids_for_calendar_window(
+                start_iso=start,
+                end_iso=end,
+                current_legislature_id=current_leg,
+                anchor_year=anchor_year,
+                lake=self._lake,
+                state_store=self._state_store,
             )
-            if self._lake is not None:
-                deputados_ids = self._lake.list_ids(
-                    DomainType.DEPUTADOS.value, "gold", "id"
-                ) or self._lake.list_ids(DomainType.DEPUTADOS.value, "silver", "id")
-            else:
-                deputados_ids = silver_fallback
 
             if not deputados_ids:
                 logger.error(
@@ -172,8 +164,11 @@ class CamaraJobPlanner:
                 return [], lambda x: {}
 
             jobs = [{"deputado_id": dep_id} for dep_id in deputados_ids]
+            if self._lake is not None:
+                covered = self._lake.list_deputy_ids_in_child_table(domain_val)
+                jobs = filter_deputado_child_jobs(jobs, covered)
             logger.info(
-                "[%s] %s jobs (1 requisição por deputado).",
+                "[%s] %s jobs (1 requisição por deputado na janela).",
                 domain_val.upper(),
                 len(jobs),
             )
@@ -201,6 +196,14 @@ class CamaraJobPlanner:
                 )
                 return [], lambda x: {}
 
+            if self._lake is not None:
+                covered_votos = self._lake.list_votacao_ids_with_votos_materialized()
+                votacoes_ids = filter_votacao_ids_pending_votos(votacoes_ids, covered_votos)
+
+            if not votacoes_ids:
+                logger.info("[VOTOS] Todas as votações da janela já possuem votos na Silver/Gold.")
+                return [], lambda x: {}
+
             batch_size = 20
             jobs = [
                 {"votacao_ids": votacoes_ids[i : i + batch_size]}
@@ -213,6 +216,34 @@ class CamaraJobPlanner:
                 return {"votacao_ids": job["votacao_ids"]}
 
             return jobs, votos_mapper
+
+        if domain_val == DomainType.ORGAOS.value:
+            jobs = [{"start_date": start, "end_date": end}]
+            logger.info("[%s] 1 job (janela %s a %s).", domain_val.upper(), start, end)
+
+            def orgaos_mapper(job: dict) -> dict:
+                return {"start_date": job["start_date"], "end_date": job["end_date"]}
+
+            return jobs, orgaos_mapper
+
+        if domain_val == DomainType.PARTIDOS.value:
+            jobs = [
+                {
+                    "start_date": start,
+                    "end_date": end,
+                    "legislatura_id": current_leg,
+                }
+            ]
+            logger.info("[%s] 1 job com legislatura %s.", domain_val.upper(), current_leg)
+
+            def partidos_mapper(job: dict) -> dict:
+                return {
+                    "start_date": job["start_date"],
+                    "end_date": job["end_date"],
+                    "legislatura_id": job["legislatura_id"],
+                }
+
+            return jobs, partidos_mapper
 
         jobs = [{"start_date": start, "end_date": end}]
 

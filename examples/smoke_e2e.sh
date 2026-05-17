@@ -11,5 +11,6 @@ else
   PY="${PYTHON:-python3}"
 fi
 
-"$PY" -c "import ipolitico.main; import ipolitico.pipeline.manager"
+"$PY" -c "import ipolitico.main; import ipolitico.pipeline.manager; import ipolitico.tools.ingestion_estimate"
 "$PY" -m ipolitico.main --help
+"$PY" "$ROOT/examples/estimate_camara_ingestion.py" --scenario full-hybrid | head -n 8

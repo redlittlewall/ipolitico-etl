@@ -74,6 +74,9 @@ class DomainType(str, Enum):
     VOTOS = "votos"
     PROFISSÕES = "profissoes"
     OCUPACOES = "ocupacoes"
+    ORGAOS = "orgaos"
+    PARTIDOS = "partidos"
+    EVENTOS = "eventos"
 
 
 class MedallionLayer(str, Enum):
@@ -91,6 +94,9 @@ class EarliestDates:
     PROPOSICOES = "1988-01-01"
     VOTACOES = "1991-01-01"
     DESPESAS = "2009-01-01"
+    ORGAOS = "1946-02-01"
+    PARTIDOS = "1946-02-01"
+    EVENTOS = "1991-01-01"
 
 
 # Facilita o acesso dinâmico: EarliestDateMap[DomainType.DESPESAS]
@@ -101,4 +107,7 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.DESPESAS: EarliestDates.DESPESAS,
     DomainType.PROFISSÕES: EarliestDates.DEPUTADOS,
     DomainType.OCUPACOES: EarliestDates.DEPUTADOS,
+    DomainType.ORGAOS: EarliestDates.ORGAOS,
+    DomainType.PARTIDOS: EarliestDates.PARTIDOS,
+    DomainType.EVENTOS: EarliestDates.EVENTOS,
 }

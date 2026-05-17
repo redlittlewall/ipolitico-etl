@@ -37,6 +37,11 @@ class DataLakeRepository:
         """
         parquet_path = self.base_dir / "gold" / DomainType.DEPUTADOS.value / "deputados.parquet"
         if not parquet_path.exists():
+            silver_ids = self.list_deputy_ids_for_legislature_bounds_from_silver(
+                leg_start, leg_end, silver_fallback_ids
+            )
+            if silver_ids is not silver_fallback_ids and silver_ids:
+                return silver_ids
             logger.warning(
                 "[DataLakeRepository] Gold deputados ausente em %s; usando fallback Silver.",
                 parquet_path,
@@ -68,6 +73,46 @@ class DataLakeRepository:
                 e,
             )
             return silver_fallback_ids
+
+    def list_deputy_ids_for_legislature_bounds_from_silver(
+        self,
+        leg_start: int,
+        leg_end: int,
+        silver_fallback_ids: List[Any],
+    ) -> List[Any]:
+        """Filtra Silver de deputados por idLegislatura quando Gold ainda não existe."""
+        import polars as pl
+
+        layer_dir = self.base_dir / "silver" / DomainType.DEPUTADOS.value
+        if not layer_dir.exists() or not list(layer_dir.glob("*.parquet")):
+            return silver_fallback_ids
+
+        try:
+            schema = pl.scan_parquet(layer_dir / "*.parquet").collect_schema()
+            if "idLegislatura" not in schema.names():
+                return silver_fallback_ids
+
+            series = (
+                pl.scan_parquet(layer_dir / "*.parquet")
+                .filter(
+                    (pl.col("idLegislatura") >= leg_start) & (pl.col("idLegislatura") <= leg_end)
+                )
+                .select("id")
+                .unique()
+                .collect()["id"]
+            )
+            ids = [v for v in series.drop_nulls().to_list() if v is not None]
+            if ids:
+                logger.info(
+                    "[DataLakeRepository] Silver deputados: %s IDs (leg %s..%s).",
+                    len(ids),
+                    leg_start,
+                    leg_end,
+                )
+                return ids
+        except Exception as e:
+            logger.warning("[DataLakeRepository] Filtro Silver deputados por leg: %s", e)
+        return silver_fallback_ids
 
     def list_ids(self, table_name: str, layer: str, column: str = "id") -> List[Any]:
         """IDs distintos em silver/<tabela> ou gold/<tabela>/<tabela>.parquet."""
@@ -186,6 +231,16 @@ class DataLakeRepository:
                 e,
             )
             return []
+
+    def list_votacao_ids_with_votos_materialized(self) -> set[Any]:
+        """votacao_id distintos já presentes em votos (Silver ou Gold)."""
+        ids = set(self.list_ids(DomainType.VOTOS.value, "silver", "votacao_id"))
+        ids.update(self.list_ids(DomainType.VOTOS.value, "gold", "votacao_id"))
+        return ids
+
+    def list_deputy_ids_in_child_table(self, table_name: str) -> set[Any]:
+        """Deputados que já têm linhas em profissoes/ocupacoes na Silver."""
+        return set(self.list_ids(table_name, "silver", "id_deputado"))
 
     def list_deputy_expense_year_pairs(self) -> set[tuple[Any, int]]:
         """Pares (id_deputado, ano) já materializados na Silver de despesas."""

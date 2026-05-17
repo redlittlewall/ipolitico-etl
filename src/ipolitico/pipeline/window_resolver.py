@@ -20,7 +20,9 @@ class WindowResolver:
     @staticmethod
     def watermark_column(domain: DomainType) -> Optional[str]:
         spec = spec_for(domain)
-        return spec.watermark_column if spec else None
+        if spec and spec.watermark_column:
+            return spec.watermark_column
+        return None
 
     def resolve(
         self,

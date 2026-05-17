@@ -53,6 +53,9 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         None,
         frozenset({DomainType.DEPUTADOS}),
     ),
+    DomainType.ORGAOS: _spec(DomainType.ORGAOS, None),
+    DomainType.PARTIDOS: _spec(DomainType.PARTIDOS, None),
+    DomainType.EVENTOS: _spec(DomainType.EVENTOS, "dataHoraInicio"),
 }
 
 

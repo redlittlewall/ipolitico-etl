@@ -50,6 +50,9 @@ class DataLakeOptimizer:
                 DomainType.DEPUTADOS.value,
                 DomainType.PROPOSICOES.value,
                 DomainType.VOTACOES.value,
+                DomainType.ORGAOS.value,
+                DomainType.PARTIDOS.value,
+                DomainType.EVENTOS.value,
             ]:
                 pk_cols = ApiParams.ID.value
             elif table_name == DomainType.VOTOS.value:

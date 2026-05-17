@@ -9,7 +9,7 @@ from typing import Any
 
 import httpx
 
-from ipolitico.core.config import CAMARA_API_BASE_URL
+from ipolitico.core.config import CAMARA_API_BASE_URL, CAMARA_HTTP_CONCURRENCY
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class CamaraClient:
             "User-Agent": "iPolitico-ETL-OpenSource/1.0",
         }
         self._init_telemetry()
-        self._semaphore = asyncio.Semaphore(2)
+        self._semaphore = asyncio.Semaphore(CAMARA_HTTP_CONCURRENCY)
 
     def _init_telemetry(self):
         """Inicializa um banco SQLite super leve apenas para logs de requisições."""

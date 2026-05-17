@@ -78,8 +78,10 @@ def test_despesas_api_jobs_skip_existing_pairs():
 
 def test_profissoes_jobs_one_per_deputy():
     store = MagicMock()
+    store.get_existing_ids.return_value = []
     lake = MagicMock()
-    lake.list_ids.return_value = [100, 200]
+    lake.list_deputy_ids_for_legislature_bounds.return_value = [100, 200]
+    lake.list_deputy_ids_in_child_table.return_value = set()
     planner = CamaraJobPlanner(store, lake)
     plan = ExtractionPlan(source_type=SourceType.API)
     jobs, mapper = planner.build(

@@ -34,3 +34,39 @@ def filter_despesas_api_jobs(
             len(kept),
         )
     return kept
+
+
+def filter_votacao_ids_pending_votos(
+    votacao_ids: List[Any],
+    covered: set[Any],
+) -> List[Any]:
+    """Remove votações cujo nominal já está na Silver/Gold de votos."""
+    if not covered:
+        return votacao_ids
+    pending = [v for v in votacao_ids if v not in covered]
+    skipped = len(votacao_ids) - len(pending)
+    if skipped:
+        logger.info(
+            "[VOTOS] Resume: %s votações já materializadas; %s pendentes.",
+            skipped,
+            len(pending),
+        )
+    return pending
+
+
+def filter_deputado_child_jobs(
+    jobs: List[Dict[str, Any]],
+    covered_deputy_ids: set[Any],
+) -> List[Dict[str, Any]]:
+    """Remove jobs de rotas filhas (/profissoes, /ocupacoes) já ingeridas."""
+    if not covered_deputy_ids:
+        return jobs
+    kept = [j for j in jobs if j.get("deputado_id") not in covered_deputy_ids]
+    skipped = len(jobs) - len(kept)
+    if skipped:
+        logger.info(
+            "[DEPUTADO_CHILD] Resume: %s deputados ignorados (já na Silver), %s restantes.",
+            skipped,
+            len(kept),
+        )
+    return kept

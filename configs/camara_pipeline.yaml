@@ -46,3 +46,21 @@ domain_configs:
     transformer: "ipolitico.transformers.camara.deputado_child_transformer.CamaraDeputadoChildTransformer"
     sinks:
       datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  orgaos:
+    extractor: "ipolitico.extractors.camara.api.orgaos.OrgaosExtractor"
+    transformer: "ipolitico.transformers.camara.orgaos_transformer.CamaraOrgaosTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  partidos:
+    extractor: "ipolitico.extractors.camara.api.partidos.PartidosExtractor"
+    transformer: "ipolitico.transformers.camara.partidos_transformer.CamaraPartidosTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  eventos:
+    extractor: "ipolitico.extractors.camara.api.eventos.EventosExtractor"
+    transformer: "ipolitico.transformers.camara.eventos_transformer.CamaraEventosTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"

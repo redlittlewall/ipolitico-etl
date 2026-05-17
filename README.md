@@ -73,10 +73,24 @@ python -m ipolitico.main --strategy incremental \
 3. Para ETL real contra a API, use janelas curtas e rode `deputados` antes de domínios dependentes (ex.: `votos` após `votacoes`).
 
 ## Testes
-Garantimos a integridade do pipeline através de testes de integração com mocks de API:
+
 ```bash
-pytest
+pytest -q
+bash examples/smoke_e2e.sh
 ```
+
+CI (GitHub Actions): `ruff check`, `ruff format --check`, `pytest` e smoke local em cada PR.
+
+## Estimativa de tempo (API vs Bulk)
+
+Script heurístico (usa `data/dbs/api_telemetry.db` se existir para calibrar latência):
+
+```bash
+python examples/estimate_camara_ingestion.py --scenario full-hybrid   # recomendado
+python examples/estimate_camara_ingestion.py --scenario full-api      # pior caso (só HTTP)
+```
+
+Variáveis de tuning: `CAMARA_HTTP_CONCURRENCY` (padrão até 5), `MAX_CONCURRENT_REQUESTS` (workers do runner).
 
 ## Contribuição
 
