@@ -100,6 +100,40 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         None,
         frozenset({DomainType.PROPOSICOES}),
     ),
+    DomainType.DEPUTADOS_FRENTES: _spec(
+        DomainType.DEPUTADOS_FRENTES, None, frozenset({DomainType.DEPUTADOS})
+    ),
+    DomainType.DEPUTADOS_ORGAOS: _spec(
+        DomainType.DEPUTADOS_ORGAOS, None, frozenset({DomainType.DEPUTADOS})
+    ),
+    DomainType.DEPUTADOS_EVENTOS: _spec(
+        DomainType.DEPUTADOS_EVENTOS, None, frozenset({DomainType.DEPUTADOS})
+    ),
+    DomainType.DEPUTADOS_HISTORICO: _spec(
+        DomainType.DEPUTADOS_HISTORICO, None, frozenset({DomainType.DEPUTADOS})
+    ),
+    DomainType.EVENTOS_DEPUTADOS: _spec(
+        DomainType.EVENTOS_DEPUTADOS, None, frozenset({DomainType.EVENTOS})
+    ),
+    DomainType.EVENTOS_VOTACOES: _spec(
+        DomainType.EVENTOS_VOTACOES, None, frozenset({DomainType.EVENTOS})
+    ),
+    DomainType.EVENTOS_PAUTA: _spec(
+        DomainType.EVENTOS_PAUTA, None, frozenset({DomainType.EVENTOS})
+    ),
+    DomainType.PARTIDOS_MEMBROS: _spec(
+        DomainType.PARTIDOS_MEMBROS, None, frozenset({DomainType.PARTIDOS})
+    ),
+    DomainType.PARTIDOS_LIDERES: _spec(
+        DomainType.PARTIDOS_LIDERES, None, frozenset({DomainType.PARTIDOS})
+    ),
+    DomainType.PROPOSICOES_VOTACOES: _spec(
+        DomainType.PROPOSICOES_VOTACOES, None, frozenset({DomainType.PROPOSICOES})
+    ),
+    DomainType.BLOCOS_PARTIDOS: _spec(
+        DomainType.BLOCOS_PARTIDOS, None, frozenset({DomainType.BLOCOS})
+    ),
+    DomainType.REFERENCIAS: _spec(DomainType.REFERENCIAS, None),
 }
 
 

@@ -57,3 +57,19 @@ class DeputadoTemporalChildExtractor(DeputadosExtractor):
 
 class DiscursosExtractor(DeputadoTemporalChildExtractor):
     route_suffix = "discursos"
+
+
+class FrentesDeputadoExtractor(DeputadoChildRouteExtractor):
+    route_suffix = "frentes"
+
+
+class HistoricoDeputadoExtractor(DeputadoChildRouteExtractor):
+    route_suffix = "historico"
+
+
+class OrgaosDeputadoExtractor(DeputadoTemporalChildExtractor):
+    route_suffix = "orgaos"
+
+
+class EventosDeputadoExtractor(DeputadoTemporalChildExtractor):
+    route_suffix = "eventos"

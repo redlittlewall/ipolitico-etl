@@ -172,3 +172,38 @@ def test_orgaos_membros_planner_passes_window():
     assert m["orgao_ids"] == [10, 20]
     assert m["start_date"] == "2024-01-01"
     assert m["end_date"] == "2024-06-30"
+
+
+def test_eventos_deputados_planner_batches_evento_ids():
+    store = MagicMock()
+    lake = MagicMock()
+    lake.list_evento_ids_silver_or_gold.return_value = [1, 2, 3]
+    lake.list_entity_ids_with_child_materialized.return_value = set()
+    planner = CamaraJobPlanner(store, lake)
+    plan = ExtractionPlan(source_type=SourceType.API)
+    jobs, mapper = planner.build(
+        DomainType.EVENTOS_DEPUTADOS,
+        "2024-03-01",
+        "2024-03-31",
+        current_leg=57,
+        anchor_year=2023,
+        extraction_plan=plan,
+    )
+    assert len(jobs) == 1
+    assert mapper(jobs[0]) == {"evento_ids": [1, 2, 3]}
+
+
+def test_referencias_planner_single_job():
+    store = MagicMock()
+    planner = CamaraJobPlanner(store, None)
+    plan = ExtractionPlan(source_type=SourceType.API)
+    jobs, mapper = planner.build(
+        DomainType.REFERENCIAS,
+        "2024-01-01",
+        "2024-12-31",
+        current_leg=57,
+        anchor_year=2023,
+        extraction_plan=plan,
+    )
+    assert len(jobs) == 1
+    assert len(mapper(jobs[0])["routes"]) >= 10

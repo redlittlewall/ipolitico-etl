@@ -160,6 +160,40 @@ class PipelineManager:
                 else ["id_proposicao", "tema"]
             )
             t_kwargs["sub_domain"] = domain_val
+        elif domain_val == DomainType.PROPOSICOES_VOTACOES.value:
+            unique_keys = ["id_proposicao", "id"]
+            t_kwargs["sub_domain"] = domain_val
+        elif domain_val == DomainType.DEPUTADOS_FRENTES.value:
+            unique_keys = ["id_deputado", "id"]
+            t_kwargs["sub_domain"] = domain_val
+        elif domain_val in (DomainType.DEPUTADOS_ORGAOS.value, DomainType.DEPUTADOS_EVENTOS.value):
+            unique_keys = ["id_deputado", "id", "dataInicio"]
+            t_kwargs["sub_domain"] = domain_val
+        elif domain_val == DomainType.DEPUTADOS_HISTORICO.value:
+            unique_keys = ["id_deputado", "dataStatus", "idLegislatura"]
+            t_kwargs["sub_domain"] = domain_val
+        elif domain_val in (
+            DomainType.EVENTOS_DEPUTADOS.value,
+            DomainType.EVENTOS_VOTACOES.value,
+            DomainType.EVENTOS_PAUTA.value,
+        ):
+            unique_keys = (
+                ["id_evento", "id"]
+                if domain_val != DomainType.EVENTOS_PAUTA.value
+                else ["id_evento", "ordem"]
+            )
+            t_kwargs["sub_domain"] = domain_val
+        elif domain_val == DomainType.PARTIDOS_MEMBROS.value:
+            unique_keys = ["id_partido", "id"]
+            t_kwargs["sub_domain"] = domain_val
+        elif domain_val == DomainType.PARTIDOS_LIDERES.value:
+            unique_keys = ["id_partido", "id", "titulo", "dataInicio"]
+            t_kwargs["sub_domain"] = domain_val
+        elif domain_val == DomainType.BLOCOS_PARTIDOS.value:
+            unique_keys = ["id_bloco", "id"]
+            t_kwargs["sub_domain"] = domain_val
+        elif domain_val == DomainType.REFERENCIAS.value:
+            unique_keys = ["referencia", "cod", "sigla", "nome"]
 
         if (
             extraction_plan.source_type == SourceType.BULK

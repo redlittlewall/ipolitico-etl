@@ -6,6 +6,7 @@ from typing import Any
 
 import polars as pl
 
+from ipolitico.core.constants import DomainType
 from ipolitico.core.schemas import SILVER_SCHEMAS
 from ipolitico.transformers.base import BaseTransformer
 
@@ -21,6 +22,14 @@ class CamaraDeputadoChildTransformer(BaseTransformer):
         contract = SILVER_SCHEMAS.get(sub)
         if not contract:
             return df
+
+        if sub == DomainType.DEPUTADOS_EVENTOS.value:
+            for col in ("dataHoraInicio", "dataHoraFim"):
+                if col in df.columns:
+                    df = df.with_columns(pl.col(col).str.to_datetime(strict=False))
+        for col in ("dataInicio", "dataFim"):
+            if col in df.columns:
+                df = df.with_columns(pl.col(col).str.slice(0, 10))
 
         for col, dtype in contract.items():
             if col not in df.columns:

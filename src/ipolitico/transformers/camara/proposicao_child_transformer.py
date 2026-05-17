@@ -18,6 +18,10 @@ class CamaraProposicaoChildTransformer(BaseTransformer):
         sub = kwargs.get("sub_domain", DomainType.TRAMITACOES.value)
         if "dataHora" in df.columns:
             df = df.with_columns(pl.col("dataHora").str.to_datetime(strict=False))
+        if sub == DomainType.PROPOSICOES_VOTACOES.value and "data" in df.columns:
+            df = df.with_columns(pl.col("data").str.to_datetime(strict=False))
+        if sub == DomainType.PROPOSICOES_VOTACOES.value and "id" in df.columns:
+            df = df.with_columns(pl.col("id").cast(pl.String, strict=False))
 
         contract = SILVER_SCHEMAS[sub]
         try:

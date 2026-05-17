@@ -50,3 +50,7 @@ class RelacionadasExtractor(ProposicaoChildRouteExtractor):
 
 class TemasExtractor(ProposicaoChildRouteExtractor):
     route_suffix = "temas"
+
+
+class ProposicoesVotacoesExtractor(ProposicaoChildRouteExtractor):
+    route_suffix = "votacoes"
