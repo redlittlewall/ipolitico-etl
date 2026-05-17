@@ -9,10 +9,22 @@ from ipolitico.core.constants import DomainType
 # Ordem estável quando todos os upstreams devem rodar primeiro
 FULL_CAMARA_PIPELINE: tuple[DomainType, ...] = (
     DomainType.DEPUTADOS,
+    DomainType.LEGISLATURAS,
+    DomainType.BLOCOS,
+    DomainType.FRENTES,
+    DomainType.GRUPOS,
+    DomainType.ORGAOS,
+    DomainType.PARTIDOS,
     DomainType.DESPESAS,
     DomainType.PROPOSICOES,
+    DomainType.TRAMITACOES,
+    DomainType.AUTORES,
+    DomainType.DISCURSOS,
+    DomainType.PROFISSÕES,
+    DomainType.OCUPACOES,
     DomainType.VOTACOES,
     DomainType.VOTOS,
+    DomainType.EVENTOS,
 )
 
 # Dependências obrigatórias (silver/gold já populado antes do domínio)
@@ -21,6 +33,9 @@ DOMAIN_UPSTREAM_REQUIREMENTS: dict[DomainType, frozenset[DomainType]] = {
     DomainType.VOTOS: frozenset({DomainType.VOTACOES}),
     DomainType.PROFISSÕES: frozenset({DomainType.DEPUTADOS}),
     DomainType.OCUPACOES: frozenset({DomainType.DEPUTADOS}),
+    DomainType.DISCURSOS: frozenset({DomainType.DEPUTADOS}),
+    DomainType.TRAMITACOES: frozenset({DomainType.PROPOSICOES}),
+    DomainType.AUTORES: frozenset({DomainType.PROPOSICOES}),
 }
 
 

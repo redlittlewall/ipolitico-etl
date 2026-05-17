@@ -94,3 +94,41 @@ def test_profissoes_jobs_one_per_deputy():
     )
     assert len(jobs) == 2
     assert mapper(jobs[0]) == {"deputado_id": 100}
+
+
+def test_tramitacoes_planner_batches_proposicao_ids():
+    store = MagicMock()
+    lake = MagicMock()
+    lake.list_proposicao_ids_silver_or_gold.return_value = list(range(30))
+    lake.list_proposicao_ids_with_child_materialized.return_value = set()
+    planner = CamaraJobPlanner(store, lake)
+    plan = ExtractionPlan(source_type=SourceType.API)
+    jobs, mapper = planner.build(
+        DomainType.TRAMITACOES,
+        "2024-03-01",
+        "2024-03-31",
+        current_leg=57,
+        anchor_year=2023,
+        extraction_plan=plan,
+    )
+    assert len(jobs) == 2
+    assert len(mapper(jobs[0])["proposicao_ids"]) == 25
+    assert len(mapper(jobs[1])["proposicao_ids"]) == 5
+
+
+def test_blocos_full_load_one_job_per_legislature():
+    from ipolitico.core.constants import EARLIEST_DATE_MAP
+
+    store = MagicMock()
+    planner = CamaraJobPlanner(store, None)
+    plan = ExtractionPlan(source_type=SourceType.API)
+    jobs, mapper = planner.build(
+        DomainType.BLOCOS,
+        EARLIEST_DATE_MAP[DomainType.BLOCOS],
+        "2026-05-15",
+        current_leg=57,
+        anchor_year=2023,
+        extraction_plan=plan,
+    )
+    assert len(jobs) == 57
+    assert mapper(jobs[0]) == {"legislatura_id": 1}

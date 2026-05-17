@@ -64,3 +64,45 @@ domain_configs:
     transformer: "ipolitico.transformers.camara.eventos_transformer.CamaraEventosTransformer"
     sinks:
       datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  blocos:
+    extractor: "ipolitico.extractors.camara.api.blocos.BlocosExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraBlocosTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  frentes:
+    extractor: "ipolitico.extractors.camara.api.frentes.FrentesExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraFrentesTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  grupos:
+    extractor: "ipolitico.extractors.camara.api.grupos.GruposExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraGruposTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  legislaturas:
+    extractor: "ipolitico.extractors.camara.api.legislaturas.LegislaturasExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraLegislaturasTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  discursos:
+    extractor: "ipolitico.extractors.camara.api.deputado_child.DiscursosExtractor"
+    transformer: "ipolitico.transformers.camara.discursos_transformer.CamaraDiscursosTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  tramitacoes:
+    extractor: "ipolitico.extractors.camara.api.proposicao_child.TramitacoesExtractor"
+    transformer: "ipolitico.transformers.camara.proposicao_child_transformer.CamaraProposicaoChildTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  autores:
+    extractor: "ipolitico.extractors.camara.api.proposicao_child.AutoresExtractor"
+    transformer: "ipolitico.transformers.camara.proposicao_child_transformer.CamaraProposicaoChildTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"

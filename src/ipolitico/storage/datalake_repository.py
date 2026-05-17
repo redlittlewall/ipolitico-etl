@@ -242,6 +242,61 @@ class DataLakeRepository:
         """Deputados que já têm linhas em profissoes/ocupacoes na Silver."""
         return set(self.list_ids(table_name, "silver", "id_deputado"))
 
+    def list_proposicao_ids_silver_or_gold(
+        self,
+        start_iso: str | None = None,
+        end_iso: str | None = None,
+    ) -> List[Any]:
+        """IDs de proposições na janela (coluna dataApresentacao)."""
+        if start_iso and end_iso:
+            ids = self._list_proposicao_ids_in_window("silver", start_iso, end_iso)
+            if ids:
+                return ids
+            return self._list_proposicao_ids_in_window("gold", start_iso, end_iso)
+        return self.list_ids(DomainType.PROPOSICOES.value, "silver", "id") or self.list_ids(
+            DomainType.PROPOSICOES.value, "gold", "id"
+        )
+
+    def _list_proposicao_ids_in_window(self, layer: str, start_iso: str, end_iso: str) -> List[Any]:
+        import polars as pl
+
+        lo, hi = start_iso[:10], end_iso[:10]
+        table = DomainType.PROPOSICOES.value
+        layer_dir = self.base_dir / layer / table
+        if not layer_dir.exists():
+            return []
+
+        gold_file = layer_dir / f"{table}.parquet"
+        paths = [gold_file] if gold_file.exists() else list(layer_dir.glob("*.parquet"))
+        if not paths:
+            return []
+
+        try:
+            lazy = pl.scan_parquet(paths)
+            schema = lazy.collect_schema()
+            if "dataApresentacao" not in schema.names():
+                return self.list_ids(table, layer, "id")
+
+            dtype = schema["dataApresentacao"]
+            is_dt = dtype == pl.Datetime or str(dtype).lower().startswith("datetime")
+            day_col = (
+                pl.col("dataApresentacao").dt.strftime("%Y-%m-%d")
+                if is_dt
+                else pl.col("dataApresentacao").cast(pl.Utf8, strict=False).str.slice(0, 10)
+            )
+            series = (
+                lazy.filter((day_col >= lo) & (day_col <= hi)).select("id").unique().collect()["id"]
+            )
+            return [v for v in series.drop_nulls().to_list() if v is not None]
+        except Exception as e:
+            logger.error("[DataLakeRepository] Falha ao filtrar proposições: %s", e)
+            return []
+
+    def list_proposicao_ids_with_child_materialized(self, table_name: str) -> set[Any]:
+        return set(self.list_ids(table_name, "silver", "id_proposicao")) | set(
+            self.list_ids(table_name, "gold", "id_proposicao")
+        )
+
     def list_deputy_expense_year_pairs(self) -> set[tuple[Any, int]]:
         """Pares (id_deputado, ano) já materializados na Silver de despesas."""
         import polars as pl

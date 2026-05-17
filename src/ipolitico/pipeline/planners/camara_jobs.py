@@ -13,6 +13,7 @@ from ipolitico.pipeline.effective_window import resolve_calendar_years
 from ipolitico.pipeline.job_resume import (
     filter_deputado_child_jobs,
     filter_despesas_api_jobs,
+    filter_proposicao_ids_pending_child,
     filter_votacao_ids_pending_votos,
 )
 from ipolitico.pipeline.source_router import ExtractionPlan
@@ -244,6 +245,108 @@ class CamaraJobPlanner:
                 }
 
             return jobs, partidos_mapper
+
+        if domain_val in (DomainType.BLOCOS.value, DomainType.FRENTES.value):
+            domain_enum = DomainType(domain_val)
+            if start == EARLIEST_DATE_MAP[domain_enum]:
+                jobs = [{"legislatura_id": leg} for leg in range(1, current_leg + 1)]
+                logger.info(
+                    "[%s] Histórico: %s legislaturas (1..%s).",
+                    domain_val.upper(),
+                    len(jobs),
+                    current_leg,
+                )
+            else:
+                jobs = [{"legislatura_id": current_leg}]
+                logger.info("[%s] Legislatura atual: %s.", domain_val.upper(), current_leg)
+
+            def leg_mapper(job: dict) -> dict:
+                return {"legislatura_id": job["legislatura_id"]}
+
+            return jobs, leg_mapper
+
+        if domain_val in (DomainType.TRAMITACOES.value, DomainType.AUTORES.value):
+            if self._lake is not None:
+                proposicao_ids = self._lake.list_proposicao_ids_silver_or_gold(start, end)
+            else:
+                proposicao_ids = self._state_store.get_existing_ids(
+                    table_name=DomainType.PROPOSICOES.value,
+                    layer=MedallionLayer.SILVER.value,
+                    column="id",
+                )
+
+            if not proposicao_ids:
+                logger.error(
+                    "[%s] Abortando: nenhuma proposição no lake. Rode '%s' antes.",
+                    domain_val.upper(),
+                    DomainType.PROPOSICOES.value,
+                )
+                return [], lambda x: {}
+
+            if self._lake is not None:
+                covered = self._lake.list_proposicao_ids_with_child_materialized(domain_val)
+                proposicao_ids = filter_proposicao_ids_pending_child(
+                    proposicao_ids, covered, domain_val
+                )
+
+            if not proposicao_ids:
+                logger.info(
+                    "[%s] Todas as proposições da janela já possuem dados na Silver/Gold.",
+                    domain_val.upper(),
+                )
+                return [], lambda x: {}
+
+            batch_size = 25
+            jobs = [
+                {"proposicao_ids": proposicao_ids[i : i + batch_size]}
+                for i in range(0, len(proposicao_ids), batch_size)
+            ]
+            logger.info(
+                "[%s] %s proposições em %s lotes.",
+                domain_val.upper(),
+                len(proposicao_ids),
+                len(jobs),
+            )
+
+            def proposicao_child_mapper(job: dict) -> dict:
+                return {"proposicao_ids": job["proposicao_ids"]}
+
+            return jobs, proposicao_child_mapper
+
+        if domain_val == DomainType.DISCURSOS.value:
+            deputados_ids = resolve_deputy_ids_for_calendar_window(
+                start_iso=start,
+                end_iso=end,
+                current_legislature_id=current_leg,
+                anchor_year=anchor_year,
+                lake=self._lake,
+                state_store=self._state_store,
+            )
+            if not deputados_ids:
+                logger.error(
+                    "[DISCURSOS] Abortando: nenhum deputado no lake. Rode '%s' antes.",
+                    DomainType.DEPUTADOS.value,
+                )
+                return [], lambda x: {}
+
+            jobs = [
+                {"deputado_id": dep_id, "start_date": start, "end_date": end}
+                for dep_id in deputados_ids
+            ]
+            if self._lake is not None:
+                covered = self._lake.list_deputy_ids_in_child_table(domain_val)
+                jobs = filter_deputado_child_jobs(jobs, covered)
+
+            logger.info("[DISCURSOS] %s jobs (deputado × janela).", len(jobs))
+
+            def discursos_mapper(job: dict) -> dict:
+                return {
+                    "deputado_id": job["deputado_id"],
+                    "start_date": job["start_date"],
+                    "end_date": job["end_date"],
+                }
+
+            return jobs, discursos_mapper
 
         jobs = [{"start_date": start, "end_date": end}]
 

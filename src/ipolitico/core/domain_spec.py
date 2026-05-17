@@ -56,6 +56,25 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
     DomainType.ORGAOS: _spec(DomainType.ORGAOS, None),
     DomainType.PARTIDOS: _spec(DomainType.PARTIDOS, None),
     DomainType.EVENTOS: _spec(DomainType.EVENTOS, "dataHoraInicio"),
+    DomainType.BLOCOS: _spec(DomainType.BLOCOS, None),
+    DomainType.FRENTES: _spec(DomainType.FRENTES, None),
+    DomainType.GRUPOS: _spec(DomainType.GRUPOS, None),
+    DomainType.LEGISLATURAS: _spec(DomainType.LEGISLATURAS, None),
+    DomainType.DISCURSOS: _spec(
+        DomainType.DISCURSOS,
+        "dataHoraInicio",
+        frozenset({DomainType.DEPUTADOS}),
+    ),
+    DomainType.TRAMITACOES: _spec(
+        DomainType.TRAMITACOES,
+        None,
+        frozenset({DomainType.PROPOSICOES}),
+    ),
+    DomainType.AUTORES: _spec(
+        DomainType.AUTORES,
+        None,
+        frozenset({DomainType.PROPOSICOES}),
+    ),
 }
 
 

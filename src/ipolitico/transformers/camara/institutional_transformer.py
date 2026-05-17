@@ -1,0 +1,63 @@
+"""Transformers para entidades institucionais (blocos, frentes, grupos, legislaturas)."""
+
+from __future__ import annotations
+
+import json
+import logging
+from typing import Any
+
+import polars as pl
+
+from ipolitico.core.constants import DomainType
+from ipolitico.core.schemas import SILVER_SCHEMAS
+from ipolitico.transformers.base import BaseTransformer
+
+logger = logging.getLogger(__name__)
+
+
+def _apply_contract(df: pl.DataFrame, domain_key: str) -> pl.DataFrame:
+    contract = SILVER_SCHEMAS[domain_key]
+    for col in contract:
+        if col not in df.columns:
+            df = df.with_columns(pl.lit(None).alias(col))
+    return df.select([pl.col(c).cast(contract[c], strict=False) for c in contract])
+
+
+class CamaraBlocosTransformer(BaseTransformer):
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        if df.is_empty():
+            return df
+        if "id" in df.columns:
+            df = df.with_columns(pl.col("id").cast(pl.Int64, strict=False))
+        return _apply_contract(df, DomainType.BLOCOS.value)
+
+
+class CamaraFrentesTransformer(BaseTransformer):
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        if df.is_empty():
+            return df
+        return _apply_contract(df, DomainType.FRENTES.value)
+
+
+class CamaraGruposTransformer(BaseTransformer):
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        if df.is_empty():
+            return df
+        if "ultimoStatus" in df.columns:
+            df = df.with_columns(
+                pl.col("ultimoStatus").map_elements(
+                    lambda v: json.dumps(v, ensure_ascii=False) if v is not None else None,
+                    return_dtype=pl.String,
+                )
+            )
+        return _apply_contract(df, DomainType.GRUPOS.value)
+
+
+class CamaraLegislaturasTransformer(BaseTransformer):
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        if df.is_empty():
+            return df
+        for col in ("dataInicio", "dataFim"):
+            if col in df.columns:
+                df = df.with_columns(pl.col(col).str.slice(0, 10))
+        return _apply_contract(df, DomainType.LEGISLATURAS.value)
