@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import Any
 
@@ -12,15 +11,31 @@ logger = logging.getLogger(__name__)
 
 
 def _jsonify_nested(df: pl.DataFrame) -> pl.DataFrame:
+    """Serializa colunas Struct ou List da API para string (contrato Silver).
+
+    Usa expressões nativas Polars (struct.json_encode, list.eval) em vez de
+    map_elements para preservar paralelismo vetorizado.
+
+    Args:
+        df: DataFrame com possíveis colunas aninhadas.
+
+    Returns:
+        DataFrame com colunas aninhadas convertidas para string. Colunas não
+        Struct/List permanecem inalteradas.
+    """
     for col in df.columns:
         dtype = df.schema[col]
-        if dtype in (pl.Struct, pl.Object, pl.List):
-            df = df.with_columns(
-                pl.col(col).map_elements(
-                    lambda v: json.dumps(v, ensure_ascii=False) if v is not None else None,
-                    return_dtype=pl.String,
+        if isinstance(dtype, pl.Struct):
+            df = df.with_columns(pl.col(col).struct.json_encode())
+        elif isinstance(dtype, pl.List):
+            inner = dtype.inner
+            if isinstance(inner, pl.Struct):
+                df = df.with_columns(
+                    pl.format(
+                        "[{}]",
+                        pl.col(col).list.eval(pl.element().struct.json_encode()).list.join(","),
+                    ).alias(col)
                 )
-            )
     return df
 
 

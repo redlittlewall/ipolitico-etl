@@ -1,4 +1,5 @@
-import json
+"""Transformer para eventos da Câmara, com serialização nativa de List(Struct)."""
+
 import logging
 from typing import Any
 
@@ -18,20 +19,17 @@ class CamaraEventosTransformer(BaseTransformer):
 
         if "orgaos" in df.columns:
             dtype = df.schema["orgaos"]
-
-            def _orgaos_json(v: Any) -> str | None:
-                if v is None:
-                    return None
-                if hasattr(v, "to_list"):
-                    v = v.to_list()
-                if hasattr(v, "to_dicts"):
-                    v = v.to_dicts()
-                return json.dumps(v, ensure_ascii=False)
-
-            if isinstance(dtype, pl.List) or dtype == pl.Object or str(dtype).startswith("List"):
-                df = df.with_columns(
-                    pl.col("orgaos").map_elements(_orgaos_json, return_dtype=pl.String)
-                )
+            if isinstance(dtype, pl.List):
+                inner = dtype.inner
+                if isinstance(inner, pl.Struct):
+                    df = df.with_columns(
+                        pl.format(
+                            "[{}]",
+                            pl.col("orgaos")
+                            .list.eval(pl.element().struct.json_encode())
+                            .list.join(","),
+                        ).alias("orgaos")
+                    )
 
         for col in ("dataHoraInicio", "dataHoraFim"):
             if col in df.columns:

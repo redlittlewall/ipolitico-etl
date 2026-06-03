@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import Any
 
@@ -17,12 +16,9 @@ class CamaraDiscursosTransformer(BaseTransformer):
             return df
 
         if "faseEvento" in df.columns:
-            df = df.with_columns(
-                pl.col("faseEvento").map_elements(
-                    lambda v: json.dumps(v, ensure_ascii=False) if v is not None else None,
-                    return_dtype=pl.String,
-                )
-            )
+            dtype = df.schema["faseEvento"]
+            if isinstance(dtype, pl.Struct):
+                df = df.with_columns(pl.col("faseEvento").struct.json_encode())
 
         for col in ("dataHoraInicio", "dataHoraFim"):
             if col in df.columns:

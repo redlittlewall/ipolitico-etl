@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import Any
 
@@ -12,7 +11,19 @@ logger = logging.getLogger(__name__)
 
 
 def _normalize_nested_to_string(df: pl.DataFrame, column: str) -> pl.DataFrame:
-    """Converte Struct/List/dict-like da API em string para o contrato Silver."""
+    """Converte coluna Struct da API em string para o contrato Silver.
+
+    Usa expressões nativas Polars (struct.json_encode / struct.field) em vez
+    de map_elements para preservar paralelismo vetorizado.
+
+    Args:
+        df: DataFrame com a coluna a normalizar.
+        column: Nome da coluna que pode ser Struct.
+
+    Returns:
+        DataFrame com a coluna convertida para string ou extraída.
+        Retorna o DataFrame inalterado se a coluna não existir ou não for Struct.
+    """
     if column not in df.columns:
         return df
     dtype = df.schema[column]
@@ -21,13 +32,6 @@ def _normalize_nested_to_string(df: pl.DataFrame, column: str) -> pl.DataFrame:
         if any(f.name == "uri" for f in fields):
             return df.with_columns(pl.col(column).struct.field("uri").alias(column))
         return df.with_columns(pl.col(column).struct.json_encode().alias(column))
-    if dtype == pl.Object:
-        return df.with_columns(
-            pl.col(column).map_elements(
-                lambda v: json.dumps(v, ensure_ascii=False) if v is not None else None,
-                return_dtype=pl.String,
-            )
-        )
     return df
 
 

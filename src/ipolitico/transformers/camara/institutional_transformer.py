@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
@@ -40,16 +39,19 @@ class CamaraFrentesTransformer(BaseTransformer):
 
 
 class CamaraGruposTransformer(BaseTransformer):
+    """Transformer para o domínio Grupos (bancadas, minoria, etc.).
+
+    Serializa ultimoStatus (Struct da API) para string usando expressão nativa
+    Polars, em vez de map_elements, para preservar paralelismo vetorizado.
+    """
+
     def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
         if df.is_empty():
             return df
         if "ultimoStatus" in df.columns:
-            df = df.with_columns(
-                pl.col("ultimoStatus").map_elements(
-                    lambda v: json.dumps(v, ensure_ascii=False) if v is not None else None,
-                    return_dtype=pl.String,
-                )
-            )
+            dtype = df.schema["ultimoStatus"]
+            if isinstance(dtype, pl.Struct):
+                df = df.with_columns(pl.col("ultimoStatus").struct.json_encode())
         return _apply_contract(df, DomainType.GRUPOS.value)
 
 

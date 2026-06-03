@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import Any
 
@@ -36,15 +35,10 @@ class CamaraEventoChildTransformer(BaseTransformer):
             df = df.with_columns(pl.col("id").cast(pl.String, strict=False))
 
         for col in df.columns:
-            if col in _NESTED_JSON_COLS or df.schema[col] in (pl.Struct, pl.Object):
-                df = df.with_columns(
-                    pl.col(col)
-                    .map_elements(
-                        lambda v: json.dumps(v, ensure_ascii=False) if v is not None else None,
-                        return_dtype=pl.String,
-                    )
-                    .alias(col)
-                )
+            dtype = df.schema[col]
+            if col in _NESTED_JSON_COLS or isinstance(dtype, pl.Struct):
+                if isinstance(dtype, pl.Struct):
+                    df = df.with_columns(pl.col(col).struct.json_encode().alias(col))
 
         for col, dtype in contract.items():
             if col not in df.columns:
