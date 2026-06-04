@@ -37,6 +37,9 @@ datalake/
 # Backups
 data_backup_*/
 
+# Issue tracker local (usar git add --force para adicionar novas)
+.scratch/
+
 # Claude Code — pessoal do desenvolvedor
 .claude/projects/
 .claude/worktrees/
