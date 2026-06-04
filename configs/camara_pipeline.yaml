@@ -305,6 +305,27 @@ domain_configs:
     sinks:
       datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
 
+  funcionarios:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraFuncionariosTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  tecad_categorias:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraTecadCategoriasTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  tecad_termos:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraTecadTermosTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
   legislaturas_lideres:
     extractor: "ipolitico.extractors.camara.api.legislatura_child.LegislaturaLideresExtractor"
     transformer: "ipolitico.transformers.camara.membros_transformer.CamaraMembrosTransformer"

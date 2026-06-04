@@ -1,53 +1,110 @@
 ---
 name: commit
-description: Commit and push changes with proper message, pre-commit handling, and optional PR creation. Use after /tdd finishes or after any implementation cycle.
+description: Commit and push changes with proper message, pre-commit handling, and optional PR creation. Uses worktree tracking to scope commits to task files only. Use after /tdd finishes or after any implementation cycle.
 ---
 
 # Commit Skill — `/commit`
 
-Automatiza o ritual de commit + push após finalizar uma tarefa. Cobre todo o
-ciclo: staging, testes, pre-commit, mensagem convencional, push e PR opcional.
+Automatiza o ritual de commit + push após finalizar uma tarefa. Usa **worktree
+tracking** (`scripts/task-track.sh`) para garantir que só arquivos da tarefa
+atual sejam commitados — prevenindo contaminação entre execuções paralelas.
 
 ## Quando usar
 
-- **Sempre depois do `/tdd`** — após o último GRN refactor, chame `/commit`
+- **Sempre depois do `/tdd`** — após o último GREEN refactor, chame `/commit`
 - Depois de qualquer alteração manual no código que você queira commitar
 - Depois de refatorações ou correções rápidas
 
 ## Fluxo
 
 ```
-/git add -A
-/pytest -q (se falhar → aborta)
-/git commit (pre-commit roda como hook)
-  ├── se pre-commit auto-fixar → git add -A + git commit (re-tenta)
-  └── se pre-commit falhar de verdade → aborta
-/git push
-└── se branch não for main → pergunta: "Quer abrir um PR?"
-    ├── sim → gh pr create (título = mensagem, corpo = detalhes)
-    └── não → pronto
+/commit
+  ├── 1. Verifica manifest de tracking → scaneia escopo
+  ├── 2. Staging (manifest ou manual)
+  │     ├── Manifest existe → git add <arquivos do manifest>
+  │     └── Sem manifest → mostra diff e pergunta o que stagear
+  ├── 3. pytest -q (se falhar → aborta)
+  ├── 4. git commit (pre-commit roda como hook)
+  │     ├── se pre-commit auto-fixar → git add -A + git commit (re-tenta)
+  │     └── se pre-commit falhar de verdade → aborta
+  ├── 5. task-track.sh finish (limpa manifest)
+  ├── 6. git push
+  └── 7. PR opcional (se branch não for main)
 ```
 
 ## Regras
 
-### Staging
+### 1. Verificação de escopo (worktree tracking)
 
-- `git add -A` sempre — não pergunta o que stagear
-- Se não houver mudanças, avisa e termina
+Antes de qualquer stage, verifique o manifest:
 
-### Testes
+```bash
+scripts/task-track.sh status
+```
 
-- `python -m pytest -q` antes de qualquer commit
+Isso mostra:
+- **No manifest**: arquivos que a tarefa atual declarou
+- **Fora do manifest**: arquivos modificados que NÃO pertencem à tarefa
+
+### 2. Staging
+
+**Cenário A — Manifest existe (recomendado):**
+
+```bash
+# Lê os arquivos do manifest e staggeia APENAS eles
+MANIFEST_FILES=$(python3 -c "
+import json
+with open('.claude/task-files/$(git rev-parse --abbrev-ref HEAD).json') as f:
+    data = json.load(f)
+print(' '.join(data['files']))
+")
+git add $MANIFEST_FILES
+```
+
+Depois, **verifique se há arquivos fora do manifest**:
+
+```bash
+scripts/task-track.sh status
+```
+
+Se houver arquivos fora do manifest:
+- Mostre a lista para o usuário
+- Pergunte: "Há N arquivo(s) modificado(s) fora do manifest desta tarefa.
+  Incluir no commit? (s/N)"
+
+**Cenário B — Sem manifest (alteração manual):**
+
+Execute `git status --short` e mostre o diff ao usuário:
+- Pergunte: "Quer stagear tudo (git add -A) ou prefere selecionar manualmente?"
+- Se "tudo" → `git add -A`
+- Se "selecionar" → "Use 'git add <arquivo>' manualmente e rode /commit de novo"
+
+### 3. Testes
+
+```bash
+python -m pytest -q
+```
+
 - Se falhar, aborta imediatamente e mostra o erro
+- Se o usuário quiser commitar mesmo com testes falhando, pergunte:
+  "Testes estão falhando. Deseja commitar assim mesmo? (s/N)"
 
-### Pre-commit hook
+### 4. Pre-commit hook
 
 - O hook `git commit` roda `ruff --fix` e `ruff-format`
-- Se o hook auto-corrigir arquivos, o commit falha — a skill **readiciona**
-  os arquivos modificados e **re-tenta o commit com a mesma mensagem**
+- Se o hook auto-corrigir arquivos, o commit falha — readicione os arquivos
+  modificados pelo auto-fix e re-tente o commit com a mesma mensagem
 - Se o hook falhar por erro real (lint não corrigível), aborta
 
-### Mensagem de commit
+### 5. Limpeza do manifest
+
+Após o commit bem-sucedido (antes do push):
+
+```bash
+scripts/task-track.sh finish
+```
+
+### 6. Mensagem de commit
 
 Formato **conventional commits**, inferida do diff:
 
@@ -73,54 +130,32 @@ O **scope** é a área de domínio mais afetada (ex: `detalhe`, `bulk`, `pipelin
 
 **Sem `Co-Authored-By`** no rodapé.
 
-### PR (opcional)
+### 7. Push e PR
 
-- Só pergunta se a branch **não** for `main`
-- Usa `gh pr create --title <título> --body <corpo>`
-- O corpo do PR é montado a partir da descrição detalhada do commit
-- Se o usuário recusar, apenas push
-
-## Comportamento detalhado
-
-### 1. Verificação inicial
-
-```python
-1. git status --porcelain → lista mudanças
-2. Se vazio → "Nada para commitar." → sai
+```bash
+git push
 ```
 
-### 2. Staging e teste
+- Se falhar → mostra erro → aborta
+- Se branch for `main` → "Commit feito e enviado." → fim
+- Se não for `main` → pergunta: "Quer abrir um PR também? (s/N)"
+  - s → `gh pr create --title "<mensagem>" --body "<corpo>"`
+  - n → pronto
 
-```python
-1. git add -A
-2. python -m pytest -q
-   ├── ok → continua
-   └── falha → "Testes falhando. Abortando." → mostra output → sai (exit 1)
+## Transparência com o usuário
+
+Sempre mostre ao usuário o **escopo do commit** antes de prosseguir:
+
 ```
+📋 Escopo do commit (worktree tracking):
+   • src/ipolitico/tools/swagger_codegen.py
+   • tests/tools/test_swagger_codegen.py
+   • tests/tools/fixtures/minimal_swagger.json
 
-### 3. Commit com retry de pre-commit
+⚠️  1 arquivo fora do manifest:
+   • src/ipolitico/core/nao_relacionado.py
 
-```python
-1. Monta mensagem de commit a partir do diff
-2. git commit -m "<mensagem>"
-   ├── retcode 0 → sucesso → continua
-   ├── retcode != 0:
-   │   git diff --name-only → verifica se é auto-fix do ruff
-   │   ├── sim → git add -A + git commit -m "<mensagem>" (re-tenta 1x)
-   │   └── não → mostra erro → aborta
-   └── 2o retry falhar → aborta
-```
-
-### 4. Push e PR
-
-```python
-1. git push
-   ├── falha → mostra erro → aborta
-   └── ok → verifica branch:
-       ├── main → "Commit feito e enviado." → fim
-       └── feat/*, fix/* etc → "Quer abrir um PR também? (s/N)"
-           ├── s → gh pr create --title "..." --body "..."
-           └── n → fim
+   Incluir o arquivo fora do manifest? (s/N)
 ```
 
 ## Exemplo de uso
@@ -129,19 +164,22 @@ O **scope** é a área de domínio mais afetada (ex: `detalhe`, `bulk`, `pipelin
 # Após finalizar uma tarefa com /tdd
 /commit
 
-# A skill vai:
-#   git add -A
-#   pytest -q
-#   git commit -m "feat(detalhe): blocos_detalhe e proposicoes_detalhe"
-#   (se ruff auto-fixar, re-tenta)
-#   git push
-#   "Branch feat/foo não é main. Quer abrir um PR? (s/N)"
+# Fluxo:
+#   1. scripts/task-track.sh status  → manifest com 3 arquivos
+#   2. git add <3 arquivos>
+#   3. pytest -q                      → 208 passed
+#   4. git commit -m "feat(tools): swagger_codegen"
+#   5. scripts/task-track.sh finish
+#   6. git push
+#   7. "Branch feat/foo não é main. Quer abrir um PR? (s/N)"
 ```
 
 ## Limitações conhecidas
 
 - **Não lida com conflitos de merge** — se o push falhar por divergência,
-  a skill aborta e você resolve manualmente
-- **Não edita mensagens** — se você quiser ajustar a mensagem, cancele a skill
-  e commite manualmente
+  aborta e você resolve manualmente
+- **Não edita mensagens** — se quiser ajustar a mensagem, cancele e commite
+  manualmente
 - **Não faz squash** — commits individuais como saem do TDD
+- **Manifest pode ficar obsoleto** se você editar arquivos sem rodar
+  `task-track.sh add`. O `/commit` detecta isso e pergunta o que fazer

@@ -63,3 +63,47 @@ class CamaraLegislaturasTransformer(BaseTransformer):
             if col in df.columns:
                 df = df.with_columns(pl.col(col).str.slice(0, 10))
         return _apply_contract(df, DomainType.LEGISLATURAS.value)
+
+
+class CamaraFuncionariosTransformer(BaseTransformer):
+    """Transformer para o domínio funcionarios (servidores da Câmara, bulk-only snapshot).
+
+    O CSV bruto tem colunas como ponto (String com prefixo P_),
+    codGrupo (numérico), nome, cargo, lotação etc. O transformer apenas
+    aplica o contrato SILVER_SCHEMAS — a conversão de tipos numéricos é
+    feita via schema_overrides no BULK_REGISTRY + _apply_contract.
+    """
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        if df.is_empty():
+            return df
+        return _apply_contract(df, DomainType.FUNCIONARIOS.value)
+
+
+class CamaraTecadCategoriasTransformer(BaseTransformer):
+    """Transformer para o domínio tecadCategorias (categorias do tesauro, bulk-only snapshot).
+
+    O CSV bruto tem colunas: codCategoria, categoria, codSubCategoria, subCategoria.
+    A conversão de códigos numéricos para Int64 é feita via schema_overrides
+    no BULK_REGISTRY + _apply_contract.
+    """
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        if df.is_empty():
+            return df
+        return _apply_contract(df, DomainType.TECAD_CATEGORIAS.value)
+
+
+class CamaraTecadTermosTransformer(BaseTransformer):
+    """Transformer para o domínio tecadTermos (termos do tesauro, bulk-only snapshot).
+
+    O CSV bruto tem colunas: codTermo, termo, categorias, subcategorias,
+    notas*, use, usadoPara, termosEspecificos, termosGenericos, termosRelacionados.
+    A conversão de codTermo para Int64 é feita via schema_overrides
+    no BULK_REGISTRY + _apply_contract.
+    """
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        if df.is_empty():
+            return df
+        return _apply_contract(df, DomainType.TECAD_TERMOS.value)

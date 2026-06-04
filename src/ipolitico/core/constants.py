@@ -118,6 +118,10 @@ class DomainType(str, Enum):
     GRUPOS_HISTORICO = "grupos_historico"
     LEGISLATURAS_LIDERES = "legislaturas_lideres"
     LEGISLATURAS_MESA = "legislaturas_mesa"
+    # Domínios bulk-only (sem rota API REST)
+    FUNCIONARIOS = "funcionarios"
+    TECAD_CATEGORIAS = "tecad_categorias"
+    TECAD_TERMOS = "tecad_termos"
 
 
 class MedallionLayer(str, Enum):
@@ -139,6 +143,9 @@ class EarliestDates:
     PARTIDOS = "1946-02-01"
     EVENTOS = "1991-01-01"
     FRENTES = "2003-01-01"
+    FUNCIONARIOS = "1826-04-29"
+    TECAD_CATEGORIAS = "1826-04-29"
+    TECAD_TERMOS = "1826-04-29"
 
 
 # Facilita o acesso dinâmico: EarliestDateMap[DomainType.DESPESAS]
@@ -194,4 +201,8 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.GRUPOS_HISTORICO: EarliestDates.DEPUTADOS,
     DomainType.LEGISLATURAS_LIDERES: EarliestDates.DEPUTADOS,
     DomainType.LEGISLATURAS_MESA: EarliestDates.DEPUTADOS,
+    # Domínios bulk-only
+    DomainType.FUNCIONARIOS: EarliestDates.FUNCIONARIOS,
+    DomainType.TECAD_CATEGORIAS: EarliestDates.TECAD_CATEGORIAS,
+    DomainType.TECAD_TERMOS: EarliestDates.TECAD_TERMOS,
 }

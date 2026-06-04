@@ -58,6 +58,9 @@ FULL_CAMARA_PIPELINE: tuple[DomainType, ...] = (
     DomainType.EVENTOS_PAUTA,
     DomainType.EVENTOS_ORGAOS,
     DomainType.REFERENCIAS,
+    DomainType.FUNCIONARIOS,
+    DomainType.TECAD_CATEGORIAS,
+    DomainType.TECAD_TERMOS,
 )
 
 # Dependências obrigatórias (silver/gold já populado antes do domínio)

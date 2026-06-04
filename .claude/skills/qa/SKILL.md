@@ -1,6 +1,6 @@
 ---
 name: qa
-description: Quality assurance gate after implementation. Runs automated checks, triages findings (fixes small inline, documents big as issues), and optionally delegates to code-review/verify/security-review before /commit.
+description: Quality assurance gate after implementation. Runs automated checks, captures session findings, triages everything (fixes small inline, documents big as issues), and optionally delegates to code-review/verify/security-review before /commit.
 ---
 
 # QA Skill — `/qa`
@@ -11,7 +11,7 @@ Quality assurance gate executada **depois do `/tdd`** e **antes do `/commit`**.
 /tdd <tarefa>
   ↓  implementa + testa
 /qa
-  ↓  verifica qualidade, tria achados
+  ↓  verifica qualidade, captura achados, tria
 /commit
   ↓  empacota e publica
 ```
@@ -22,10 +22,42 @@ Quality assurance gate executada **depois do `/tdd`** e **antes do `/commit`**.
 - **Achado pequeno → corrijo agora**: typo, debug leftover, docstring ausente
 - **Achado grande → vira issue**: bug estrutural, dívida técnica, planejamento
 - **Mínima fricção**: você aprova ou rejeita cada passo interativo
+- **Captura proativa**: pergunta o que surgiu DURANTE a execução (TDD, descobertas)
 
 ---
 
 ## Fluxo completo
+
+### FASE 0 — Captura de achados da sessão
+
+**Antes de rodar qualquer scan automático**, pergunte ao usuário:
+
+```
+? Teve algum achado durante esta execução?
+  (bug, dívida técnica, mudança de design, descoberta importante)
+
+  Tipos:
+    • Bug          — algo que está errado e precisa de correção
+    • Tech debt    — algo funcional mas que deveria ser melhorado
+    • Architecture — decisão estrutural que afeta o futuro
+    • Design change — pivot, novo requisito, descoberta
+```
+
+Se o usuário relatar algo, **documente como issue** seguindo o template em
+`docs/agents/finding-template.md`:
+
+```
+Status: needs-triage
+Date: <hoje>
+Area: <domínio>
+Severity: <low|medium|high>
+Source: <skill-ou-origem>
+Type: <bug|tech-debt|architecture|design-change|discovery>
+```
+
+Os issues vão para `.scratch/qa-<data-hora>/issues/`.
+
+Se o usuário disser que não, siga para Fase 1.
 
 ### FASE 1 — Verificações automáticas (AFK-safe)
 
@@ -60,7 +92,7 @@ Tudo isso roda sem sua interação:
    └── `__init__.py` faltando em pacotes novos
 
 ── Relatório FASE 1 ──────────────────────────
-  ✅ pytest: 169 passed
+  ✅ pytest: 208 passed
   ✅ pre-commit: limpo
   ⚠ docstrings: 2 funções sem docstring (detalhe abaixo)
   ✅ debug leftovers: nenhum
@@ -71,15 +103,17 @@ Tudo isso roda sem sua interação:
 
 ### FASE 2 — Triage dos achados
 
-Para cada achado da Fase 1 + Fase 3:
+Para cada achado da Fase 0 + Fase 1 + Fase 3:
 
 | Critério | Ação |
 |----------|------|
 | **1-5 linhas**, risco baixo | Corrige inline (sem perguntar) |
 | **>5 linhas** ou risco médio | Pergunta: "Corrigir agora ou documentar como issue?" |
-| **Bug**, decisão arquitetural, dívida estrutural | Cria issue em `.scratch/qa-<data-hora>/` |
+| **Bug**, decisão arquitetural, dívida estrutural | Cria issue em `.scratch/qa-<data-hora>/issues/` |
+| **Findings da Fase 0** (relatados pelo usuário) | Sempre virar issue |
 
-Os issues seguem este formato:
+Os issues seguem este formato (veja `docs/agents/finding-template.md` para
+detalhes e exemplos):
 
 ```markdown
 ---
@@ -88,6 +122,7 @@ Date: 2026-06-04
 Area: <domain>
 Severity: low | medium | high
 Source: qa-skill
+Type: bug | tech-debt | architecture | design-change | discovery
 ---
 
 # <título conciso>
@@ -189,8 +224,11 @@ A skill sempre imprime um resumo no final:
 ┌─────────────────────────────────────────────────────────────┐
 │                     QA Report — 2026-06-04                  │
 ├─────────────────────────────────────────────────────────────┤
+│ FASE 0 — Achados da sessão                                  │
+│   📋 "Bug de paginação em /deputados" → issue criado       │
+│                                                              │
 │ FASE 1 — Automático                                         │
-│   ✅ pytest: 169 passed                                     │
+│   ✅ pytest: 208 passed                                     │
 │   ✅ pre-commit: limpo                                       │
 │   ⚠ docstrings: 2 pendentes (corrigido inline)              │
 │   ✅ debug leftovers: nenhum                                 │
@@ -200,7 +238,7 @@ A skill sempre imprime um resumo no final:
 │   ☐ /verify: pulado                                         │
 │                                                              │
 │ Achados documentados como issues:                            │
-│   📋 .scratch/qa-20260604-153000/issues/01-docstrings.md     │
+│   📋 .scratch/qa-20260604-153000/issues/01-paginacao.md     │
 │                                                              │
 │ Resultado: ✅ Pode commitar                                  │
 └─────────────────────────────────────────────────────────────┘

@@ -193,4 +193,35 @@ BULK_REGISTRY: dict[str, dict] = {
         "bulk_filter_date_column": "dataHoraVotacao",
         "schema_overrides": {},
     },
+    # ── Domínios bulk-only (Fase 3) ────────────────────────────────────────
+    "funcionarios": {
+        "requires_year": False,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/funcionarios/csv/funcionarios.csv"
+        ),
+        "bulk_granularity": "snapshot",
+        "bulk_filter_date_column": None,
+        "schema_overrides": {"codGrupo": pl.Int64},
+        "bulk_only": True,
+    },
+    "tecad_categorias": {
+        "requires_year": False,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/tecadCategorias/csv/tecadCategorias.csv"
+        ),
+        "bulk_granularity": "snapshot",
+        "bulk_filter_date_column": None,
+        "schema_overrides": {"codCategoria": pl.Int64, "codSubCategoria": pl.Int64},
+        "bulk_only": True,
+    },
+    "tecad_termos": {
+        "requires_year": False,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/tecadTermos/csv/tecadTermos.csv"
+        ),
+        "bulk_granularity": "snapshot",
+        "bulk_filter_date_column": None,
+        "schema_overrides": {"codTermo": pl.Int64},
+        "bulk_only": True,
+    },
 }

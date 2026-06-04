@@ -30,6 +30,9 @@ São os blocos de construção do ETL. A enumeração `DomainType` em
 | `grupos`         | Grupos parlamentares (Bancadas)                              | — (dimensional)     |
 | `legislaturas`   | Legislaturas (ciclos de 4 anos)                              | — (dimensional)     |
 | `referencias`    | Catálogos de referência (tipos de proposição, situação, etc.) | — (dimensional)   |
+| `funcionarios`   | Servidores da Câmara (nome, cargo, lotação, snapshot)        | — (snapshot)        |
+| `tecadCategorias`| Categorias do Tesauro TECAD (classificação temática)         | — (snapshot)        |
+| `tecadTermos`    | Termos do Tesauro TECAD (vocabulário controlado)             | — (snapshot)        |
 
 **Domínios de detalhe** (adicional de um domínio raiz, acessado via `/{id}`):
 
@@ -205,6 +208,10 @@ O `SourceRouter` decide:
 | Full load, dump anual, janela > 1 ano | **Bulk** |
 
 Nota: **Bulk** só para os domínios que o tem disponível, para os outros o consumo é via API.
+
+**Bulk-only**: domínios como `funcionarios`, `tecadCategorias` e `tecadTermos` não
+possuem rota na API REST. O `SourceRouter` sempre retorna BULK para estes
+(`bulk_only=True` no `BULK_REGISTRY`), independentemente da estratégia.
 ---
 
 ## 4. Arquitetura Medallion (Bronze → Silver → Gold)

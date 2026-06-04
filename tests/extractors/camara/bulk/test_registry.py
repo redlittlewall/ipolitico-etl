@@ -5,7 +5,7 @@ Testes estruturais do BULK_REGISTRY e seus schema_overrides.
 import polars as pl
 from ipolitico.extractors.camara.bulk.registry import BULK_REGISTRY
 
-# 5 legados + 13 novos domínios institucionais = 18
+# 5 legados + 13 domínios institucionais + 3 bulk-only (Fase 3) = 21
 REQUIRED_SCHEMA_OVERRIDE_DOMAINS = {
     "deputados",
     "despesas",
@@ -26,6 +26,10 @@ REQUIRED_SCHEMA_OVERRIDE_DOMAINS = {
     "ocupacoes",
     "profissoes",
     "orientacoes",
+    # Fase 3 — Domínios bulk-only (sem rota API)
+    "funcionarios",
+    "tecad_categorias",
+    "tecad_termos",
 }
 
 REQUIRED_KEYS = frozenset(
@@ -51,6 +55,10 @@ SNAPSHOT_DOMAINS = frozenset(
         "deputados_frentes",
         "ocupacoes",
         "profissoes",
+        # Fase 3 — bulk-only snapshot
+        "funcionarios",
+        "tecad_categorias",
+        "tecad_termos",
     }
 )
 

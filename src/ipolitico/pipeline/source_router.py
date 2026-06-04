@@ -68,6 +68,17 @@ class SourceRouter:
         """
         spec = spec_for(domain)
         meta = bulk_meta_for_domain(domain)
+
+        # Domínios bulk_only (sem rota API): sempre Bulk
+        if meta.get("bulk_only"):
+            col = meta.get("bulk_filter_date_column")
+            return ExtractionPlan(
+                SourceType.BULK,
+                bulk_temporal_column=col if isinstance(col, str) else None,
+                bulk_eff_start_iso=effective_start_iso,
+                bulk_eff_end_iso=effective_end_iso,
+            )
+
         granularity = (spec.bulk_granularity if spec else None) or meta.get("bulk_granularity")
 
         if granularity == "snapshot":

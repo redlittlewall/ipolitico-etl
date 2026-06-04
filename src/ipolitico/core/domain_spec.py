@@ -329,6 +329,22 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         uk=("id_legislatura", "id", "titulo", "dataInicio"),
         sub="legislaturas_mesa",
     ),
+    # ── Domínios bulk-only (Fase 3) ────────────────────────────────────────
+    DomainType.FUNCIONARIOS: _spec(
+        DomainType.FUNCIONARIOS,
+        None,
+        uk=("ponto",),
+    ),
+    DomainType.TECAD_CATEGORIAS: _spec(
+        DomainType.TECAD_CATEGORIAS,
+        None,
+        uk=("codCategoria", "codSubCategoria"),
+    ),
+    DomainType.TECAD_TERMOS: _spec(
+        DomainType.TECAD_TERMOS,
+        None,
+        uk=("codTermo",),
+    ),
 }
 
 
