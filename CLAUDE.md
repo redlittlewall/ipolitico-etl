@@ -127,3 +127,9 @@ See `docs/agents/triage-labels.md`.
 
 Single-context layout — one `CONTEXT.md` at the repo root.
 See `docs/agents/domain.md`.
+
+### Commit flow
+
+After any `/tdd` cycle or manual implementation, use `/commit` to automate
+staging, tests, pre-commit, conventional commit message, push, and optional PR.
+See `.claude/skills/commit/SKILL.md`.
