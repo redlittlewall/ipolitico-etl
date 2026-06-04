@@ -32,3 +32,16 @@ class BaseSink(ABC):
             **kwargs: Parâmetros adicionais específicos do armazenamento.
         """
         pass
+
+    async def flush(self, table_name: str, layer: str = MedallionLayer.SILVER.value) -> None:
+        """
+        Descarrega buffers pendentes para o armazenamento persistente.
+
+        Implementação padrão é no-op. Sinks com buffer interno (ex: DataLakeSink)
+        devem sobrescrever este método.
+
+        Args:
+            table_name (str): Nome da tabela ou entidade.
+            layer (str): Camada Medallion bronze/silver/gold.
+        """
+        pass

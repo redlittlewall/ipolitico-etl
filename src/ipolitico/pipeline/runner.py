@@ -144,3 +144,6 @@ class PipelineRunner:
         # Envia a poison pill para desligar o consumidor com segurança
         await df_queue.put(None)
         await consumer_task
+
+        # Garante que todo buffer residual seja descarregado
+        await components.sink.flush(table_name=table_name, layer=layer.value)
