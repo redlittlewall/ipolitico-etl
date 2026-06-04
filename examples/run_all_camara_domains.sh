@@ -15,7 +15,7 @@ fi
 
 START="${START_DATE:-2024-03-01}"
 END="${END_DATE:-2024-03-31}"
-STRATEGY="${STRATEGY:-incremental}"
+STRATEGY="$(echo "${STRATEGY:-incremental}" | tr '[:upper:]' '[:lower:]')"
 OPTIMIZE="${OPTIMIZE:-}"
 
 # Ordem do grafo de dependências (todos os DomainType da Câmara).
