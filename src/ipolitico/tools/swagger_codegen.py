@@ -1,7 +1,7 @@
 """
 Ferramenta Swagger Codegen para iPolitico ETL.
 
-Lê o arquivo Swagger da API da Câmara dos Deputados e gera blocos de
+Lê o arquivo Swagger da API de um provider (Câmara, Senado) e gera blocos de
 configuração e stubs de código para rotas ainda não implementadas.
 """
 
@@ -10,6 +10,49 @@ import json
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
+
+
+@dataclass(frozen=True)
+class ProviderTemplate:
+    """Templates de geração de código por provider (Câmara, Senado, etc.).
+
+    Attributes:
+        name: Nome do provider.
+        extractor_tpl: Template do módulo extrator.
+        transformer_tpl: Template do módulo transformer.
+        domain_type_class: Nome da classe Enum de DomainType.
+        domain_type_module: Módulo Python do DomainType.
+        sink_tpl: Template do módulo sink.
+        swagger_doc_ref: Caminho do arquivo Swagger para TODOs.
+    """
+
+    name: str
+    extractor_tpl: str
+    transformer_tpl: str
+    domain_type_class: str = "DomainType"
+    domain_type_module: str = "ipolitico.core.constants"
+    sink_tpl: str = "ipolitico.sinks.datalake_sink.DataLakeSink"
+    swagger_doc_ref: str = "docs/camara_swagger.json"
+
+
+PROVIDER_TEMPLATES: dict[str, ProviderTemplate] = {
+    "camara": ProviderTemplate(
+        name="camara",
+        extractor_tpl="ipolitico.extractors.camara.api.{domain}.{class_name}Extractor",
+        transformer_tpl=(
+            "ipolitico.transformers.camara.{domain}_transformer." "Camara{class_name}Transformer"
+        ),
+    ),
+    "senado": ProviderTemplate(
+        name="senado",
+        extractor_tpl="ipolitico.extractors.senado.{domain}.{class_name}Extractor",
+        transformer_tpl=(
+            "ipolitico.transformers.senado.{domain}_transformer." "Senado{class_name}Transformer"
+        ),
+        domain_type_class="SenadoDomainType",
+        swagger_doc_ref="docs/senado_swagger.json",
+    ),
+}
 
 
 class PathType(str, Enum):
@@ -38,9 +81,9 @@ def _to_snake_case(name: str) -> str:
     Converte camelCase ou CamelCase para snake_case.
 
     Exemplos:
-        'mandatosExternos' → 'mandatos_externos'
-        'Deputados' → 'deputados'
-        'codSituacao' → 'cod_situacao'
+        'mandatosExternos' -> 'mandatos_externos'
+        'Deputados' -> 'deputados'
+        'codSituacao' -> 'cod_situacao'
 
     Args:
         name: String em camelCase.
@@ -64,13 +107,13 @@ def _is_param(segment: str) -> bool:
 
 def _classify_segments(segments: list[str]) -> tuple[PathType, list[str]]:
     """
-    Classifica uma rota pelo padrão de segments e extrai candidatos.
+    Classifica uma rota pelo padrao de segments e extrai candidatos.
 
     Args:
         segments: Lista de segmentos do path (split por '/').
 
     Returns:
-        Tupla (PathType, lista de nomes de domínio candidatos).
+        Tupla (PathType, lista de nomes de dominio candidatos).
     """
     segments = [_to_snake_case(s) for s in segments]
 
@@ -94,56 +137,60 @@ def _classify_segments(segments: list[str]) -> tuple[PathType, list[str]]:
 
 
 def _indent_block(block: str, prefix: str) -> str:
-    """Aplica prefixo de indentação em cada linha de um bloco."""
+    """Aplica prefixo de indentacao em cada linha de um bloco."""
     return "\n".join(f"{prefix}{line}" for line in block.split("\n"))
 
 
-def format_report(routes: list[RouteInfo]) -> str:
+def format_report(
+    routes: list[RouteInfo],
+    provider: str = "camara",
+) -> str:
     """
-    Gera relatório formatado com stubs para todas as rotas não mapeadas.
+    Gera relatorio formatado com stubs para todas as rotas nao mapeadas.
 
     Args:
-        routes: Lista de RouteInfo não mapeadas.
+        routes: Lista de RouteInfo nao mapeadas.
+        provider: Nome do provider ('camara', 'senado').
 
     Returns:
-        Relatório formatado em texto simples.
+        Relatorio formatado em texto simples.
     """
     if not routes:
-        return "Nenhuma rota não mapeada encontrada.\n"
+        return "Nenhuma rota nao mapeada encontrada.\n"
 
     indent = "      "
-    lines = [f"=== ROTAS NÃO MAPEADAS: {len(routes)} encontrada(s) ===\n"]
+    lines = [f"=== ROTAS NAO MAPEADAS: {len(routes)} encontrada(s) ===\n"]
     for i, route in enumerate(routes, 1):
         lines.append(
-            f"[{i}] {route.path} ({route.http_method}) — {route.summary or 'sem descrição'}"
+            f"[{i}] {route.path} ({route.http_method}) - {route.summary or 'sem descricao'}"
         )
         lines.append(
-            f"    Tipo: {route.path_type.value} → candidatos: {', '.join(route.candidate_domains)}"
+            f"    Tipo: {route.path_type.value} -> candidatos: {', '.join(route.candidate_domains)}"
         )
         lines.append("")
         lines.append("    YAML:")
-        lines.append(_indent_block(generate_yaml_block(route), indent))
+        lines.append(_indent_block(generate_yaml_block(route, provider=provider), indent))
         lines.append("")
         lines.append("    DomainSpec:")
-        lines.append(_indent_block(generate_domain_spec_stub(route), indent))
+        lines.append(_indent_block(generate_domain_spec_stub(route, provider=provider), indent))
         lines.append("")
         lines.append("    SILVER_SCHEMA:")
-        lines.append(_indent_block(generate_silver_schema_stub(route), indent))
+        lines.append(_indent_block(generate_silver_schema_stub(route, provider=provider), indent))
         lines.append("")
     return "\n".join(lines)
 
 
 def _to_enum_name(domain: str) -> str:
-    """Converte nome de domínio para nome de enum (ex: 'recurso_novo' → 'RECURSO_NOVO')."""
+    """Converte nome de dominio para nome de enum (ex: 'recurso_novo' -> 'RECURSO_NOVO')."""
     return domain.upper()
 
 
 def _to_class_name(domain: str) -> str:
     """
-    Converte nome de domínio snake_case para PascalCase (ex: 'recurso_novo' → 'RecursoNovo').
+    Converte nome de dominio snake_case para PascalCase.
 
     Args:
-        domain: Nome do domínio em snake_case.
+        domain: Nome do dominio em snake_case.
 
     Returns:
         Nome da classe em PascalCase.
@@ -151,79 +198,91 @@ def _to_class_name(domain: str) -> str:
     return domain.title().replace("_", "")
 
 
-def generate_silver_schema_stub(route: RouteInfo) -> str:
+def generate_silver_schema_stub(
+    route: RouteInfo,
+    provider: str = "camara",
+) -> str:
     """
-    Gera stub de SILVER_SCHEMA para uma rota não mapeada.
+    Gera stub de SILVER_SCHEMA para uma rota nao mapeada.
 
     Args:
-        route: Informações da rota.
+        route: Informacoes da rota.
+        provider: Nome do provider.
 
     Returns:
         Bloco de schema para colar em core/schemas.py.
     """
+    tpl = PROVIDER_TEMPLATES[provider]
     domain = route.candidate_domains[0]
     lines = [
         f"# -- {domain} --",
         "# Em core/schemas.py (SILVER_SCHEMAS):",
-        f"DomainType.{_to_enum_name(domain)}.value: {{",
+        f"{tpl.domain_type_class}.{_to_enum_name(domain)}.value: {{",
         '    "id": pl.Int64,',
-        "    # TODO: mapear colunas do Swagger — consultar schema em",
-        f"    #       docs/camara_swagger.json → paths → {route.path}",
+        "    # TODO: mapear colunas do Swagger - consultar schema em",
+        f"    #       {tpl.swagger_doc_ref} -> paths -> {route.path}",
         "},",
     ]
     return "\n".join(lines)
 
 
-def generate_domain_spec_stub(route: RouteInfo) -> str:
+def generate_domain_spec_stub(
+    route: RouteInfo,
+    provider: str = "camara",
+) -> str:
     """
-    Gera stub de DomainSpec para uma rota não mapeada.
+    Gera stub de DomainSpec para uma rota nao mapeada.
 
     Args:
-        route: Informações da rota.
+        route: Informacoes da rota.
+        provider: Nome do provider.
 
     Returns:
-        Bloco de código Python com enum + DomainSpec para colar em constants.py
-        e domain_spec.py.
+        Bloco de codigo Python com enum + DomainSpec.
     """
+    tpl = PROVIDER_TEMPLATES[provider]
     domain = route.candidate_domains[0]
     enum_name = _to_enum_name(domain)
     lines = [
         f"# -- {domain} --",
-        "# Em core/constants.py (DomainType):",
+        f"# Em {tpl.domain_type_module} ({tpl.domain_type_class}):",
         f'# {enum_name} = "{domain}"',
         "",
         "# Em core/domain_spec.py:",
         "DomainSpec(",
-        f"    domain=DomainType.{enum_name},",
-        "    watermark_column=None,         # TODO: verificar se há coluna de data",
+        f"    domain={tpl.domain_type_class}.{enum_name},",
+        "    watermark_column=None,         # TODO: verificar se ha coluna de data",
         "    earliest_iso=EarliestDates.DEPUTADOS,  # TODO: ajustar data mais antiga",
-        "    depends_on=frozenset(),        # TODO: adicionar dependências",
+        "    depends_on=frozenset(),        # TODO: adicionar dependencias",
         '    unique_keys=("id",),',
         "),",
     ]
     return "\n".join(lines)
 
 
-def generate_yaml_block(route: RouteInfo) -> str:
+def generate_yaml_block(route: RouteInfo, provider: str = "camara") -> str:
     """
-    Gera um bloco de configuração YAML para uma rota não mapeada.
+    Gera um bloco de configuracao YAML para uma rota nao mapeada.
 
     Args:
-        route: Informações da rota a ser gerada.
+        route: Informacoes da rota a ser gerada.
+        provider: Nome do provider.
 
     Returns:
         Bloco YAML formatado com extractor, transformer e sinks.
     """
+    tpl = PROVIDER_TEMPLATES[provider]
     domain = route.candidate_domains[0]
     class_name = _to_class_name(domain)
+    extractor = tpl.extractor_tpl.format(domain=domain, class_name=class_name)
+    transformer = tpl.transformer_tpl.format(domain=domain, class_name=class_name)
     return "\n".join(
         [
             f"  {domain}:",
-            f'    extractor: "ipolitico.extractors.camara.api.{domain}.{class_name}Extractor"',
-            f"    transformer: "
-            f'"ipolitico.transformers.camara.{domain}_transformer.Camara{class_name}Transformer"',
+            f'    extractor: "{extractor}"',
+            f"    transformer: " f'"{transformer}"',
             "    sinks:",
-            '      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"',
+            f'      datalake: "{tpl.sink_tpl}"',
         ]
     )
 
@@ -233,15 +292,15 @@ def find_unmapped_routes(
     existing_domains: set[str],
 ) -> list[RouteInfo]:
     """
-    Percorre as paths do Swagger e retorna as que NÃO estão mapeadas.
+    Percorre as paths do Swagger e retorna as que NAO estao mapeadas.
 
     Args:
         swagger: Dict do Swagger (parsed JSON).
-        existing_domains: Conjunto de nomes de domínio já implementados
+        existing_domains: Conjunto de nomes de dominio ja implementados
                           (valores de DomainType).
 
     Returns:
-        Lista de RouteInfo para rotas ainda não implementadas.
+        Lista de RouteInfo para rotas ainda nao implementadas.
     """
     result: list[RouteInfo] = []
     paths = swagger.get("paths", {})
@@ -261,14 +320,14 @@ def _try_add_route(
     result: list[RouteInfo],
 ) -> None:
     """
-    Analisa um path individual e adiciona à lista se não estiver mapeado.
+    Analisa um path individual e adiciona a lista se nao estiver mapeado.
 
     Args:
         path: Path da rota (ex: '/deputados').
-        http_method: Método HTTP (ex: 'GET').
+        http_method: Metodo HTTP (ex: 'GET').
         details: Dict com summary, tags etc.
-        existing_domains: Domínios já implementados.
-        result: Lista de saída (append se unmapped).
+        existing_domains: Dominios ja implementados.
+        result: Lista de saida (append se unmapped).
     """
     segments = [s for s in path.split("/") if s]
     path_type, candidates = _classify_segments(segments)
@@ -290,14 +349,15 @@ def _try_add_route(
 
 def build_parser() -> argparse.ArgumentParser:
     """
-    Constrói o parser de argumentos da CLI.
+    Constroi o parser de argumentos da CLI.
 
     Returns:
         ArgumentParser configurado.
     """
     parser = argparse.ArgumentParser(
         description=(
-            "Gera stubs de código para rotas Swagger não implementadas " "da Câmara dos Deputados."
+            "Gera stubs de codigo para rotas Swagger nao implementadas "
+            "de um provider (Camara, Senado, etc.)."
         ),
     )
     parser.add_argument(
@@ -305,12 +365,18 @@ def build_parser() -> argparse.ArgumentParser:
         default="docs/camara_swagger.json",
         help="Caminho para o arquivo Swagger JSON (default: docs/camara_swagger.json)",
     )
+    parser.add_argument(
+        "--provider",
+        default="camara",
+        choices=list(PROVIDER_TEMPLATES.keys()),
+        help="Provider da API (default: camara)",
+    )
     return parser
 
 
 def main() -> None:
     """
-    Entry point da CLI. Lê o Swagger, encontra rotas não mapeadas e gera relatório.
+    Entry point da CLI. Le o Swagger, encontra rotas nao mapeadas e gera relatorio.
     """
     parser = build_parser()
     args = parser.parse_args()
@@ -323,7 +389,7 @@ def main() -> None:
     existing = {v.value for v in DomainType}
 
     routes = find_unmapped_routes(swagger, existing)
-    print(format_report(routes), end="")
+    print(format_report(routes, provider=args.provider), end="")
 
 
 if __name__ == "__main__":

@@ -99,7 +99,7 @@ class TestFindUnmappedRoutes:
             ),
         ]
         report = format_report(routes)
-        assert "ROTAS NÃO MAPEADAS" in report
+        assert "ROTAS NÃO MAPEADAS" in report or "ROTAS NAO MAPEADAS" in report
         assert "/recurso_novo" in report
         assert "/recurso_novo/{id}/detalhe_filho" in report
         assert "YAML" in report
@@ -121,6 +121,90 @@ class TestFindUnmappedRoutes:
         assert "pl.Int64" in stub
         assert "SILVER_SCHEMAS" in stub or "silver" in stub.lower()
         assert "TODO" in stub
+
+    def test_generate_silver_schema_stub_senado(self):
+        """SILVER_SCHEMA stub com provider='senado' usa SenadoDomainType."""
+        route = RouteInfo(
+            path="/recurso_novo",
+            http_method="GET",
+            summary="Novo recurso",
+            path_type=PathType.LIST,
+            candidate_domains=["recurso_novo"],
+            already_mapped=False,
+        )
+        stub = generate_silver_schema_stub(route, provider="senado")
+        assert "SenadoDomainType" in stub
+        assert "docs/senado_swagger.json" in stub
+
+    def test_generate_domain_spec_stub_senado(self):
+        """DomainSpec stub com provider='senado' usa SenadoDomainType."""
+        route = RouteInfo(
+            path="/recurso_novo",
+            http_method="GET",
+            summary="Novo recurso",
+            path_type=PathType.LIST,
+            candidate_domains=["recurso_novo"],
+            already_mapped=False,
+        )
+        stub = generate_domain_spec_stub(route, provider="senado")
+        assert "SenadoDomainType" in stub
+        assert "recurso_novo" in stub
+        assert "DomainSpec" in stub
+
+    def test_generate_yaml_block_default_camara(self):
+        """YAML block default provider='camara' mantém módulos Câmara."""
+        route = RouteInfo(
+            path="/recurso_novo",
+            http_method="GET",
+            summary="Novo recurso",
+            path_type=PathType.LIST,
+            candidate_domains=["recurso_novo"],
+            already_mapped=False,
+        )
+        yaml = generate_yaml_block(route)
+        assert "ipolitico.extractors.camara" in yaml
+        assert "Camara" in yaml
+
+    def test_generate_yaml_block_senado(self):
+        """YAML block com provider='senado' gera módulos Senado."""
+        route = RouteInfo(
+            path="/recurso_novo",
+            http_method="GET",
+            summary="Novo recurso",
+            path_type=PathType.LIST,
+            candidate_domains=["recurso_novo"],
+            already_mapped=False,
+        )
+        yaml = generate_yaml_block(route, provider="senado")
+        assert "ipolitico.extractors.senado" in yaml
+        assert "Senado" in yaml
+        assert "ipolitico.transformers.senado" in yaml
+
+    def test_build_parser_has_provider_arg(self):
+        """CLI parser tem --provider com choices camara e senado."""
+        parser = build_parser()
+        actions = {a.dest: a for a in parser._actions}
+        assert "provider" in actions
+        assert set(actions["provider"].choices) == {"camara", "senado"}
+        assert actions["provider"].default == "camara"
+
+    def test_format_report_senado_includes_senado_paths(self):
+        """Formatted report com provider='senado' tem stubs com módulos senado."""
+        routes = [
+            RouteInfo(
+                path="/recurso_novo",
+                http_method="GET",
+                summary="Novo recurso",
+                path_type=PathType.LIST,
+                candidate_domains=["recurso_novo"],
+                already_mapped=False,
+            ),
+        ]
+        report = format_report(routes, provider="senado")
+        assert "/recurso_novo" in report
+        assert "ipolitico.extractors.senado" in report
+        assert "SenadoDomainType" in report
+        assert "docs/senado_swagger.json" in report
 
     def test_generate_domain_spec_stub_for_new_domain(self):
         """DomainSpec stub includes DomainType constant and spec entry."""
