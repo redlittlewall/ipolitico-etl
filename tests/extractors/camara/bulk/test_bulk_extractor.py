@@ -58,6 +58,46 @@ async def test_base_bulk_extraction_flow_zip(
     assert 'ï»¿"id"' not in result.columns
 
 
+@pytest.mark.asyncio
+@patch(
+    "ipolitico.extractors.camara.bulk.base_bulk.BULK_REGISTRY",
+    new={
+        "dummy": {
+            "requires_year": False,
+            "url": "http://dadosabertos.camara.leg.br/arquivos/dummy/csv/dummy.csv.zip",
+            "bulk_granularity": "snapshot",
+            "bulk_filter_date_column": None,
+            "schema_overrides": {"id": pl.Int64, "ano": pl.Int32},
+        },
+    },
+)
+@patch("ipolitico.extractors.camara.bulk.base_bulk.pl.read_csv")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.ZipFile")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.is_zipfile")
+async def test_extract_passes_schema_overrides_to_read_csv(
+    mock_is_zipfile, mock_zipfile, mock_read_csv, mock_client
+):
+    """
+    [SCHEMA OVERRIDES] Verifica que o extract() encaminha o schema_overrides
+    do BULK_REGISTRY para o pl.read_csv(), eliminando a necessidade de
+    conversão posterior nos transformers.
+    """
+    mock_is_zipfile.return_value = True
+    mock_zip_instance = MagicMock()
+    mock_zip_instance.namelist.return_value = ["dummy.csv"]
+    mock_zipfile.return_value.__enter__.return_value = mock_zip_instance
+
+    df_bruto = pl.DataFrame({"id": ["1"], "nome": ["A"]})
+    mock_read_csv.return_value = df_bruto
+
+    ext = BaseBulkExtractor(mock_client, domain_name="dummy")
+    await ext.extract()
+
+    mock_read_csv.assert_called_once()
+    _args, kwargs = mock_read_csv.call_args
+    assert kwargs.get("schema_overrides") == {"id": pl.Int64, "ano": pl.Int32}
+
+
 def test_base_bulk_build_url_unmapped():
     ext = BaseBulkExtractor(None, domain_name="dominio_fantasma")
     with pytest.raises(ValueError, match="não mapeado no registry"):

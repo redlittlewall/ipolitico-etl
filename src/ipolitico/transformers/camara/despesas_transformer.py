@@ -6,6 +6,7 @@ import polars as pl
 from ipolitico.core.constants import DomainType
 from ipolitico.core.schemas import SILVER_SCHEMAS
 from ipolitico.transformers.base import BaseTransformer
+from ipolitico.transformers.br_locale import convert_br_currency_columns
 from ipolitico.transformers.ceap_bulk import apply_ceap_column_aliases, normalize_document_date_iso
 
 logger = logging.getLogger(__name__)
@@ -43,14 +44,7 @@ class CamaraDespesasTransformer(BaseTransformer):
                 )
                 return df
 
-        for col_moeda in ["valorLiquido", "valorDocumento", "valorGlosa"]:
-            if col_moeda in df.columns and df.schema[col_moeda] == pl.String:
-                df = df.with_columns(
-                    pl.col(col_moeda)
-                    .str.replace_all(r"\.", "")
-                    .str.replace(r",", ".")
-                    .alias(col_moeda)
-                )
+        df = convert_br_currency_columns(df, ["valorLiquido", "valorDocumento", "valorGlosa"])
 
         contract = SILVER_SCHEMAS[DomainType.DESPESAS.value]
 

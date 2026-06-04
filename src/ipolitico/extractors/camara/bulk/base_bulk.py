@@ -22,6 +22,11 @@ class BaseBulkExtractor(BaseExtractor):
     Garante o Princípio da Responsabilidade Única (SRP): foca estritamente
     em baixar o arquivo (CSV/ZIP), descompactar e carregar o DataFrame bruto em
     memória, sem aplicar padronizações de regras de negócio ou realizar persistência.
+
+    A leitura do CSV utiliza ``schema_overrides`` do ``BULK_REGISTRY`` (se
+    presentes) para tipar colunas conhecidas na origem, evitando o segundo passe
+    de cast nos transformers. Colunas de moeda BR permanecem como ``pl.Utf8``
+    para processamento posterior pelo helper ``convert_br_currency_columns``.
     """
 
     def __init__(self, client: CamaraClient, domain_name: str = ""):
@@ -58,6 +63,11 @@ class BaseBulkExtractor(BaseExtractor):
     async def extract(self, year: Optional[int] = None, **kwargs: Any) -> pl.DataFrame:
         """
         Descarrega o arquivo estático, descompacta (se aplicável) e lê o CSV.
+
+        Aplica ``schema_overrides`` do ``BULK_REGISTRY`` (se presentes) na chamada
+        a ``pl.read_csv``, tipando colunas conhecidas diretamente na leitura.
+        Colunas de moeda BR (ex: ``vlrLiquido``) são mantidas como ``pl.Utf8``
+        para processamento posterior pelo helper ``convert_br_currency_columns``.
 
         Args:
             year (int, optional): Ano para particionamento do arquivo.
@@ -100,6 +110,7 @@ class BaseBulkExtractor(BaseExtractor):
                     return pl.DataFrame()
 
             try:
+                config_registry = BULK_REGISTRY.get(self.domain_name, {})
                 df = pl.read_csv(
                     dest_path,
                     separator=";",
@@ -108,6 +119,7 @@ class BaseBulkExtractor(BaseExtractor):
                     encoding="utf8-lossy",
                     truncate_ragged_lines=True,
                     quote_char=None,
+                    schema_overrides=config_registry.get("schema_overrides"),
                 )
 
                 df = df.rename(
