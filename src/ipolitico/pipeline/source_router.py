@@ -7,7 +7,7 @@ from typing import Optional
 
 from ipolitico.core.constants import DomainType, LoadStrategy, SourceType
 from ipolitico.core.domain_spec import bulk_meta_for_domain, spec_for
-from ipolitico.pipeline.effective_window import resolve_calendar_years
+from ipolitico.pipeline.window_resolver import resolve_calendar_years
 
 
 @dataclass(frozen=True)

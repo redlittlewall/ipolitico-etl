@@ -14,8 +14,8 @@ from typing import Iterable
 
 from ipolitico.core.config import CAMARA_HTTP_CONCURRENCY, TELEMETRY_PATH
 from ipolitico.core.constants import EARLIEST_DATE_MAP, DomainType, LoadStrategy
-from ipolitico.pipeline.effective_window import resolve_calendar_years
 from ipolitico.pipeline.source_router import SourceRouter
+from ipolitico.pipeline.window_resolver import resolve_calendar_years
 
 # Ordens de grandeza observadas em produção (ajuste via env ou telemetria).
 DEFAULT_DEPUTY_COUNT = 513

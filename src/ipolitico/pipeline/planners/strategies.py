@@ -15,7 +15,6 @@ from typing import Any, Callable
 from ipolitico.core.constants import EARLIEST_DATE_MAP, DomainType, MedallionLayer, SourceType
 from ipolitico.core.domain_spec import DomainSpec
 from ipolitico.pipeline.deputy_universe import resolve_deputy_ids_for_calendar_window
-from ipolitico.pipeline.effective_window import resolve_calendar_years
 from ipolitico.pipeline.job_resume import (
     filter_deputado_child_jobs,
     filter_despesas_api_jobs,
@@ -23,6 +22,7 @@ from ipolitico.pipeline.job_resume import (
     filter_votacao_ids_pending_votos,
 )
 from ipolitico.pipeline.source_router import ExtractionPlan
+from ipolitico.pipeline.window_resolver import resolve_calendar_years
 from ipolitico.storage.datalake_repository import DataLakeRepository
 from ipolitico.storage.state_store import StateStore
 
@@ -1063,6 +1063,29 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     DomainType.PROPOSICOES_DETALHE: DetailStrategy(),
     # Referências
     DomainType.REFERENCIAS: ReferenciasStrategy(),
+    # ── Filhos de deputado ─────────────────────────────────────────────────
+    DomainType.MANDATOS_EXTERNOS: DeputyChildStrategy(include_date_range=False),
+    # ── Filhos de evento ────────────────────────────────────────────────────
+    DomainType.EVENTOS_ORGAOS: ParentBatchedStrategy(
+        parent_key="evento_ids",
+        batch_size=20,
+        resolve_fn=_resolve_evento_ids,
+        parent_col="id_evento",
+    ),
+    # ── Domínios bulk-only snapshot ─────────────────────────────────────────
+    DomainType.FUNCIONARIOS: DefaultWindowStrategy(),
+    DomainType.TECAD_CATEGORIAS: DefaultWindowStrategy(),
+    DomainType.TECAD_TERMOS: DefaultWindowStrategy(),
+    # ── Domínios bulk-only yearly (requerem TimeWindowStrategy para jobs por ano) ──
+    DomainType.EVENTOS_PRESENCA_DEPUTADOS: TimeWindowStrategy(),
+    DomainType.EVENTOS_REQUERIMENTOS: TimeWindowStrategy(),
+    DomainType.VOTACOES_OBJETOS: TimeWindowStrategy(),
+    DomainType.VOTACOES_PROPOSICOES: TimeWindowStrategy(),
+    DomainType.LICITACOES: TimeWindowStrategy(),
+    DomainType.LICITACOES_CONTRATOS: TimeWindowStrategy(),
+    DomainType.LICITACOES_ITENS: TimeWindowStrategy(),
+    DomainType.LICITACOES_PEDIDOS: TimeWindowStrategy(),
+    DomainType.LICITACOES_PROPOSTAS: TimeWindowStrategy(),
 }
 
 

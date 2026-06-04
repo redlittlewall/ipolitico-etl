@@ -4,7 +4,7 @@ from datetime import datetime
 from unittest.mock import MagicMock
 
 from ipolitico.core.constants import DomainType, LoadStrategy
-from ipolitico.pipeline.effective_window import (
+from ipolitico.pipeline.window_resolver import (
     resolve_calendar_years,
     resolve_effective_iso_window,
 )
@@ -20,7 +20,7 @@ def test_resolve_calendar_years_swapped():
 
 def test_effective_window_applies_domain_floor(monkeypatch):
     monkeypatch.setattr(
-        "ipolitico.pipeline.effective_window.datetime",
+        "ipolitico.pipeline.window_resolver.datetime",
         MagicMock(now=MagicMock(return_value=datetime(2025, 6, 1))),
     )
     start, end = resolve_effective_iso_window(
@@ -38,7 +38,7 @@ def test_effective_window_applies_domain_floor(monkeypatch):
 
 def test_effective_window_caps_at_today(monkeypatch):
     monkeypatch.setattr(
-        "ipolitico.pipeline.effective_window.datetime",
+        "ipolitico.pipeline.window_resolver.datetime",
         MagicMock(now=MagicMock(return_value=datetime(2024, 3, 15))),
     )
     start, end = resolve_effective_iso_window(

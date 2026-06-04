@@ -7,7 +7,7 @@ from typing import Any, List, Optional
 
 from ipolitico.core.constants import DomainType, MedallionLayer
 from ipolitico.core.legislature import legislature_id_bounds_for_calendar_years
-from ipolitico.pipeline.effective_window import resolve_calendar_years
+from ipolitico.pipeline.window_resolver import resolve_calendar_years
 from ipolitico.storage.datalake_repository import DataLakeRepository
 from ipolitico.storage.state_store import StateStore
 

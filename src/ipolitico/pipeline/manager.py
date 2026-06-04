@@ -13,11 +13,10 @@ from ipolitico.core.constants import (
 from ipolitico.core.domain_spec import spec_for
 from ipolitico.core.legislature import legislature_anchor_year_from_iso
 from ipolitico.pipeline.builder import PipelineBuilder
-from ipolitico.pipeline.effective_window import resolve_effective_iso_window
 from ipolitico.pipeline.planners.camara_jobs import CamaraJobPlanner
 from ipolitico.pipeline.runner import PipelineRunner
 from ipolitico.pipeline.source_router import SourceRouter
-from ipolitico.pipeline.window_resolver import WindowResolver
+from ipolitico.pipeline.window_resolver import WindowResolver, resolve_effective_iso_window
 from ipolitico.services.metadata import CamaraMetadataService
 from ipolitico.sinks.base import BaseSink
 from ipolitico.storage.datalake_repository import DataLakeRepository

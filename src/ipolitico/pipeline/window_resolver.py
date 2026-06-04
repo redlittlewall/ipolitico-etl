@@ -11,6 +11,55 @@ from ipolitico.storage.state_store import StateStore
 logger = logging.getLogger(__name__)
 
 
+def resolve_calendar_years(span_start: str, span_end: str) -> tuple[int, int]:
+    """Retorna anos civis inicial e final a partir de ISO YYYY-MM-DD."""
+    y0 = int(span_start.split("-")[0])
+    y1 = int(span_end.split("-")[0])
+    if y0 > y1:
+        return y1, y0
+    return y0, y1
+
+
+def resolve_effective_iso_window(
+    domain: DomainType,
+    *,
+    orchestration_start: str,
+    orchestration_end: str,
+    earliest_possible: str,
+    strategy: LoadStrategy,
+    state_store: StateStore | None,
+    watermark_column: str | None,
+) -> tuple[str, str]:
+    """
+    Aplica piso dominial + teto=hoje.
+
+    Incremental já foi materializado em *orchestration_start* via watermark;
+    esta função reforça piso dominial.
+
+    Args:
+        domain: Tipo do domínio (usado para extensões futuras).
+        orchestration_start: Início da janela orquestrada (ISO).
+        orchestration_end: Fim da janela orquestrada (ISO).
+        earliest_possible: Data mais antiga do domínio (piso).
+        strategy: Estratégia de carga (reservado para extensões futuras).
+        state_store: StateStore (reservado para extensões futuras).
+        watermark_column: Coluna watermark (reservado para extensões futuras).
+
+    Returns:
+        Tupla (start, end) com piso e teto aplicados.
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    start = max(orchestration_start, earliest_possible)
+    end = min(orchestration_end, today)
+
+    # Parâmetros reservados para extensões futuras (P1)
+    _ = strategy, state_store, watermark_column, domain
+
+    if start > end:
+        end = today
+    return start, end
+
+
 class WindowResolver:
     """Resolve janela orquestrada (incremental / full) a partir do estado persistido."""
 
