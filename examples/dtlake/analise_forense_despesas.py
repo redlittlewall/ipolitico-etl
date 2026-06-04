@@ -1,45 +1,49 @@
+"""Análise Forense: Documentos Duplicados em Despesas.
+
+Domínios utilizados: despesas (camada Gold)
+"""
+
 from pathlib import Path
 
 import duckdb
 import pandas as pd
 
-DATALAKE_PATH = Path("data/datalake/bronze")
+DATALAKE_PATH = Path("data/datalake/gold")
 
 
 def main():
-    parquet_file = DATALAKE_PATH / "despesas.parquet"
+    parquet_file = DATALAKE_PATH / "despesas" / "despesas.parquet"
     if not parquet_file.exists():
         print(f"Erro: Arquivo não encontrado em {parquet_file}")
         return
 
     conn = duckdb.connect()
 
-    # 1. Pegamos 3 Códigos de Documento (que não sejam vazios/zero) que se repetem
-    # 2. Puxamos todas as linhas exatas desses documentos para inspecionar
+    # Busca documentos que aparecem mais de uma vez com mesmo código+parcela
     query = f"""
         WITH chaves_duplicadas AS (
-            SELECT codDocumento, numParcela
+            SELECT codDocumento, parcela
             FROM '{parquet_file}'
             WHERE codDocumento IS NOT NULL
               AND CAST(codDocumento AS VARCHAR) != '0'
               AND CAST(codDocumento AS VARCHAR) != ''
-            GROUP BY codDocumento, numParcela
+            GROUP BY codDocumento, parcela
             HAVING COUNT(*) > 1
             LIMIT 3
         )
         SELECT
             d.codDocumento,
-            d.numParcela,
+            d.parcela,
             d.dataDocumento,
             d.nomeFornecedor,
-            d.txtDescricao,
+            d.tipoDespesa,
             d.valorDocumento,
-            d.vlrGlosa,
+            d.valorGlosa,
             d.valorLiquido
         FROM '{parquet_file}' d
         JOIN chaves_duplicadas cd
           ON d.codDocumento = cd.codDocumento
-         AND d.numParcela = cd.numParcela
+         AND d.parcela = cd.parcela
         ORDER BY d.codDocumento, d.valorLiquido DESC
     """
 
@@ -48,7 +52,6 @@ def main():
     print("\n=== 🔎 ESTUDO DE CASO: O JOGO DOS 7 ERROS NAS DUPLICATAS ===")
     print("O que muda entre as linhas do mesmo documento?\n")
 
-    # Configurando o Pandas para não esconder colunas no print
     pd.set_option("display.max_columns", None)
     pd.set_option("display.width", 1000)
 
