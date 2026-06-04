@@ -36,6 +36,29 @@ def test_votos_one_request_per_votacao():
     assert est.http_requests == 100
 
 
+def test_funcionarios_bulk_snapshot_one_download():
+    """Snapshot domain com janela de 200 anos deve estimar 1 bulk download."""
+    est = estimate_domain(
+        DomainType.FUNCIONARIOS,
+        "1826-01-01",
+        "2026-12-31",
+        LoadStrategy.FULL_LOAD,
+    )
+    assert est.bulk_downloads == 1
+    assert est.http_requests == 0
+
+
+def test_tecad_categorias_snapshot_um_download():
+    """TECAD_CATEGORIAS snapshot com 100 anos deve estimar 1 bulk download."""
+    est = estimate_domain(
+        DomainType.TECAD_CATEGORIAS,
+        "1925-01-01",
+        "2025-12-31",
+        LoadStrategy.FULL_LOAD,
+    )
+    assert est.bulk_downloads == 1
+
+
 def test_estimate_camara_wall_time_positive():
     est = estimate_camara_ingestion(
         [DomainType.PROFISSÕES],

@@ -1,5 +1,5 @@
 ---
-Status: needs-triage
+Status: resolved
 Date: 2026-06-04
 Area: tools
 Severity: medium

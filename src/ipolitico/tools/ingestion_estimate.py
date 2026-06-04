@@ -14,6 +14,7 @@ from typing import Iterable
 
 from ipolitico.core.config import CAMARA_HTTP_CONCURRENCY, TELEMETRY_PATH
 from ipolitico.core.constants import EARLIEST_DATE_MAP, DomainType, LoadStrategy
+from ipolitico.extractors.camara.bulk.registry import BULK_REGISTRY
 from ipolitico.pipeline.source_router import SourceRouter
 from ipolitico.pipeline.window_resolver import resolve_calendar_years
 
@@ -106,13 +107,33 @@ def estimate_domain(
     votacoes_per_month: int = DEFAULT_VOTACOES_PER_MONTH,
     force_api: bool = False,
 ) -> DomainEstimate:
+    """
+    Estima o número de requisições HTTP e downloads bulk para um domínio.
+
+    Para domínios bulk, consulta ``bulk_granularity`` no BULK_REGISTRY:
+    granularidade ``"snapshot"`` conta 1 download independente da janela
+    temporal; ``"year"`` conta um download por ano.
+
+    Args:
+        domain: Tipo do domínio.
+        start_iso: Início da janela (ISO).
+        end_iso: Fim da janela (ISO).
+        strategy: Estratégia de carga.
+        deputy_count: Número de deputados (para heurísticas API).
+        votacoes_per_month: Média de votações por mês.
+        force_api: Se True, ignora bulk e força estimativa via API.
+
+    Returns:
+        DomainEstimate com contagem estimada de HTTP e bulk downloads.
+    """
     plan = SourceRouter.plan(domain, strategy, start_iso, end_iso)
     use_bulk = plan.source_type.value == "bulk" and not force_api
     years = _years_inclusive(start_iso, end_iso)
     months = _months_inclusive(start_iso, end_iso)
 
     if use_bulk:
-        bulk = years
+        granularity = BULK_REGISTRY.get(domain.value, {}).get("bulk_granularity", "year")
+        bulk = 1 if granularity == "snapshot" else years
         return DomainEstimate(
             domain=domain.value,
             http_requests=0,
