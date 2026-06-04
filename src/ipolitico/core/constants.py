@@ -122,6 +122,12 @@ class DomainType(str, Enum):
     FUNCIONARIOS = "funcionarios"
     TECAD_CATEGORIAS = "tecad_categorias"
     TECAD_TERMOS = "tecad_termos"
+    # Domínios bulk-only de licitações (dumps CSV anuais)
+    LICITACOES = "licitacoes"
+    LICITACOES_CONTRATOS = "licitacoes_contratos"
+    LICITACOES_ITENS = "licitacoes_itens"
+    LICITACOES_PEDIDOS = "licitacoes_pedidos"
+    LICITACOES_PROPOSTAS = "licitacoes_propostas"
 
 
 class MedallionLayer(str, Enum):
@@ -146,6 +152,7 @@ class EarliestDates:
     FUNCIONARIOS = "1826-04-29"
     TECAD_CATEGORIAS = "1826-04-29"
     TECAD_TERMOS = "1826-04-29"
+    LICITACOES = "1999-01-01"
 
 
 # Facilita o acesso dinâmico: EarliestDateMap[DomainType.DESPESAS]
@@ -205,4 +212,10 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.FUNCIONARIOS: EarliestDates.FUNCIONARIOS,
     DomainType.TECAD_CATEGORIAS: EarliestDates.TECAD_CATEGORIAS,
     DomainType.TECAD_TERMOS: EarliestDates.TECAD_TERMOS,
+    # Domínios bulk-only de licitações
+    DomainType.LICITACOES: EarliestDates.LICITACOES,
+    DomainType.LICITACOES_CONTRATOS: EarliestDates.LICITACOES,
+    DomainType.LICITACOES_ITENS: EarliestDates.LICITACOES,
+    DomainType.LICITACOES_PEDIDOS: EarliestDates.LICITACOES,
+    DomainType.LICITACOES_PROPOSTAS: EarliestDates.LICITACOES,
 }

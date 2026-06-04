@@ -107,3 +107,76 @@ class CamaraTecadTermosTransformer(BaseTransformer):
         if df.is_empty():
             return df
         return _apply_contract(df, DomainType.TECAD_TERMOS.value)
+
+
+class CamaraLicitacoesTransformer(BaseTransformer):
+    """Transformer para o domínio licitacoes (bulk-only, dumps CSV anuais).
+
+    O CSV bruto tem colunas: idLicitacao, numero, ano, numProcesso, anoProcesso,
+    objeto, modalidade, tipo, situacao, vlrEstimado, vlrContratado, vlrPago,
+    datas e contagens numéricas. A conversão de tipos numéricos é feita via
+    schema_overrides no BULK_REGISTRY + _apply_contract.
+    """
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        if df.is_empty():
+            return df
+        return _apply_contract(df, DomainType.LICITACOES.value)
+
+
+class CamaraLicitacoesContratosTransformer(BaseTransformer):
+    """Transformer para o domínio licitacoesContratos (bulk-only, dumps CSV anuais).
+
+    O CSV bruto tem colunas: ano, idLicitacao, numContrato, anoContrato,
+    tipoContrato, situacaoContrato, vlrOriginal, vlrTotal, objeto, datas vigência,
+    fornecedor*, numSeqArquivoInstrContratual, txtNomeArquivo.
+    """
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        if df.is_empty():
+            return df
+        return _apply_contract(df, DomainType.LICITACOES_CONTRATOS.value)
+
+
+class CamaraLicitacoesItensTransformer(BaseTransformer):
+    """Transformer para o domínio licitacoesItens (bulk-only, dumps CSV anuais).
+
+    O CSV bruto tem colunas: ano, idLicitacao, numItem, numSubitem, descricao,
+    especificacao, unidade, qtdLicitada, vlrUnitarioEstimado, qtdContratada,
+    vlrUnitarioContratado, vlrTotalContratado, fornecedor*, uriContrato,
+    numContrato, anoContrato, tipoContrato, situacaoItem, observacoes,
+    naturezaDespesa, programaTrabalho, codPTRES.
+    """
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        if df.is_empty():
+            return df
+        return _apply_contract(df, DomainType.LICITACOES_ITENS.value)
+
+
+class CamaraLicitacoesPedidosTransformer(BaseTransformer):
+    """Transformer para o domínio licitacoesPedidos (bulk-only, dumps CSV anuais).
+
+    O CSV bruto tem colunas: ano, idLicitacao, tipoRegistro, numPedido,
+    anoPedido, dataHoraCadastro, idOrgao, orgao, objeto, observacoes.
+    """
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        if df.is_empty():
+            return df
+        return _apply_contract(df, DomainType.LICITACOES_PEDIDOS.value)
+
+
+class CamaraLicitacoesPropostasTransformer(BaseTransformer):
+    """Transformer para o domínio licitacoesPropostas (bulk-only, dumps CSV anuais).
+
+    O CSV bruto tem colunas: ano, idLicitacao, numItem, descricao, numSubitens,
+    unidadesLicitadas, vlrEstimado, unidadesProposta, vlrProposta, numProposta,
+    marcaProposta, fornecedorCpfCnpj, fornecedorSituacao, dataProposta,
+    diasValidadeProposta, observacoes, urlDocumento.
+    """
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        if df.is_empty():
+            return df
+        return _apply_contract(df, DomainType.LICITACOES_PROPOSTAS.value)

@@ -224,4 +224,103 @@ BULK_REGISTRY: dict[str, dict] = {
         "schema_overrides": {"codTermo": pl.Int64},
         "bulk_only": True,
     },
+    # ── Domínios bulk-only de licitações (Fase 3) ───────────────────────────
+    "licitacoes": {
+        "requires_year": True,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/licitacoes/csv/licitacoes-{year}.csv"
+        ),
+        "bulk_granularity": "year",
+        "bulk_filter_date_column": "dataPublicacao",
+        "schema_overrides": {
+            "idLicitacao": pl.Int64,
+            "numero": pl.Int64,
+            "ano": pl.Int64,
+            "anoProcesso": pl.Int64,
+            "numItens": pl.Int64,
+            "numUnidades": pl.Int64,
+            "numPropostas": pl.Int64,
+            "numContratos": pl.Int64,
+            "vlrEstimado": pl.Float64,
+            "vlrContratado": pl.Float64,
+            "vlrPago": pl.Float64,
+        },
+        "bulk_only": True,
+    },
+    "licitacoes_contratos": {
+        "requires_year": True,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/licitacoesContratos/csv/licitacoesContratos-{year}.csv"
+        ),
+        "bulk_granularity": "year",
+        "bulk_filter_date_column": "dataPublicacao",
+        "schema_overrides": {
+            "ano": pl.Int64,
+            "idLicitacao": pl.Int64,
+            "numContrato": pl.Int64,
+            "anoContrato": pl.Int64,
+            "vlrOriginal": pl.Float64,
+            "vlrTotal": pl.Float64,
+            "numSeqArquivoInstrContratual": pl.Int64,
+        },
+        "bulk_only": True,
+    },
+    "licitacoes_itens": {
+        "requires_year": True,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/licitacoesItens/csv/licitacoesItens-{year}.csv"
+        ),
+        "bulk_granularity": "year",
+        "bulk_filter_date_column": None,
+        "schema_overrides": {
+            "ano": pl.Int64,
+            "idLicitacao": pl.Int64,
+            "numItem": pl.Int64,
+            "numSubitem": pl.Int64,
+            "qtdLicitada": pl.Float64,
+            "vlrUnitarioEstimado": pl.Float64,
+            "qtdContratada": pl.Float64,
+            "vlrUnitarioContratado": pl.Float64,
+            "vlrTotalContratado": pl.Float64,
+            "numContrato": pl.Int64,
+            "anoContrato": pl.Int64,
+        },
+        "bulk_only": True,
+    },
+    "licitacoes_pedidos": {
+        "requires_year": True,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/licitacoesPedidos/csv/licitacoesPedidos-{year}.csv"
+        ),
+        "bulk_granularity": "year",
+        "bulk_filter_date_column": "dataHoraCadastro",
+        "schema_overrides": {
+            "ano": pl.Int64,
+            "idLicitacao": pl.Int64,
+            "numPedido": pl.Int64,
+            "anoPedido": pl.Int64,
+            "idOrgao": pl.Int64,
+        },
+        "bulk_only": True,
+    },
+    "licitacoes_propostas": {
+        "requires_year": True,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/licitacoesPropostas/csv/licitacoesPropostas-{year}.csv"
+        ),
+        "bulk_granularity": "year",
+        "bulk_filter_date_column": "dataProposta",
+        "schema_overrides": {
+            "ano": pl.Int64,
+            "idLicitacao": pl.Int64,
+            "numItem": pl.Int64,
+            "numSubitens": pl.Int64,
+            "vlrEstimado": pl.Float64,
+            "unidadesProposta": pl.Float64,
+            "vlrProposta": pl.Float64,
+            "numProposta": pl.Int64,
+            "diasValidadeProposta": pl.Int64,
+        },
+        "bulk_only": True,
+    },
 }

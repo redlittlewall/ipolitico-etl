@@ -326,6 +326,42 @@ domain_configs:
     sinks:
       datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
 
+  # ── Domínios bulk-only de licitações (Fase 3) ─────────────────────────
+  licitacoes:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraLicitacoesTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  licitacoes_contratos:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraLicitacoesContratosTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  licitacoes_itens:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraLicitacoesItensTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  licitacoes_pedidos:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraLicitacoesPedidosTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  licitacoes_propostas:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraLicitacoesPropostasTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
   legislaturas_lideres:
     extractor: "ipolitico.extractors.camara.api.legislatura_child.LegislaturaLideresExtractor"
     transformer: "ipolitico.transformers.camara.membros_transformer.CamaraMembrosTransformer"

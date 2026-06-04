@@ -1,0 +1,15 @@
+{
+  "branch": "feat/etl-architecture-refactor",
+  "task": "09-bulk-only-licitacoes-5-domains",
+  "started_at": "2026-06-04T16:14:34Z",
+  "files": [
+    "src/ipolitico/core/constants.py",
+    "tests/core/test_new_bulk_domains.py",
+    "src/ipolitico/extractors/camara/bulk/registry.py",
+    "src/ipolitico/core/schemas.py",
+    "src/ipolitico/core/domain_spec.py",
+    "src/ipolitico/transformers/camara/institutional_transformer.py",
+    "configs/camara_pipeline.yaml",
+    "tests/transformers/test_institutional_transformer.py"
+  ]
+}

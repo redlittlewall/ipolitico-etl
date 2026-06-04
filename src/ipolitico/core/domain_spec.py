@@ -345,6 +345,32 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         None,
         uk=("codTermo",),
     ),
+    # ── Domínios bulk-only de licitações (Fase 3) ────────────────────────────
+    DomainType.LICITACOES: _spec(
+        DomainType.LICITACOES,
+        None,
+        uk=("idLicitacao",),
+    ),
+    DomainType.LICITACOES_CONTRATOS: _spec(
+        DomainType.LICITACOES_CONTRATOS,
+        None,
+        uk=("idLicitacao", "numContrato", "anoContrato"),
+    ),
+    DomainType.LICITACOES_ITENS: _spec(
+        DomainType.LICITACOES_ITENS,
+        None,
+        uk=("idLicitacao", "numItem", "numSubitem"),
+    ),
+    DomainType.LICITACOES_PEDIDOS: _spec(
+        DomainType.LICITACOES_PEDIDOS,
+        None,
+        uk=("idLicitacao", "numPedido", "anoPedido"),
+    ),
+    DomainType.LICITACOES_PROPOSTAS: _spec(
+        DomainType.LICITACOES_PROPOSTAS,
+        None,
+        uk=("idLicitacao", "numItem", "numProposta", "fornecedorCpfCnpj"),
+    ),
 }
 
 

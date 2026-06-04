@@ -157,3 +157,301 @@ class TestCamaraTecadTermosTransformer:
         )
         result = transformer.transform(raw)
         assert result.is_empty()
+
+
+class TestCamaraLicitacoesTransformer:
+    """Transformer para licitações (bulk-only, dumps CSV anuais)."""
+
+    @pytest.fixture
+    def transformer(self):
+        from ipolitico.transformers.camara.institutional_transformer import (
+            CamaraLicitacoesTransformer,
+        )
+
+        return CamaraLicitacoesTransformer()
+
+    def test_transform_empty_df(self, transformer):
+        """DataFrame vazio retorna vazio."""
+        df = pl.DataFrame(
+            {
+                col: pl.Series([], dtype=t)
+                for col, t in SILVER_SCHEMAS[DomainType.LICITACOES.value].items()
+            }
+        )
+        result = transformer.transform(df)
+        assert result.is_empty()
+
+    def test_transform_happy_path(self, transformer):
+        raw = pl.DataFrame(
+            {
+                "idLicitacao": ["19616", "19738"],
+                "numero": ["1", "2"],
+                "ano": ["2024", "2024"],
+                "numProcesso": ["365069", "249497"],
+                "anoProcesso": ["2024", "2024"],
+                "objeto": [
+                    "Concurso para seleção de obras radiofônicas",
+                    "Concurso de obras Audiovisuais",
+                ],
+                "modalidade": ["Concurso", "Concurso"],
+                "tipo": ["Melhor Técnica", "Melhor Técnica"],
+                "situacao": [
+                    "Instrumento convocatório publicado",
+                    "Instrumento convocatório publicado",
+                ],
+                "vlrEstimado": ["0", "50000"],
+                "vlrContratado": ["0", "0"],
+                "vlrPago": ["0", "0"],
+                "dataAutorizacao": ["2024-06-05", "2024-07-15"],
+                "dataPublicacao": ["2024-06-17", "2024-08-05"],
+                "dataAbertura": ["", ""],
+                "numItens": ["1", "1"],
+                "numUnidades": ["1", "5"],
+                "numPropostas": ["0", "0"],
+                "numContratos": ["0", "0"],
+            }
+        )
+        result = transformer.transform(raw)
+        assert result.height == 2
+        assert result.schema["idLicitacao"] == pl.Int64
+        assert result.schema["objeto"] == pl.String
+        assert result.schema["vlrEstimado"] == pl.Float64
+        assert result["idLicitacao"].to_list() == [19616, 19738]
+
+
+class TestCamaraLicitacoesContratosTransformer:
+    """Transformer para contratos de licitação (bulk-only, dumps CSV anuais)."""
+
+    @pytest.fixture
+    def transformer(self):
+        from ipolitico.transformers.camara.institutional_transformer import (
+            CamaraLicitacoesContratosTransformer,
+        )
+
+        return CamaraLicitacoesContratosTransformer()
+
+    def test_transform_empty_df(self, transformer):
+        df = pl.DataFrame(
+            {
+                col: pl.Series([], dtype=t)
+                for col, t in SILVER_SCHEMAS[DomainType.LICITACOES_CONTRATOS.value].items()
+            }
+        )
+        result = transformer.transform(df)
+        assert result.is_empty()
+
+    def test_transform_happy_path(self, transformer):
+        raw = pl.DataFrame(
+            {
+                "ano": ["2024", "2024"],
+                "idLicitacao": ["19456", "19472"],
+                "numContrato": ["93", "184"],
+                "anoContrato": ["2025", "2024"],
+                "tipoContrato": ["Contrato", "Contrato"],
+                "situacaoContrato": ["Vigente", "Vigente"],
+                "vlrOriginal": ["181000", "10099812"],
+                "vlrTotal": ["226250", "10099812"],
+                "objeto": [
+                    "Aquisição de painel de videowall",
+                    "PRESTAÇÃO DE SERVIÇOS DE AGENCIAMENTO",
+                ],
+                "dataAssinatura": ["2025-04-29", "2024-09-10"],
+                "dataPublicacao": ["2025-04-30", "2024-09-10"],
+                "dataInicioVigenciaOriginal": ["2025-04-29", "2024-09-10"],
+                "dataFimVigenciaOriginal": ["2026-07-28", "2026-09-09"],
+                "dataFimUltimaVigencia": ["2026-07-28", "2026-09-09"],
+                "fornecedorCpfCnpj": [
+                    "35.364.825/0001-70",
+                    "16.604.411/0001-26",
+                ],
+                "fornecedorNome": [
+                    "P1LED COMÉRCIO E IMPORTAÇÃO",
+                    "ÉTICA TURISMO VIAGENS RECEPTIVOS",
+                ],
+                "fornecedorEndereco": [
+                    "RUA ESTADOS UNIDOS, 2186",
+                    "VENIDA FELICIANO COELHO, 1438",
+                ],
+                "fornecedorCidade": ["SÃO PAULO", "MACAPÁ"],
+                "fornecedorSiglaUF": ["SP", "AP"],
+                "numSeqArquivoInstrContratual": ["13816", "13320"],
+                "txtNomeArquivo": [
+                    "P1LED COMERCIO -  2025.093.0.pdf",
+                    "ETICA TURISMO - 2024.184.0.pdf",
+                ],
+            }
+        )
+        result = transformer.transform(raw)
+        assert result.height == 2
+        assert result.schema["idLicitacao"] == pl.Int64
+        assert result.schema["numContrato"] == pl.Int64
+        assert result.schema["fornecedorNome"] == pl.String
+        assert result.schema["vlrOriginal"] == pl.Float64
+        assert result["numContrato"].to_list() == [93, 184]
+
+
+class TestCamaraLicitacoesItensTransformer:
+    """Transformer para itens de licitação (bulk-only, dumps CSV anuais)."""
+
+    @pytest.fixture
+    def transformer(self):
+        from ipolitico.transformers.camara.institutional_transformer import (
+            CamaraLicitacoesItensTransformer,
+        )
+
+        return CamaraLicitacoesItensTransformer()
+
+    def test_transform_empty_df(self, transformer):
+        df = pl.DataFrame(
+            {
+                col: pl.Series([], dtype=t)
+                for col, t in SILVER_SCHEMAS[DomainType.LICITACOES_ITENS.value].items()
+            }
+        )
+        result = transformer.transform(df)
+        assert result.is_empty()
+
+    def test_transform_happy_path(self, transformer):
+        raw = pl.DataFrame(
+            {
+                "ano": ["2024", "2024"],
+                "idLicitacao": ["19425", "19425"],
+                "numItem": ["8", "9"],
+                "numSubitem": ["0", "0"],
+                "descricao": ["TRANSPALETE MANUAL", "QUADRO BRANCO MAGNÉTICO"],
+                "especificacao": ["", ""],
+                "unidade": ["UN", "UN"],
+                "qtdLicitada": ["1", "8"],
+                "vlrUnitarioEstimado": ["2649", "2253"],
+                "qtdContratada": ["1", "8"],
+                "vlrUnitarioContratado": ["2349", "1910"],
+                "vlrTotalContratado": ["34875", "34876"],
+                "fornecedorCpfCnpj": [
+                    "44.258.379/0001-00",
+                    "29.926.189/0001-20",
+                ],
+                "fornecedorNome": ["Worker", "Cortiarte"],
+                "uriContrato": ["", ""],
+                "numContrato": ["34875", "34876"],
+                "anoContrato": ["2024", "2024"],
+                "tipoContrato": ["", ""],
+                "situacaoItem": ["", ""],
+                "observacoes": ["", ""],
+                "naturezaDespesa": ["", ""],
+                "programaTrabalho": ["", ""],
+                "codPTRES": ["", ""],
+            }
+        )
+        result = transformer.transform(raw)
+        assert result.height == 2
+        assert result.schema["idLicitacao"] == pl.Int64
+        assert result.schema["numItem"] == pl.Int64
+        assert result.schema["descricao"] == pl.String
+        assert result.schema["vlrTotalContratado"] == pl.Float64
+        assert result["numItem"].to_list() == [8, 9]
+
+
+class TestCamaraLicitacoesPedidosTransformer:
+    """Transformer para pedidos de licitação (bulk-only, dumps CSV anuais)."""
+
+    @pytest.fixture
+    def transformer(self):
+        from ipolitico.transformers.camara.institutional_transformer import (
+            CamaraLicitacoesPedidosTransformer,
+        )
+
+        return CamaraLicitacoesPedidosTransformer()
+
+    def test_transform_empty_df(self, transformer):
+        df = pl.DataFrame(
+            {
+                col: pl.Series([], dtype=t)
+                for col, t in SILVER_SCHEMAS[DomainType.LICITACOES_PEDIDOS.value].items()
+            }
+        )
+        result = transformer.transform(df)
+        assert result.is_empty()
+
+    def test_transform_happy_path(self, transformer):
+        raw = pl.DataFrame(
+            {
+                "ano": ["2024", "2024"],
+                "idLicitacao": ["19246", "19246"],
+                "tipoRegistro": ["Pedido", "Pedido"],
+                "numPedido": ["151", "152"],
+                "anoPedido": ["2022", "2022"],
+                "dataHoraCadastro": [
+                    "2022-04-27 17:23:55.843",
+                    "2022-05-10 10:00:00.000",
+                ],
+                "idOrgao": ["", ""],
+                "orgao": [
+                    "DEPARTAMENTO TÉCNICO",
+                    "DEPARTAMENTO TÉCNICO",
+                ],
+                "objeto": [
+                    "Aquisição de Scanner Planetário",
+                    "Aquisição de Scanner Planetário",
+                ],
+                "observacoes": ["", ""],
+            }
+        )
+        result = transformer.transform(raw)
+        assert result.height == 2
+        assert result.schema["idLicitacao"] == pl.Int64
+        assert result.schema["numPedido"] == pl.Int64
+        assert result.schema["orgao"] == pl.String
+
+
+class TestCamaraLicitacoesPropostasTransformer:
+    """Transformer para propostas de licitação (bulk-only, dumps CSV anuais)."""
+
+    @pytest.fixture
+    def transformer(self):
+        from ipolitico.transformers.camara.institutional_transformer import (
+            CamaraLicitacoesPropostasTransformer,
+        )
+
+        return CamaraLicitacoesPropostasTransformer()
+
+    def test_transform_empty_df(self, transformer):
+        df = pl.DataFrame(
+            {
+                col: pl.Series([], dtype=t)
+                for col, t in SILVER_SCHEMAS[DomainType.LICITACOES_PROPOSTAS.value].items()
+            }
+        )
+        result = transformer.transform(df)
+        assert result.is_empty()
+
+    def test_transform_happy_path(self, transformer):
+        raw = pl.DataFrame(
+            {
+                "ano": ["2024", "2024"],
+                "idLicitacao": ["19425", "19425"],
+                "numItem": ["8", "9"],
+                "descricao": ["TRANSPALETE MANUAL", "QUADRO BRANCO MAGNÉTICO"],
+                "numSubitens": ["1", "1"],
+                "unidadesLicitadas": ["1", "8"],
+                "vlrEstimado": ["2649", "2253"],
+                "unidadesProposta": ["1", "8"],
+                "vlrProposta": ["2349", "1910"],
+                "numProposta": ["34875", "34876"],
+                "marcaProposta": ["Worker", "Cortiarte"],
+                "fornecedorCpfCnpj": [
+                    "44.258.379/0001-00",
+                    "29.926.189/0001-20",
+                ],
+                "fornecedorSituacao": ["Incluído", "Incluído"],
+                "dataProposta": ["2024-07-30", "2024-07-29"],
+                "diasValidadeProposta": ["120", "60"],
+                "observacoes": ["", ""],
+                "urlDocumento": ["", ""],
+            }
+        )
+        result = transformer.transform(raw)
+        assert result.height == 2
+        assert result.schema["idLicitacao"] == pl.Int64
+        assert result.schema["numItem"] == pl.Int64
+        assert result.schema["vlrProposta"] == pl.Float64
+        assert result["numProposta"].to_list() == [34875, 34876]
