@@ -2,7 +2,27 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import polars as pl
+
+
+@dataclass(frozen=True)
+class BulkTemporalFilter:
+    """Filtro temporal tipado para transformações bulk.
+
+    Substitui a 3-tupla (column, start_iso, end_iso) que era passada via
+    **kwargs, eliminando o hidden data contract.
+
+    Args:
+        column: Nome da coluna de data para filtrar.
+        start_iso: Início da janela (ISO 8601).
+        end_iso: Fim da janela (ISO 8601).
+    """
+
+    column: str
+    start_iso: str
+    end_iso: str
 
 
 def apply_bulk_temporal_filter(

@@ -107,9 +107,11 @@ class PipelineBuilder:
         sink_class_path = sink_path_config.get(sink_type.value)
 
         if not sink_class_path:
-            raise ValueError(f"Sink '{sink_type.value}' não mapeado na configuração do domínio.")
+            from ipolitico.sinks.datalake_sink import DataLakeSink
 
-        sink_class = self._import_class(sink_class_path)
+            sink_class = DataLakeSink
+        else:
+            sink_class = self._import_class(sink_class_path)
 
         sink_instance = sink_class(base_dir=str(DATA_DIR / "datalake"))
 

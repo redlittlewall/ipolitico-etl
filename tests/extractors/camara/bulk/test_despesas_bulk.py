@@ -1,6 +1,7 @@
 """Despesas Bulk: aliases CEAP → contrato Silver no CamaraDespesasTransformer."""
 
 import polars as pl
+from ipolitico.transformers.bulk_window import BulkTemporalFilter
 from ipolitico.transformers.camara.despesas_transformer import CamaraDespesasTransformer
 
 
@@ -83,7 +84,9 @@ def test_despesas_transformer_ceap_ide_documento_and_br_date():
 
     df_limpo = tr.transform(
         df_ceap,
-        bulk_temporal_filter=("dataDocumento", "2023-01-01", "2023-12-31"),
+        bulk_temporal_filter=BulkTemporalFilter(
+            column="dataDocumento", start_iso="2023-01-01", end_iso="2023-12-31"
+        ),
     )
 
     assert df_limpo.height == 1

@@ -138,10 +138,12 @@ class PipelineManager:
             and extraction_plan.bulk_eff_start_iso
             and extraction_plan.bulk_eff_end_iso
         ):
-            t_kwargs["bulk_temporal_filter"] = (
-                extraction_plan.bulk_temporal_column,
-                extraction_plan.bulk_eff_start_iso,
-                extraction_plan.bulk_eff_end_iso,
+            from ipolitico.transformers.bulk_window import BulkTemporalFilter
+
+            t_kwargs["bulk_temporal_filter"] = BulkTemporalFilter(
+                column=extraction_plan.bulk_temporal_column,
+                start_iso=extraction_plan.bulk_eff_start_iso,
+                end_iso=extraction_plan.bulk_eff_end_iso,
             )
 
         await self.runner.execute(

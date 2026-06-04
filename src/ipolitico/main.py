@@ -16,6 +16,7 @@ from ipolitico.pipeline.optimizer import DataLakeOptimizer
 from ipolitico.pipeline.runner import PipelineRunner
 from ipolitico.sinks.datalake_sink import DataLakeSink
 from ipolitico.sources.camara_provider import CamaraSourceProvider
+from ipolitico.storage.gold_exporter import ExportFormat, GoldExporter
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,13 @@ async def main():
     )
     parser.add_argument("--start-date", type=str, default=None)
     parser.add_argument("--end-date", type=str, default=None)
+    parser.add_argument(
+        "--export-gold",
+        type=str,
+        choices=["sqlite", "duckdb"],
+        default=None,
+        help="Exporta a camada Gold para banco SQL (sqlite ou duckdb) após a ingestão.",
+    )
 
     args = parser.parse_args()
 
@@ -93,6 +101,13 @@ async def main():
             for domain in args.domains:
                 logger.info(f"=== Otimizando Camada Gold para {domain.value.upper()} ===")
                 DataLakeOptimizer().compact_and_deduplicate(domain.value)
+
+        if args.export_gold:
+            fmt = ExportFormat(args.export_gold)
+            ext = "db" if fmt == ExportFormat.SQLITE else "duckdb"
+            output = Path(f"data/gold_export.{ext}")
+            logger.info("=== Exportando Gold para %s ===", output)
+            GoldExporter().export_all(str(output), format=fmt)
     except Exception as e:
         logger.error(f"Falha catastrófica no ETL: {e}")
     finally:

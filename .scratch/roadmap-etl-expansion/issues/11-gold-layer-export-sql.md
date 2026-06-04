@@ -41,12 +41,12 @@ duckdb.execute("CREATE TABLE gold_db.deputados AS SELECT * FROM read_parquet(...
 
 ## Acceptance criteria
 
-- [ ] CLI ganha `--export-gold` com opções `sqlite` e `duckdb`
-- [ ] Exporta todos os domínios Gold para SQL
-- [ ] Schemas SQL refletem os tipos dos `SILVER_SCHEMAS`
-- [ ] Inclui índices nas colunas de chave primária (se SQLite)
-- [ ] Documentação no README sobre como usar a exportação SQL
-- [ ] Teste de integração (exporta SQLite temp + lê algumas linhas)
+- [x] CLI ganha `--export-gold` com opções `sqlite` e `duckdb`
+- [x] Exporta todos os domínios Gold para SQL
+- [x] Schemas SQL refletem os tipos dos `SILVER_SCHEMAS` (via DuckDB `CREATE TABLE AS SELECT`)
+- [x] Inclui índices nas colunas de chave primária (se SQLite)
+- [x] Documentação no README sobre como usar a exportação SQL
+- [x] Teste de integração (exporta SQLite temp + lê algumas linhas)
 
 ## Blocked by
 

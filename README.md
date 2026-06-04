@@ -66,6 +66,28 @@ python -m ipolitico.main --strategy incremental \
   --start-date 2025-01-01 --end-date 2025-01-31 --optimize
 ```
 
+## Exportar Gold para SQL (SQLite / DuckDB)
+
+A camada Gold (Parquet deduplicado) pode ser exportada para bancos SQL
+relacionais via DuckDB. Útil para queries ad hoc, BI tools ou compartilhamento.
+
+```bash
+# Exportar para SQLite (data/gold_export.db)
+python -m ipolitico.main --export-gold sqlite
+
+# Exportar para DuckDB nativo (data/gold_export.duckdb)
+python -m ipolitico.main --export-gold duckdb
+
+# Combinado com otimização Gold (pipeline → optimize → export)
+python -m ipolitico.main --strategy incremental --domains deputados \
+  --start-date 2025-01-01 --end-date 2025-01-31 --optimize --export-gold sqlite
+```
+
+O exportador (`GoldExporter`) descobre automaticamente todos os domínios com
+dados na camada Gold e cria uma tabela SQL para cada um. No formato SQLite,
+índices são criados nas colunas de chave primária de cada tabela para
+performance em consultas relacionais.
+
 ## Ordem sugerida (smoke local)
 
 1. Instale dependências (`pip install -e .`).

@@ -69,9 +69,15 @@ class CamaraVotacoesTransformer(BaseTransformer):
 
         bf = kwargs.get("bulk_temporal_filter")
         if bf:
-            from ipolitico.transformers.bulk_window import apply_bulk_temporal_filter
+            from ipolitico.transformers.bulk_window import (
+                BulkTemporalFilter,
+                apply_bulk_temporal_filter,
+            )
 
-            fc, lo, hi = bf
+            if isinstance(bf, BulkTemporalFilter):
+                fc, lo, hi = bf.column, bf.start_iso, bf.end_iso
+            else:
+                fc, lo, hi = bf  # fallback tuple (deprecated)
             df = apply_bulk_temporal_filter(df, fc, lo, hi)
             if df.is_empty():
                 return pl.DataFrame()
