@@ -180,3 +180,61 @@ class CamaraLicitacoesPropostasTransformer(BaseTransformer):
         if df.is_empty():
             return df
         return _apply_contract(df, DomainType.LICITACOES_PROPOSTAS.value)
+
+
+class CamaraEventosPresencaDeputadosTransformer(BaseTransformer):
+    """Transformer para o domínio eventosPresencaDeputados (bulk-only yearly).
+
+    O CSV bruto tem colunas: idEvento, uriEvento, dataHoraInicio, idDeputado,
+    uriDeputado. A conversão de tipos numéricos é feita via schema_overrides
+    no BULK_REGISTRY + _apply_contract.
+    """
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        if df.is_empty():
+            return df
+        return _apply_contract(df, DomainType.EVENTOS_PRESENCA_DEPUTADOS.value)
+
+
+class CamaraEventosRequerimentosTransformer(BaseTransformer):
+    """Transformer para o domínio eventosRequerimentos (bulk-only yearly).
+
+    O CSV bruto tem colunas: idEvento, uriEvento, tituloRequerimento,
+    uriRequerimento. A conversão de idEvento para Int64 é feita via
+    schema_overrides + _apply_contract.
+    """
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        if df.is_empty():
+            return df
+        return _apply_contract(df, DomainType.EVENTOS_REQUERIMENTOS.value)
+
+
+class CamaraVotacoesObjetosTransformer(BaseTransformer):
+    """Transformer para o domínio votacoesObjetos (bulk-only yearly).
+
+    O CSV bruto tem colunas: idVotacao, uriVotacao, data, descricao,
+    proposicao_id, proposicao_uri, proposicao_ementa, proposicao_codTipo,
+    proposicao_siglaTipo, proposicao_numero, proposicao_ano, proposicao_titulo.
+    A conversão de tipos numéricos é feita via schema_overrides + _apply_contract.
+    """
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        if df.is_empty():
+            return df
+        return _apply_contract(df, DomainType.VOTACOES_OBJETOS.value)
+
+
+class CamaraVotacoesProposicoesTransformer(BaseTransformer):
+    """Transformer para o domínio votacoesProposicoes (bulk-only yearly).
+
+    O CSV bruto tem colunas: idVotacao, uriVotacao, data, descricao,
+    proposicao_id, proposicao_uri, proposicao_titulo, proposicao_ementa,
+    proposicao_codTipo, proposicao_siglaTipo, proposicao_numero, proposicao_ano.
+    A conversão de tipos numéricos é feita via schema_overrides + _apply_contract.
+    """
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        if df.is_empty():
+            return df
+        return _apply_contract(df, DomainType.VOTACOES_PROPOSICOES.value)

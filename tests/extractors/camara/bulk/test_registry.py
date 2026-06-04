@@ -5,7 +5,7 @@ Testes estruturais do BULK_REGISTRY e seus schema_overrides.
 import polars as pl
 from ipolitico.extractors.camara.bulk.registry import BULK_REGISTRY
 
-# 5 legados + 13 domínios institucionais + 3 bulk-only (Fase 3) = 21
+# 5 legados + 13 institucionais + 3 funcionarios/tecad + 5 licitacoes + 4 eventos = 30
 REQUIRED_SCHEMA_OVERRIDE_DOMAINS = {
     "deputados",
     "despesas",
@@ -30,6 +30,17 @@ REQUIRED_SCHEMA_OVERRIDE_DOMAINS = {
     "funcionarios",
     "tecad_categorias",
     "tecad_termos",
+    # Fase 3 — bulk-only licitações (anuais)
+    "licitacoes",
+    "licitacoes_contratos",
+    "licitacoes_itens",
+    "licitacoes_pedidos",
+    "licitacoes_propostas",
+    # Fase 3 — bulk-only eventos/votações (anuais)
+    "eventos_presenca_deputados",
+    "eventos_requerimentos",
+    "votacoes_objetos",
+    "votacoes_proposicoes",
 }
 
 REQUIRED_KEYS = frozenset(
@@ -62,7 +73,31 @@ SNAPSHOT_DOMAINS = frozenset(
     }
 )
 
-YEARLY_DOMAINS = frozenset({"eventos", "orientacoes"})
+YEARLY_DOMAINS = frozenset(
+    {
+        "eventos",
+        "orientacoes",
+        # Fase 3 — bulk-only licitações (anuais)
+        "licitacoes",
+        "licitacoes_contratos",
+        "licitacoes_itens",
+        "licitacoes_pedidos",
+        "licitacoes_propostas",
+        # Fase 3 — bulk-only eventos/votações (anuais)
+        "eventos_presenca_deputados",
+        "eventos_requerimentos",
+        "votacoes_objetos",
+        "votacoes_proposicoes",
+    }
+)
+
+# Domínios anuais que NÃO possuem coluna de data para filtro temporal
+YEARLY_DOMAINS_NO_FILTER = frozenset(
+    {
+        "licitacoes_itens",
+        "eventos_requerimentos",
+    }
+)
 
 
 def test_all_bulk_domains_have_schema_overrides():
@@ -132,9 +167,11 @@ def test_snapshot_domains_no_filter_date_column():
 def test_yearly_domains_have_filter_date_column():
     """
     [FILTRO] Domínios anuais com bulk_granularity='year' devem ter
-    bulk_filter_date_column definida.
+    bulk_filter_date_column definida (exceto aqueles sem coluna de data).
     """
     for domain in YEARLY_DOMAINS:
+        if domain in YEARLY_DOMAINS_NO_FILTER:
+            continue
         entry = BULK_REGISTRY[domain]
         assert (
             entry["bulk_filter_date_column"] is not None

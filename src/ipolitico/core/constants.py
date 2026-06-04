@@ -122,6 +122,11 @@ class DomainType(str, Enum):
     FUNCIONARIOS = "funcionarios"
     TECAD_CATEGORIAS = "tecad_categorias"
     TECAD_TERMOS = "tecad_termos"
+    # Domínios bulk-only de eventos/votações (dumps CSV anuais)
+    EVENTOS_PRESENCA_DEPUTADOS = "eventos_presenca_deputados"
+    EVENTOS_REQUERIMENTOS = "eventos_requerimentos"
+    VOTACOES_OBJETOS = "votacoes_objetos"
+    VOTACOES_PROPOSICOES = "votacoes_proposicoes"
     # Domínios bulk-only de licitações (dumps CSV anuais)
     LICITACOES = "licitacoes"
     LICITACOES_CONTRATOS = "licitacoes_contratos"
@@ -152,6 +157,10 @@ class EarliestDates:
     FUNCIONARIOS = "1826-04-29"
     TECAD_CATEGORIAS = "1826-04-29"
     TECAD_TERMOS = "1826-04-29"
+    EVENTOS_PRESENCA_DEPUTADOS = "1991-01-01"
+    EVENTOS_REQUERIMENTOS = "1991-01-01"
+    VOTACOES_OBJETOS = "1991-01-01"
+    VOTACOES_PROPOSICOES = "1991-01-01"
     LICITACOES = "1999-01-01"
 
 
@@ -212,6 +221,11 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.FUNCIONARIOS: EarliestDates.FUNCIONARIOS,
     DomainType.TECAD_CATEGORIAS: EarliestDates.TECAD_CATEGORIAS,
     DomainType.TECAD_TERMOS: EarliestDates.TECAD_TERMOS,
+    # Domínios bulk-only de eventos/votações
+    DomainType.EVENTOS_PRESENCA_DEPUTADOS: EarliestDates.EVENTOS_PRESENCA_DEPUTADOS,
+    DomainType.EVENTOS_REQUERIMENTOS: EarliestDates.EVENTOS_REQUERIMENTOS,
+    DomainType.VOTACOES_OBJETOS: EarliestDates.VOTACOES_OBJETOS,
+    DomainType.VOTACOES_PROPOSICOES: EarliestDates.VOTACOES_PROPOSICOES,
     # Domínios bulk-only de licitações
     DomainType.LICITACOES: EarliestDates.LICITACOES,
     DomainType.LICITACOES_CONTRATOS: EarliestDates.LICITACOES,

@@ -455,3 +455,173 @@ class TestCamaraLicitacoesPropostasTransformer:
         assert result.schema["numItem"] == pl.Int64
         assert result.schema["vlrProposta"] == pl.Float64
         assert result["numProposta"].to_list() == [34875, 34876]
+
+
+class TestCamaraEventosPresencaDeputadosTransformer:
+    """Transformer para eventosPresencaDeputados (bulk-only yearly)."""
+
+    @pytest.fixture
+    def transformer(self):
+        from ipolitico.transformers.camara.institutional_transformer import (
+            CamaraEventosPresencaDeputadosTransformer,
+        )
+
+        return CamaraEventosPresencaDeputadosTransformer()
+
+    def test_transform_empty(self, transformer):
+        schema = SILVER_SCHEMAS[DomainType.EVENTOS_PRESENCA_DEPUTADOS.value]
+        df = pl.DataFrame({col: pl.Series([], dtype=t) for col, t in schema.items()})
+        result = transformer.transform(df)
+        assert result.is_empty()
+
+    def test_transform_happy_path(self, transformer):
+        raw = pl.DataFrame(
+            {
+                "idEvento": ["71665", "71666"],
+                "uriEvento": [
+                    "https://dadosabertos.camara.leg.br/api/v2/eventos/71665",
+                    "https://dadosabertos.camara.leg.br/api/v2/eventos/71666",
+                ],
+                "dataHoraInicio": ["2024-03-26T10:13:03", "2024-03-26T11:00:00"],
+                "idDeputado": ["74848", "88256"],
+                "uriDeputado": [
+                    "https://dadosabertos.camara.leg.br/api/v2/deputados/74848",
+                    "https://dadosabertos.camara.leg.br/api/v2/deputados/88256",
+                ],
+            }
+        )
+        result = transformer.transform(raw)
+        assert result.height == 2
+        assert result.schema["idEvento"] == pl.Int64
+        assert result.schema["idDeputado"] == pl.Int64
+        assert result["idEvento"].to_list() == [71665, 71666]
+        assert result["idDeputado"].to_list() == [74848, 88256]
+
+
+class TestCamaraEventosRequerimentosTransformer:
+    """Transformer para eventosRequerimentos (bulk-only yearly)."""
+
+    @pytest.fixture
+    def transformer(self):
+        from ipolitico.transformers.camara.institutional_transformer import (
+            CamaraEventosRequerimentosTransformer,
+        )
+
+        return CamaraEventosRequerimentosTransformer()
+
+    def test_transform_empty(self, transformer):
+        schema = SILVER_SCHEMAS[DomainType.EVENTOS_REQUERIMENTOS.value]
+        df = pl.DataFrame({col: pl.Series([], dtype=t) for col, t in schema.items()})
+        result = transformer.transform(df)
+        assert result.is_empty()
+
+    def test_transform_happy_path(self, transformer):
+        raw = pl.DataFrame(
+            {
+                "idEvento": ["71834", "71837"],
+                "uriEvento": [
+                    "https://dadosabertos.camara.leg.br/api/v2/eventos/71834",
+                    "https://dadosabertos.camara.leg.br/api/v2/eventos/71837",
+                ],
+                "tituloRequerimento": ["REQ 247/2024", "REQ 74/2024"],
+                "uriRequerimento": [
+                    "https://dadosabertos.camara.leg.br/api/v2/proposicoes/2417914",
+                    "https://dadosabertos.camara.leg.br/api/v2/proposicoes/2417029",
+                ],
+            }
+        )
+        result = transformer.transform(raw)
+        assert result.height == 2
+        assert result.schema["idEvento"] == pl.Int64
+        assert result.schema["tituloRequerimento"] == pl.String
+        assert result["idEvento"].to_list() == [71834, 71837]
+
+
+class TestCamaraVotacoesObjetosTransformer:
+    """Transformer para votacoesObjetos (bulk-only yearly)."""
+
+    @pytest.fixture
+    def transformer(self):
+        from ipolitico.transformers.camara.institutional_transformer import (
+            CamaraVotacoesObjetosTransformer,
+        )
+
+        return CamaraVotacoesObjetosTransformer()
+
+    def test_transform_empty(self, transformer):
+        schema = SILVER_SCHEMAS[DomainType.VOTACOES_OBJETOS.value]
+        df = pl.DataFrame({col: pl.Series([], dtype=t) for col, t in schema.items()})
+        result = transformer.transform(df)
+        assert result.is_empty()
+
+    def test_transform_happy_path(self, transformer):
+        raw = pl.DataFrame(
+            {
+                "idVotacao": ["2355879-42"],
+                "uriVotacao": ["https://dadosabertos.camara.leg.br/api/v2/votacoes/2355879-42"],
+                "data": ["2024-02-06"],
+                "descricao": ["Aprovado o Substitutivo"],
+                "proposicao_id": ["2380451"],
+                "proposicao_uri": ["https://dadosabertos.camara.leg.br/api/v2/proposicoes/2380451"],
+                "proposicao_ementa": ["Cria a Semana Cultural Interescolar"],
+                "proposicao_codTipo": ["392"],
+                "proposicao_siglaTipo": ["REQ"],
+                "proposicao_numero": ["2617"],
+                "proposicao_ano": ["2023"],
+                "proposicao_titulo": ["REQ 2617/2023"],
+            }
+        )
+        result = transformer.transform(raw)
+        assert result.height == 1
+        assert result.schema["idVotacao"] == pl.String
+        assert result.schema["proposicao_id"] == pl.Int64
+        assert result["proposicao_id"].to_list() == [2380451]
+        assert result["proposicao_siglaTipo"].to_list() == ["REQ"]
+
+
+class TestCamaraVotacoesProposicoesTransformer:
+    """Transformer para votacoesProposicoes (bulk-only yearly)."""
+
+    @pytest.fixture
+    def transformer(self):
+        from ipolitico.transformers.camara.institutional_transformer import (
+            CamaraVotacoesProposicoesTransformer,
+        )
+
+        return CamaraVotacoesProposicoesTransformer()
+
+    def test_transform_empty(self, transformer):
+        schema = SILVER_SCHEMAS[DomainType.VOTACOES_PROPOSICOES.value]
+        df = pl.DataFrame({col: pl.Series([], dtype=t) for col, t in schema.items()})
+        result = transformer.transform(df)
+        assert result.is_empty()
+
+    def test_transform_happy_path(self, transformer):
+        raw = pl.DataFrame(
+            {
+                "idVotacao": ["1006391-32", "1029052-77"],
+                "uriVotacao": [
+                    "https://dadosabertos.camara.leg.br/api/v2/votacoes/1006391-32",
+                    "https://dadosabertos.camara.leg.br/api/v2/votacoes/1029052-77",
+                ],
+                "data": ["2024-02-20", "2024-06-19"],
+                "descricao": ["Aprovado requerimento", "Aprovado o Parecer"],
+                "proposicao_id": ["1006391", "1029052"],
+                "proposicao_uri": [
+                    "https://dadosabertos.camara.leg.br/api/v2/proposicoes/1006391",
+                    "https://dadosabertos.camara.leg.br/api/v2/proposicoes/1029052",
+                ],
+                "proposicao_titulo": ["PL 742/2015", "PL 761/2015"],
+                "proposicao_ementa": ["Dispõe sobre a obrigatoriedade", "Acrescenta o inciso VI"],
+                "proposicao_codTipo": ["139", "139"],
+                "proposicao_siglaTipo": ["PL", "PL"],
+                "proposicao_numero": ["742", "761"],
+                "proposicao_ano": ["2015", "2015"],
+            }
+        )
+        result = transformer.transform(raw)
+        assert result.height == 2
+        assert result.schema["idVotacao"] == pl.String
+        assert result.schema["proposicao_id"] == pl.Int64
+        assert result["proposicao_numero"].to_list() == [742, 761]
+        assert result["proposicao_ano"].to_list() == [2015, 2015]

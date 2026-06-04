@@ -362,6 +362,35 @@ domain_configs:
     sinks:
       datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
 
+  # ── Domínios bulk-only de eventos/votações ──────────────────────────────
+  eventos_presenca_deputados:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraEventosPresencaDeputadosTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  eventos_requerimentos:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraEventosRequerimentosTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  votacoes_objetos:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraVotacoesObjetosTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  votacoes_proposicoes:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraVotacoesProposicoesTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
   legislaturas_lideres:
     extractor: "ipolitico.extractors.camara.api.legislatura_child.LegislaturaLideresExtractor"
     transformer: "ipolitico.transformers.camara.membros_transformer.CamaraMembrosTransformer"

@@ -224,6 +224,61 @@ BULK_REGISTRY: dict[str, dict] = {
         "schema_overrides": {"codTermo": pl.Int64},
         "bulk_only": True,
     },
+    # ── Domínios bulk-only de eventos/votações (Fase 3) ─────────────────────────
+    "eventos_presenca_deputados": {
+        "requires_year": True,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/eventosPresencaDeputados/"
+            "csv/eventosPresencaDeputados-{year}.csv"
+        ),
+        "bulk_granularity": "year",
+        "bulk_filter_date_column": "dataHoraInicio",
+        "schema_overrides": {"idEvento": pl.Int64, "idDeputado": pl.Int64},
+        "bulk_only": True,
+    },
+    "eventos_requerimentos": {
+        "requires_year": True,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/eventosRequerimentos/"
+            "csv/eventosRequerimentos-{year}.csv"
+        ),
+        "bulk_granularity": "year",
+        "bulk_filter_date_column": None,
+        "schema_overrides": {"idEvento": pl.Int64},
+        "bulk_only": True,
+    },
+    "votacoes_objetos": {
+        "requires_year": True,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/votacoesObjetos/"
+            "csv/votacoesObjetos-{year}.csv"
+        ),
+        "bulk_granularity": "year",
+        "bulk_filter_date_column": "data",
+        "schema_overrides": {
+            "proposicao_id": pl.Int64,
+            "proposicao_codTipo": pl.Int64,
+            "proposicao_numero": pl.Int64,
+            "proposicao_ano": pl.Int64,
+        },
+        "bulk_only": True,
+    },
+    "votacoes_proposicoes": {
+        "requires_year": True,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/votacoesProposicoes/"
+            "csv/votacoesProposicoes-{year}.csv"
+        ),
+        "bulk_granularity": "year",
+        "bulk_filter_date_column": "data",
+        "schema_overrides": {
+            "proposicao_id": pl.Int64,
+            "proposicao_codTipo": pl.Int64,
+            "proposicao_numero": pl.Int64,
+            "proposicao_ano": pl.Int64,
+        },
+        "bulk_only": True,
+    },
     # ── Domínios bulk-only de licitações (Fase 3) ───────────────────────────
     "licitacoes": {
         "requires_year": True,
