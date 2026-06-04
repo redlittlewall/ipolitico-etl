@@ -4,15 +4,14 @@ from typing import Any, Dict, Optional
 
 from ipolitico.core.constants import (
     EARLIEST_DATE_MAP,
-    ApiParams,
     DomainType,
     LoadStrategy,
     MedallionLayer,
     SinkType,
     SourceType,
 )
+from ipolitico.core.domain_spec import spec_for
 from ipolitico.core.legislature import legislature_anchor_year_from_iso
-from ipolitico.core.schemas import DESPESAS_PARTITION_KEYS
 from ipolitico.pipeline.builder import PipelineBuilder
 from ipolitico.pipeline.effective_window import resolve_effective_iso_window
 from ipolitico.pipeline.planners.camara_jobs import CamaraJobPlanner
@@ -123,102 +122,11 @@ class PipelineManager:
         if not jobs:
             return
 
-        unique_keys = ApiParams.ID.value
-        domain_val = domain.value if hasattr(domain, "value") else str(domain)
-        t_kwargs: Dict[str, Any] = {}
-
-        if domain_val == DomainType.DESPESAS.value:
-            unique_keys = list(DESPESAS_PARTITION_KEYS)
-        elif domain_val == DomainType.VOTOS.value:
-            unique_keys = [ApiParams.DEPUTADO_ID.value, "votacao_id"]
-            t_kwargs["sub_domain"] = "votos"
-        elif domain_val == DomainType.VOTACOES.value:
-            t_kwargs["sub_domain"] = "votacoes"
-        elif domain_val in (DomainType.PROFISSÕES.value, DomainType.OCUPACOES.value):
-            unique_keys = ["id_deputado", "titulo", "entidade", "anoInicio"]
-            t_kwargs["sub_domain"] = domain_val
-        elif domain_val == DomainType.DISCURSOS.value:
-            unique_keys = ["id_deputado", "dataHoraInicio"]
-        elif domain_val == DomainType.TRAMITACOES.value:
-            unique_keys = ["id_proposicao", "sequencia"]
-            t_kwargs["sub_domain"] = domain_val
-        elif domain_val == DomainType.AUTORES.value:
-            unique_keys = ["id_proposicao", "ordemAssinatura", "nome"]
-            t_kwargs["sub_domain"] = domain_val
-        elif domain_val == DomainType.ORIENTACOES.value:
-            unique_keys = ["votacao_id", "codPartidoBloco", "codTipoLideranca"]
-        elif domain_val == DomainType.ORGAOS_MEMBROS.value:
-            unique_keys = ["id_orgao", "id", "codTitulo", "dataInicio"]
-            t_kwargs["sub_domain"] = domain_val
-        elif domain_val == DomainType.FRENTES_MEMBROS.value:
-            unique_keys = ["id_frente", "id", "codTitulo", "dataInicio"]
-            t_kwargs["sub_domain"] = domain_val
-        elif domain_val in (DomainType.RELACIONADAS.value, DomainType.TEMAS.value):
-            unique_keys = (
-                ["id_proposicao", "id"]
-                if domain_val == DomainType.RELACIONADAS.value
-                else ["id_proposicao", "tema"]
-            )
-            t_kwargs["sub_domain"] = domain_val
-        elif domain_val == DomainType.PROPOSICOES_VOTACOES.value:
-            unique_keys = ["id_proposicao", "id"]
-            t_kwargs["sub_domain"] = domain_val
-        elif domain_val == DomainType.DEPUTADOS_FRENTES.value:
-            unique_keys = ["id_deputado", "id"]
-            t_kwargs["sub_domain"] = domain_val
-        elif domain_val in (DomainType.DEPUTADOS_ORGAOS.value, DomainType.DEPUTADOS_EVENTOS.value):
-            unique_keys = ["id_deputado", "id", "dataInicio"]
-            t_kwargs["sub_domain"] = domain_val
-        elif domain_val == DomainType.DEPUTADOS_HISTORICO.value:
-            unique_keys = ["id_deputado", "dataStatus", "idLegislatura"]
-            t_kwargs["sub_domain"] = domain_val
-        elif domain_val in (
-            DomainType.EVENTOS_DEPUTADOS.value,
-            DomainType.EVENTOS_VOTACOES.value,
-            DomainType.EVENTOS_PAUTA.value,
-        ):
-            unique_keys = (
-                ["id_evento", "id"]
-                if domain_val != DomainType.EVENTOS_PAUTA.value
-                else ["id_evento", "ordem"]
-            )
-            t_kwargs["sub_domain"] = domain_val
-        elif domain_val == DomainType.PARTIDOS_MEMBROS.value:
-            unique_keys = ["id_partido", "id"]
-            t_kwargs["sub_domain"] = domain_val
-        elif domain_val == DomainType.PARTIDOS_LIDERES.value:
-            unique_keys = ["id_partido", "id", "titulo", "dataInicio"]
-            t_kwargs["sub_domain"] = domain_val
-        elif domain_val == DomainType.BLOCOS_PARTIDOS.value:
-            unique_keys = ["id_bloco", "id"]
-            t_kwargs["sub_domain"] = domain_val
-        elif domain_val == DomainType.REFERENCIAS.value:
-            unique_keys = ["referencia", "cod", "sigla", "nome"]
-        elif domain_val.endswith("_detalhe"):
-            unique_keys = ["id"]
-            t_kwargs["sub_domain"] = domain_val
-        elif domain_val in (
-            DomainType.ORGAOS_EVENTOS.value,
-            DomainType.ORGAOS_VOTACOES.value,
-        ):
-            unique_keys = (
-                ["id_orgao", "id", "dataHoraInicio"]
-                if domain_val == DomainType.ORGAOS_EVENTOS.value
-                else ["id_orgao", "id"]
-            )
-            t_kwargs["sub_domain"] = domain_val
-        elif domain_val == DomainType.GRUPOS_MEMBROS.value:
-            unique_keys = ["id_grupo", "id"]
-            t_kwargs["sub_domain"] = domain_val
-        elif domain_val == DomainType.GRUPOS_HISTORICO.value:
-            unique_keys = ["id_grupo", "data", "descricao"]
-            t_kwargs["sub_domain"] = domain_val
-        elif domain_val in (
-            DomainType.LEGISLATURAS_LIDERES.value,
-            DomainType.LEGISLATURAS_MESA.value,
-        ):
-            unique_keys = ["id_legislatura", "id", "titulo", "dataInicio"]
-            t_kwargs["sub_domain"] = domain_val
+        spec = spec_for(domain)
+        unique_keys: list[str] = list(spec.unique_keys) if spec else ["id"]
+        t_kwargs: dict[str, Any] = {}
+        if spec and spec.sub_domain:
+            t_kwargs["sub_domain"] = spec.sub_domain
 
         if (
             extraction_plan.source_type == SourceType.BULK
