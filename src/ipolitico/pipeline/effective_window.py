@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from ipolitico.core.constants import DomainType, LoadStrategy
 
 if TYPE_CHECKING:
-    from ipolitico.sinks.datalake_sink import DataLakeSink
+    from ipolitico.storage.state_store import StateStore
 
 
 def _iso_max(a: str, b: str) -> str:
@@ -33,7 +33,7 @@ def resolve_effective_iso_window(
     orchestration_end: str,
     earliest_possible: str,
     strategy: LoadStrategy,
-    state_store: "DataLakeSink | None",
+    state_store: "StateStore | None",
     watermark_column: str | None,
 ) -> tuple[str, str]:
     """

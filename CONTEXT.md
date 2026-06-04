@@ -106,21 +106,21 @@ FederationOrchestrator ──► CamaraSourceProvider
     │                           │
     │                           ▼
     │                    PipelineManager (por domínio)
-    │                           │
-    │                           ├── WindowResolver (watermark → janela)
-    │                           ├── SourceRouter (API vs Bulk)
-    │                           ├── PipelineBuilder (YAML → classes)
-    │                           ├── CamaraJobPlanner (jobs)
-    │                           └── PipelineRunner (execução)
-    │                                   │
-    │                     ┌─────────────┼─────────────┐
-    │                     ▼             ▼             ▼
-    │               Extractor    Transformer      Sink
-    │               (I/O bruto)  (regras)     (persistência)
-    │                     │                        │
-    │                     ▼                        ▼
-    │               API / Bulk              DataLake (Parquet)
-    │                                   bronze/  silver/  gold/
+    │                     │          │
+    │                     │          ├── WindowResolver (StateStore→janela)
+    │                     │          ├── SourceRouter (API vs Bulk)
+    │               state_store      ├── PipelineBuilder (YAML → classes)
+    │               (BaseSink)       ├── CamaraJobPlanner (StateStore)
+    │               save/flush       └── PipelineRunner (execução)
+    │                     │                   │
+    │                     │         ┌─────────┼─────────┐
+    │                     ▼         ▼         ▼         ▼
+    │               DataLake    Extractor  Transformer  Sink
+    │               Repository  (I/O bruto) (regras) (persistência)
+    │               (StateStore)   │                     │
+    │               watermarks     ▼                     ▼
+    │               + IDs     API / Bulk         DataLake (Parquet)
+    │                                           bronze/  silver/  gold/
     │
     └── Opcional: DataLakeOptimizer (DuckDB) — bronze/silver → gold
 ```
@@ -153,10 +153,9 @@ Cada sink implementa `BaseSink.save(df, table_name, layer, unique_keys)`.
 
 - **DataLakeSink**: salva em Parquet, append-only, com micro-batching por job
   (UUID + timestamp no nome do arquivo). Adiciona coluna de auditoria `captured_at`.
-- **SQLiteSink** (não usado atualmente como destino principal): salva em tabelas
-  relacionais com UPSERT via `unique_keys`.
-- `get_watermark()` e `get_existing_ids()` são usados pelo `WindowResolver` e
-  `CamaraJobPlanner` para retomada incremental.
+
+O estado persistido (watermarks e IDs existentes) é consultado via `StateStore`,
+implementado pelo `DataLakeRepository`. Veja `storage/state_store.py`.
 
 ### 2.5 Camada de Orquestração
 
@@ -311,7 +310,7 @@ automaticamente via `expand_camara_domains_with_dependencies()`.
 
 | Padrão | Onde | Descrição |
 |---|---|---|
-| **Strategy** | `sinks/base.py` | `BaseSink` é a interface; `DataLakeSink` e `SQLiteSink` são implementações concretas. Trocáveis sem alterar o orquestrador. |
+| **Strategy** | `sinks/base.py` | `BaseSink` é a interface; `DataLakeSink` é a implementação concreta. Trocável sem alterar o orquestrador. |
 | **Template Method** | `extractors/base.py` e `transformers/base.py` | Classes base definem o contrato; classes filhas implementam a lógica específica. |
 | **Builder** | `pipeline/builder.py` | `PipelineBuilder` constrói objetos complexos (Extractor + Transformer + Sink) a partir de configuração YAML. |
 | **Factory Method** (Reflection) | `PipelineBuilder._import_class()` | Carrega classes dinamicamente a partir de strings (caminho completo) no YAML. Substitui fábricas engessadas. |
@@ -447,7 +446,6 @@ ipolitico-etl/
 │   │   ├── silver/{dominio}/          # Micro-batches append-only
 │   │   └── gold/{dominio}/            # Consolidado deduplicado
 │   ├── dbs/
-│   │   ├── ipolitico_state.db          # SQLite de estado (reservado)
 │   │   └── api_telemetry.db            # Telemetria de requisições
 │   └── logs/
 │       └── ipolitico_etl.log
@@ -482,7 +480,7 @@ ipolitico-etl/
 │       ├── services/                   # Serviços auxiliares (metadata)
 │       ├── sinks/                      # Destinos (DataLake, SQLite)
 │       ├── sources/                    # Source providers (Câmara)
-│       ├── storage/                    # DataLakeRepository
+│       ├── storage/                    # DataLakeRepository, StateStore
 │       ├── tools/                      # Ferramentas (estimador)
 │       └── transformers/              # Transformadores
 │           └── camara/                 # Transformers por domínio

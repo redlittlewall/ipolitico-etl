@@ -2,15 +2,16 @@
 
 import logging
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, Optional
 
 import duckdb
 from ipolitico.core.constants import DomainType
+from ipolitico.storage.state_store import StateStore
 
 logger = logging.getLogger(__name__)
 
 
-class DataLakeRepository:
+class DataLakeRepository(StateStore):
     """
     Repositório de leitura para Parquet no layout Medallion.
     Centraliza consultas ad hoc que antes viviam no PipelineManager.
@@ -153,6 +154,67 @@ class DataLakeRepository:
                 e,
             )
             return []
+
+    def get_existing_ids(
+        self,
+        table_name: str,
+        layer: str,
+        column: str = "id",
+    ) -> List[Any]:
+        """
+        Retorna valores distintos de uma coluna de ID persistidos no Data Lake.
+
+        Implementa o contrato StateStore. Busca na camada especificada; se não
+        encontrar, tenta a camada gold como fallback.
+
+        Args:
+            table_name: Nome da tabela/domínio.
+            layer: Camada Medallion ('silver', 'gold').
+            column: Nome da coluna de ID (padrão 'id').
+
+        Returns:
+            Lista de valores distintos encontrados ou lista vazia.
+        """
+        ids = self.list_ids(table_name, layer, column)
+        if not ids:
+            ids = self.list_ids(table_name, "gold", column)
+        return ids
+
+    def get_watermark(self, table_name: str, watermark_column: str) -> Optional[str]:
+        """
+        Retorna o maior valor da coluna watermark nos Parquet Silver.
+
+        Implementa o contrato StateStore usando Polars Lazy API (scan)
+        para evitar carregar todos os dados em memória.
+
+        Args:
+            table_name: Nome da tabela/domínio.
+            watermark_column: Nome da coluna que serve como marca d'água.
+
+        Returns:
+            Valor máximo em string ISO, ou None se não houver dados.
+        """
+        import polars as pl
+
+        layer_dir = self.base_dir / "silver" / table_name
+        if not layer_dir.exists() or not list(layer_dir.glob("*.parquet")):
+            return None
+
+        try:
+            lazy_df = pl.scan_parquet(layer_dir / "*.parquet")
+            max_val = lazy_df.select(pl.col(watermark_column).max()).collect().item()
+
+            if max_val is not None:
+                return str(max_val).replace(" ", "T")
+
+            return None
+        except Exception as e:
+            logger.warning(
+                "[DataLakeRepository] Falha ao ler watermark de '%s': %s",
+                table_name,
+                e,
+            )
+            return None
 
     def list_votacao_ids_silver_or_gold(
         self,

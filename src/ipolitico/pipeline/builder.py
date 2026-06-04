@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Dict
 
 from ipolitico.core.client import CamaraClient
-from ipolitico.core.config import DATA_DIR, DB_PATH
+from ipolitico.core.config import DATA_DIR
 from ipolitico.core.constants import SinkType, SourceType
 from ipolitico.extractors.base import BaseExtractor
 from ipolitico.sinks.base import BaseSink
@@ -48,7 +48,7 @@ class PipelineBuilder:
         Carrega uma classe dinamicamente a partir do seu caminho em string.
 
         Args:
-            class_path (str): Caminho completo (ex: "ipolitico.sinks.sqlite_sink.SQLiteSink").
+            class_path (str): Caminho completo (ex: "ipolitico.sinks.datalake_sink.DataLakeSink").
 
         Returns:
             Any: A referência da classe pronta para ser instanciada.
@@ -77,7 +77,7 @@ class PipelineBuilder:
         Args:
             domain_config (Dict[str, str]): Dicionário com os paths mapeados do YAML.
                 Ex: {"extractor": "path.to.Ext", "transformer": "path.to.Trans"}
-            sink_type (SinkType): O destino escolhido pelo usuário (SQLite ou DataLake).
+            sink_type (SinkType): O destino escolhido pelo usuário (DataLake).
             source_type (SourceType): Fonte de extração (API ou Bulk).
             domain_name (str, optional): Nome do domínio para extratores Bulk.
 
@@ -111,13 +111,7 @@ class PipelineBuilder:
 
         sink_class = self._import_class(sink_class_path)
 
-        # Injeção de dependência de caminhos baseados no tipo do Sink
-        if sink_type == SinkType.SQLITE:
-            sink_instance = sink_class(db_path=str(DB_PATH))
-        elif sink_type == SinkType.DATALAKE:
-            sink_instance = sink_class(base_dir=str(DATA_DIR / "datalake"))
-        else:
-            sink_instance = sink_class()
+        sink_instance = sink_class(base_dir=str(DATA_DIR / "datalake"))
 
         logger.info(
             f"Pipeline montado com sucesso: [{extractor_class.__name__} -> "

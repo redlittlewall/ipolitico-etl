@@ -24,6 +24,7 @@ from ipolitico.pipeline.job_resume import (
 )
 from ipolitico.pipeline.source_router import ExtractionPlan
 from ipolitico.storage.datalake_repository import DataLakeRepository
+from ipolitico.storage.state_store import StateStore
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ class DomainJobStrategy(ABC):
         current_leg: int,
         anchor_year: int,
         extraction_plan: ExtractionPlan,
-        state_store: Any,
+        state_store: StateStore,
         lake: DataLakeRepository | None,
     ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
         """
@@ -79,7 +80,7 @@ class DeputadosStrategy(DomainJobStrategy):
         current_leg: int,
         anchor_year: int,
         extraction_plan: ExtractionPlan,
-        state_store: Any,
+        state_store: StateStore,
         lake: DataLakeRepository | None,
     ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
         if start == EARLIEST_DATE_MAP[DomainType.DEPUTADOS]:
@@ -113,7 +114,7 @@ class DespesasStrategy(DomainJobStrategy):
         current_leg: int,
         anchor_year: int,
         extraction_plan: ExtractionPlan,
-        state_store: Any,
+        state_store: StateStore,
         lake: DataLakeRepository | None,
     ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
         start_year, end_year = resolve_calendar_years(start, end)
@@ -186,7 +187,7 @@ class TimeWindowStrategy(DomainJobStrategy):
         current_leg: int,
         anchor_year: int,
         extraction_plan: ExtractionPlan,
-        state_store: Any,
+        state_store: StateStore,
         lake: DataLakeRepository | None,
     ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
         start_year = int(start.split("-")[0])
@@ -241,7 +242,7 @@ class DeputyChildStrategy(DomainJobStrategy):
         current_leg: int,
         anchor_year: int,
         extraction_plan: ExtractionPlan,
-        state_store: Any,
+        state_store: StateStore,
         lake: DataLakeRepository | None,
     ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
         deputados_ids = resolve_deputy_ids_for_calendar_window(
@@ -305,7 +306,7 @@ class VotosStrategy(DomainJobStrategy):
         current_leg: int,
         anchor_year: int,
         extraction_plan: ExtractionPlan,
-        state_store: Any,
+        state_store: StateStore,
         lake: DataLakeRepository | None,
     ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
         if lake is not None:
@@ -358,7 +359,7 @@ class OrientacoesStrategy(DomainJobStrategy):
         current_leg: int,
         anchor_year: int,
         extraction_plan: ExtractionPlan,
-        state_store: Any,
+        state_store: StateStore,
         lake: DataLakeRepository | None,
     ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
         if lake is not None:
@@ -410,7 +411,7 @@ class OrgaosStrategy(DomainJobStrategy):
         current_leg: int,
         anchor_year: int,
         extraction_plan: ExtractionPlan,
-        state_store: Any,
+        state_store: StateStore,
         lake: DataLakeRepository | None,
     ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
         jobs = [{"start_date": start, "end_date": end}]
@@ -434,7 +435,7 @@ class PartidosStrategy(DomainJobStrategy):
         current_leg: int,
         anchor_year: int,
         extraction_plan: ExtractionPlan,
-        state_store: Any,
+        state_store: StateStore,
         lake: DataLakeRepository | None,
     ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
         jobs = [
@@ -468,7 +469,7 @@ class LegislaturaScopeStrategy(DomainJobStrategy):
         current_leg: int,
         anchor_year: int,
         extraction_plan: ExtractionPlan,
-        state_store: Any,
+        state_store: StateStore,
         lake: DataLakeRepository | None,
     ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
         if start == EARLIEST_DATE_MAP.get(
@@ -536,7 +537,7 @@ class ParentBatchedStrategy(DomainJobStrategy):
         current_leg: int,
         anchor_year: int,
         extraction_plan: ExtractionPlan,
-        state_store: Any,
+        state_store: StateStore,
         lake: DataLakeRepository | None,
     ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
         domain_val = domain.value
@@ -598,7 +599,7 @@ class DetailStrategy(DomainJobStrategy):
         current_leg: int,
         anchor_year: int,
         extraction_plan: ExtractionPlan,
-        state_store: Any,
+        state_store: StateStore,
         lake: DataLakeRepository | None,
     ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
         domain_val = domain.value
@@ -642,7 +643,7 @@ class DetailStrategy(DomainJobStrategy):
         current_leg: int,
         anchor_year: int,
         lake: DataLakeRepository | None,
-        state_store: Any,
+        state_store: StateStore,
     ) -> tuple[list[Any], str]:
         """Resolve IDs de entidades para processamento de detalhe."""
         if domain_val == DomainType.DEPUTADOS_DETALHE.value:
@@ -716,7 +717,7 @@ class ReferenciasStrategy(DomainJobStrategy):
         current_leg: int,
         anchor_year: int,
         extraction_plan: ExtractionPlan,
-        state_store: Any,
+        state_store: StateStore,
         lake: DataLakeRepository | None,
     ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
         # Import lazy para evitar dependência circular
@@ -743,7 +744,7 @@ class DefaultWindowStrategy(DomainJobStrategy):
         current_leg: int,
         anchor_year: int,
         extraction_plan: ExtractionPlan,
-        state_store: Any,
+        state_store: StateStore,
         lake: DataLakeRepository | None,
     ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
         jobs = [{"start_date": start, "end_date": end}]
@@ -759,7 +760,7 @@ class DefaultWindowStrategy(DomainJobStrategy):
 
 def _resolve_orgao_ids(
     lake: DataLakeRepository | None,
-    state_store: Any,
+    state_store: StateStore,
     **kwargs: Any,
 ) -> list[Any]:
     if lake:
@@ -773,7 +774,7 @@ def _resolve_orgao_ids(
 
 def _resolve_evento_ids(
     lake: DataLakeRepository | None,
-    state_store: Any,
+    state_store: StateStore,
     start: str,
     end: str,
     **kwargs: Any,
@@ -789,7 +790,7 @@ def _resolve_evento_ids(
 
 def _resolve_proposicao_ids(
     lake: DataLakeRepository | None,
-    state_store: Any,
+    state_store: StateStore,
     start: str,
     end: str,
     **kwargs: Any,
@@ -805,7 +806,7 @@ def _resolve_proposicao_ids(
 
 def _resolve_partido_ids(
     lake: DataLakeRepository | None,
-    state_store: Any,
+    state_store: StateStore,
     **kwargs: Any,
 ) -> list[Any]:
     if lake:
@@ -819,7 +820,7 @@ def _resolve_partido_ids(
 
 def _resolve_frente_ids(
     lake: DataLakeRepository | None,
-    state_store: Any,
+    state_store: StateStore,
     current_leg: int,
     **kwargs: Any,
 ) -> list[Any]:
@@ -834,7 +835,7 @@ def _resolve_frente_ids(
 
 def _resolve_bloco_ids(
     lake: DataLakeRepository | None,
-    state_store: Any,
+    state_store: StateStore,
     current_leg: int,
     **kwargs: Any,
 ) -> list[Any]:
@@ -849,7 +850,7 @@ def _resolve_bloco_ids(
 
 def _resolve_grupo_ids(
     lake: DataLakeRepository | None,
-    state_store: Any,
+    state_store: StateStore,
     **kwargs: Any,
 ) -> list[Any]:
     if lake:
@@ -863,7 +864,7 @@ def _resolve_grupo_ids(
 
 def _resolve_legislatura_ids(
     lake: DataLakeRepository | None,
-    state_store: Any,
+    state_store: StateStore,
     start: str,
     current_leg: int,
     **kwargs: Any,

@@ -6,7 +6,7 @@ from typing import Optional, Tuple
 
 from ipolitico.core.constants import DomainType, LoadStrategy
 from ipolitico.core.domain_spec import spec_for
-from ipolitico.sinks.base import BaseSink
+from ipolitico.storage.state_store import StateStore
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class WindowResolver:
     """Resolve janela orquestrada (incremental / full) a partir do estado persistido."""
 
-    def __init__(self, state_store: BaseSink) -> None:
+    def __init__(self, state_store: StateStore) -> None:
         self._store = state_store
 
     @staticmethod

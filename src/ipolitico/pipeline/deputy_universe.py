@@ -9,6 +9,7 @@ from ipolitico.core.constants import DomainType, MedallionLayer
 from ipolitico.core.legislature import legislature_id_bounds_for_calendar_years
 from ipolitico.pipeline.effective_window import resolve_calendar_years
 from ipolitico.storage.datalake_repository import DataLakeRepository
+from ipolitico.storage.state_store import StateStore
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ def resolve_deputy_ids_for_calendar_window(
     current_legislature_id: int,
     anchor_year: int,
     lake: Optional[DataLakeRepository],
-    state_store: Any,
+    state_store: StateStore,
 ) -> List[Any]:
     """
     Deputados que atuaram em legislatura(s) compatíveis com os anos civis da janela.

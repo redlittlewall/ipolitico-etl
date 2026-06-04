@@ -15,6 +15,7 @@ from ipolitico.core.domain_spec import spec_for
 from ipolitico.pipeline.planners.strategies import strategy_for
 from ipolitico.pipeline.source_router import ExtractionPlan
 from ipolitico.storage.datalake_repository import DataLakeRepository
+from ipolitico.storage.state_store import StateStore
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ class CamaraJobPlanner:
     que encapsula a lógica de geração de jobs. Esta classe orquestra a delegação.
     """
 
-    def __init__(self, state_store: Any, lake_repository: DataLakeRepository | None) -> None:
+    def __init__(self, state_store: StateStore, lake_repository: DataLakeRepository | None) -> None:
         self._state_store = state_store
         self._lake = lake_repository
 

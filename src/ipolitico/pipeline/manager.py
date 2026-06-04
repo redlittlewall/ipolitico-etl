@@ -52,9 +52,13 @@ class PipelineManager:
         self._lake: Optional[DataLakeRepository] = lake_repository
         if self._lake is None and hasattr(state_store, "base_dir"):
             self._lake = DataLakeRepository.from_sink(state_store)
+        if self._lake is None:
+            from ipolitico.core.config import DATA_DIR
 
-        self._job_planner = CamaraJobPlanner(self.state_store, self._lake)
-        self._window_resolver = WindowResolver(self.state_store)
+            self._lake = DataLakeRepository(DATA_DIR / "datalake")
+
+        self._job_planner = CamaraJobPlanner(state_store=self._lake, lake_repository=self._lake)
+        self._window_resolver = WindowResolver(state_store=self._lake)
 
     async def run_domain(
         self,
@@ -93,7 +97,7 @@ class PipelineManager:
             orchestration_end=end,
             earliest_possible=earliest_possible,
             strategy=strategy,
-            state_store=self.state_store,
+            state_store=self._lake,
             watermark_column=wm_col,
         )
         logger.info(

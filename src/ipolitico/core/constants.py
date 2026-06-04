@@ -19,7 +19,6 @@ class SourceType(str, Enum):
 class SinkType(str, Enum):
     """Tipos de destinos de armazenamento (Sinks) para a persistência."""
 
-    SQLITE = "sqlite"
     DATALAKE = "datalake"
 
 
