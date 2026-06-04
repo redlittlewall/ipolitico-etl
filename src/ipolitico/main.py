@@ -7,9 +7,12 @@ from pathlib import Path
 import yaml
 
 from ipolitico.core.client import CamaraClient
-from ipolitico.core.constants import DomainType, LoadStrategy, SinkType
+from ipolitico.core.constants import DOMAIN_LABELS, DomainType, LoadStrategy, SinkType
 from ipolitico.pipeline.builder import PipelineBuilder
-from ipolitico.pipeline.domain_order import expand_camara_domains_with_dependencies
+from ipolitico.pipeline.domain_order import (
+    FULL_CAMARA_PIPELINE,
+    expand_camara_domains_with_dependencies,
+)
 from ipolitico.pipeline.federation import FederationOrchestrator
 from ipolitico.pipeline.manager import PipelineManager
 from ipolitico.pipeline.optimizer import DataLakeOptimizer
@@ -27,6 +30,86 @@ def load_config(file_path: Path) -> dict:
         return yaml.safe_load(f)
 
 
+def _print_domain_tree() -> None:
+    """
+    Exibe a árvore hierárquica de domínios com labels descritivos.
+
+    Agrupa domínios em seções: Entidades Principais (pais), Referências
+    e Carga Massiva (bulk-only). Filhos são indentados sob seus pais
+    com caracteres de árvore (├── / └──).
+    """
+    from ipolitico.core.domain_spec import DOMAIN_SPECS
+    from ipolitico.extractors.camara.bulk.registry import BULK_REGISTRY
+
+    # ── Catalogar domínios ────────────────────────────────────────────────────
+    bulk_only: set[DomainType] = {
+        DomainType(k) for k, v in BULK_REGISTRY.items() if v.get("bulk_only")
+    }
+
+    # Pais → filhos via DOMAIN_SPECS (depends_on)
+    parent_children: dict[DomainType, list[DomainType]] = {}
+    all_with_deps: set[DomainType] = set()
+    for domain, spec in DOMAIN_SPECS.items():
+        for parent in spec.depends_on:
+            parent_children.setdefault(parent, []).append(domain)
+            all_with_deps.add(domain)
+
+    # Ordem canônica como chave de ordenação
+    pipeline_order = {d: i for i, d in enumerate(FULL_CAMARA_PIPELINE)}
+
+    # Entidades raiz: não são bulk-only e não dependem de ninguém (via DOMAIN_SPECS)
+    EXCLUDED_ROOTS: set[DomainType] = {DomainType.REFERENCIAS}
+    roots: list[DomainType] = [
+        d
+        for d in DOMAIN_SPECS
+        if d not in bulk_only and d not in EXCLUDED_ROOTS and not DOMAIN_SPECS[d].depends_on
+    ]
+    roots.sort(key=lambda d: pipeline_order.get(d, 999))
+
+    # ── Helper de formatação ──────────────────────────────────────────────────
+    def _fmt(domain: DomainType, prefix: str = "") -> str:
+        name = domain.value
+        label = DOMAIN_LABELS.get(domain, name)
+        label_width = 50
+        return f"{prefix}{name:<20} {label:<{label_width}}"
+
+    def _section(title: str) -> None:
+        sep = "─" * (60 - len(title) - 4)
+        print(f"\n{sep} {title} {sep}")
+
+    # ── Seção 1: Entidades Principais ─────────────────────────────────────────
+    _section("Entidades Principais")
+    for root in roots:
+        children = parent_children.get(root, [])
+        children.sort(key=lambda d: pipeline_order.get(d, 999))
+
+        print(_fmt(root))
+        if children:
+            for i, child in enumerate(children):
+                branch = "  └─ " if i == len(children) - 1 else "  ├─ "
+                print(_fmt(child, branch))
+            print()
+        else:
+            print()
+
+    # ── Seção 2: Referências ──────────────────────────────────────────────────
+    if DomainType.REFERENCIAS not in bulk_only:
+        _section("Referencias")
+        print(_fmt(DomainType.REFERENCIAS))
+        print()
+
+    # ── Seção 3: Carga Massiva ────────────────────────────────────────────────
+    _section("Carga Massiva (Bulk)")
+    bulk_sorted = sorted(
+        (d for d in bulk_only if d in DOMAIN_LABELS),
+        key=lambda d: pipeline_order.get(d, 999),
+    )
+    for domain in bulk_sorted:
+        print(_fmt(domain))
+
+    print()
+
+
 async def main():
     """
     Ponto de Entrada (CLI).
@@ -36,6 +119,11 @@ async def main():
     parser = argparse.ArgumentParser(description="Motor ETL iPolitico")
     parser.add_argument(
         "--source", type=str, default="api", help="Descontinuado - O YAML gerencia a origem."
+    )
+    parser.add_argument(
+        "--list-domains",
+        action="store_true",
+        help="Lista todos os domínios disponíveis com descrição e hierarquia.",
     )
     parser.add_argument(
         "--optimize",
@@ -67,6 +155,10 @@ async def main():
     )
 
     args = parser.parse_args()
+
+    if args.list_domains:
+        _print_domain_tree()
+        return
 
     if args.domains is None:
         args.domains = list(DomainType)
