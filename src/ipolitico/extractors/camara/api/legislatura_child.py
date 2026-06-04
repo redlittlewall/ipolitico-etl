@@ -26,7 +26,7 @@ class LegislaturaChildRouteExtractor(CamaraBaseExtractor):
         for lid in legislatura_ids:
             endpoint = f"{ApiRoutes.LEGISLATURAS.value}/{lid}/{self.route_suffix}"
             try:
-                data = await self.fetch_paginated(endpoint, {})
+                data = await self.fetch_unpaginated(endpoint, {})
                 for item in data:
                     if isinstance(item, dict):
                         rows.append({**item, "id_legislatura": int(lid)})

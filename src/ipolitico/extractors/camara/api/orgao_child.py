@@ -36,7 +36,7 @@ class OrgaoChildRouteExtractor(CamaraBaseExtractor):
         for oid in orgao_ids:
             endpoint = f"{ApiRoutes.ORGAOS.value}/{oid}/{self.route_suffix}"
             try:
-                data = await self.fetch_paginated(endpoint, params)
+                data = await self.fetch_unpaginated(endpoint, params)
                 for item in data:
                     if isinstance(item, dict):
                         rows.append({**item, "id_orgao": int(oid)})

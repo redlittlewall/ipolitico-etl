@@ -11,7 +11,7 @@ from ipolitico.extractors.camara.api.evento_child import EventoOrgaosExtractor
 def extractor() -> EventoOrgaosExtractor:
     client = AsyncMock()
     ext = EventoOrgaosExtractor(client)
-    ext.fetch_paginated = AsyncMock()
+    ext.fetch_unpaginated = AsyncMock()
     return ext
 
 
@@ -29,7 +29,7 @@ class TestEventoOrgaosExtractor:
     @pytest.mark.asyncio
     async def test_extract_chama_endpoint_para_cada_evento(self, extractor: EventoOrgaosExtractor):
         """extract([1, 2]) deve chamar /eventos/1/orgaos e /eventos/2/orgaos."""
-        extractor.fetch_paginated.side_effect = [
+        extractor.fetch_unpaginated.side_effect = [
             [{"id": 10, "sigla": "CD", "nome": "Comissão A"}],
             [{"id": 20, "sigla": "CE", "nome": "Comissão B"}],
         ]
@@ -37,16 +37,16 @@ class TestEventoOrgaosExtractor:
         df = await extractor.extract(evento_ids=[1, 2])
 
         assert df.height == 2
-        assert extractor.fetch_paginated.call_count == 2
+        assert extractor.fetch_unpaginated.call_count == 2
 
-        calls = extractor.fetch_paginated.call_args_list
+        calls = extractor.fetch_unpaginated.call_args_list
         assert "eventos/1/orgaos" in calls[0][0][0]
         assert "eventos/2/orgaos" in calls[1][0][0]
 
     @pytest.mark.asyncio
     async def test_extract_adiciona_id_evento(self, extractor: EventoOrgaosExtractor):
         """Cada registro deve receber o id_evento do pai."""
-        extractor.fetch_paginated.return_value = [
+        extractor.fetch_unpaginated.return_value = [
             {"id": 10, "sigla": "CD", "nome": "Comissão A"},
         ]
 
@@ -63,12 +63,12 @@ class TestEventoOrgaosExtractor:
 
         assert isinstance(df, pl.DataFrame)
         assert df.is_empty()
-        extractor.fetch_paginated.assert_not_called()
+        extractor.fetch_unpaginated.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_extract_ignora_erro_em_um_evento(self, extractor: EventoOrgaosExtractor):
         """Se um evento falhar, o extrator continua com os demais."""
-        extractor.fetch_paginated.side_effect = [
+        extractor.fetch_unpaginated.side_effect = [
             [{"id": 10, "sigla": "CD", "nome": "Comissão A"}],
             Exception("API error"),
             [{"id": 30, "sigla": "CE", "nome": "Comissão C"}],
@@ -77,15 +77,14 @@ class TestEventoOrgaosExtractor:
         df = await extractor.extract(evento_ids=[1, 2, 3])
 
         assert df.height == 2
-        assert extractor.fetch_paginated.call_count == 3
+        assert extractor.fetch_unpaginated.call_count == 3
 
     @pytest.mark.asyncio
     async def test_extract_evento_sem_orgaos_retorna_vazio_se_lista_unica(
         self, extractor: EventoOrgaosExtractor
     ):
         """Se o evento não tiver órgãos, retorna lista vazia para ele (agrega geral vazio)."""
-        extractor.fetch_paginated.return_value = []
-        extractor.fetch_paginated.side_effect = [
+        extractor.fetch_unpaginated.side_effect = [
             [],
             [{"id": 20, "sigla": "CE", "nome": "Comissão B"}],
         ]

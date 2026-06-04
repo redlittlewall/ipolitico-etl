@@ -22,7 +22,7 @@ class BlocoPartidosExtractor(CamaraBaseExtractor):
         for bid in bloco_ids:
             endpoint = f"{ApiRoutes.BLOCOS.value}/{bid}/partidos"
             try:
-                data = await self.fetch_paginated(endpoint, {})
+                data = await self.fetch_unpaginated(endpoint, {})
                 for item in data:
                     if isinstance(item, dict):
                         rows.append({**item, "id_bloco": int(bid)})

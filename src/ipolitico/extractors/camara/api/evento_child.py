@@ -25,7 +25,7 @@ class EventoChildRouteExtractor(CamaraBaseExtractor):
         for eid in evento_ids:
             endpoint = f"{ApiRoutes.EVENTOS.value}/{eid}/{self.route_suffix}"
             try:
-                data = await self.fetch_paginated(endpoint, {})
+                data = await self.fetch_unpaginated(endpoint, {})
                 for item in data:
                     if isinstance(item, dict):
                         rows.append({**item, self.parent_id_field: int(eid)})

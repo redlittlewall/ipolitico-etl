@@ -84,6 +84,25 @@ class CamaraBaseExtractor(BaseExtractor):
 
         return all_data
 
+    async def fetch_unpaginated(
+        self, endpoint: str, params: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """
+        Obtém dados de um endpoint que NÃO suporta paginação (itens/pagina).
+
+        Alguns endpoints da API Câmara (ex: /proposicoes/{id}/tramitacoes,
+        /eventos/{id}/deputados) rejeitam os parâmetros 'itens' e 'pagina'
+        com erro 400/405. Para estes, use este método em vez de fetch_paginated.
+
+        Args:
+            endpoint (str): Caminho relativo do recurso.
+            params (Dict[str, Any]): Parâmetros de filtro (ex: dataInicio, dataFim).
+
+        Returns:
+            List[Dict[str, Any]]: Registros retornados pela API.
+        """
+        return await self.client.fetch(endpoint, params=params)
+
     async def probe_endpoint(self, endpoint: str) -> int:
         """
         Sonda o endpoint pedindo apenas 1 item para validar a existência de dados.

@@ -22,7 +22,7 @@ class FrenteMembrosExtractor(CamaraBaseExtractor):
         for fid in frente_ids:
             endpoint = f"{ApiRoutes.FRENTES.value}/{fid}/membros"
             try:
-                data = await self.fetch_paginated(endpoint, {})
+                data = await self.fetch_unpaginated(endpoint, {})
                 for item in data:
                     if isinstance(item, dict):
                         rows.append({**item, "id_frente": int(fid)})

@@ -3,20 +3,50 @@ from pathlib import Path
 
 import duckdb
 
-from ipolitico.core.constants import ApiParams, DomainType, MedallionLayer
+from ipolitico.core.constants import MedallionLayer
 from ipolitico.core.schemas import despesas_optimizer_partition_sql
 
 logger = logging.getLogger(__name__)
+
+_EXCLUDED_COLS_DEDUP = frozenset({"captured_at", "rn"})
 
 
 class DataLakeOptimizer:
     """
     Motor de Compactação e Governança Out-of-Core usando DuckDB.
     Resolve o 'Small Files Problem' e aplica UPSERT analítico (deduplicação).
+
+    A chave de partição para deduplicação é determinada por introspecção:
+      - Se houver coluna ``id`` → `PARTITION BY id`
+        (domínios entidade: mantém o snapshot mais recente por entidade)
+      - Senão → `PARTITION BY todas_colunas_exceto_metadados`
+        (domínios evento: linhas imutáveis; duplicatas = linhas idênticas)
     """
 
     def __init__(self, base_dir: str = "data/datalake"):
         self.base_dir = Path(base_dir)
+
+    @staticmethod
+    def _resolve_pk_cols(source_path: Path) -> str:
+        """Define a cláusula PARTITION BY inspecionando o schema dos parquet."""
+        with duckdb.connect(database=":memory:") as con:
+            cols = [
+                row[0]
+                for row in con.execute(
+                    "SELECT column_name"
+                    " FROM (DESCRIBE"
+                    " SELECT * FROM read_parquet('{}'))".format(source_path)
+                ).fetchall()
+                if row[0] not in _EXCLUDED_COLS_DEDUP
+            ]
+
+        if "id" in cols:
+            return "id"
+
+        if "id_deputado" in cols and "votacao_id" in cols:
+            return "votacao_id, id_deputado"
+
+        return ", ".join(cols)
 
     def compact_and_deduplicate(
         self,
@@ -39,26 +69,13 @@ class DataLakeOptimizer:
 
         target_file = target_dir / f"{table_name}.parquet"
 
-        con = duckdb.connect(database=":memory:")
-
         logger.info(f"[{table_name.upper()}] Iniciando compactação e deduplicação Out-of-Core...")
 
         try:
-            if table_name == DomainType.DESPESAS.value:
+            if table_name == "despesas":
                 pk_cols = despesas_optimizer_partition_sql()
-            elif table_name in [
-                DomainType.DEPUTADOS.value,
-                DomainType.PROPOSICOES.value,
-                DomainType.VOTACOES.value,
-                DomainType.ORGAOS.value,
-                DomainType.PARTIDOS.value,
-                DomainType.EVENTOS.value,
-            ]:
-                pk_cols = ApiParams.ID.value
-            elif table_name == DomainType.VOTOS.value:
-                pk_cols = f"votacao_id, {ApiParams.DEPUTADO_ID.value}"
             else:
-                pk_cols = ApiParams.ID.value
+                pk_cols = self._resolve_pk_cols(source_path)
 
             query = f"""
             COPY (
@@ -74,7 +91,8 @@ class DataLakeOptimizer:
             ) TO '{target_file}' (FORMAT PARQUET, COMPRESSION 'ZSTD');
             """
 
-            con.execute(query)
+            with duckdb.connect(database=":memory:") as con:
+                con.execute(query)
             logger.info(
                 f"[{table_name.upper()}] Camada {target_layer.upper()}"
                 f" gerada com sucesso em {target_file}"
@@ -82,8 +100,6 @@ class DataLakeOptimizer:
 
         except duckdb.Error as e:
             logger.error(f"[{table_name.upper()}] Falha na Compactação DuckDB: {e}")
-        finally:
-            con.close()
 
 
 if __name__ == "__main__":

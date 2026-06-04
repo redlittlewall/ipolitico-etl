@@ -24,7 +24,7 @@ class GrupoChildRouteExtractor(CamaraBaseExtractor):
         for gid in grupo_ids:
             endpoint = f"{ApiRoutes.GRUPOS.value}/{gid}/{self.route_suffix}"
             try:
-                data = await self.fetch_paginated(endpoint, {})
+                data = await self.fetch_unpaginated(endpoint, {})
                 for item in data:
                     if isinstance(item, dict):
                         rows.append({**item, "id_grupo": int(gid)})

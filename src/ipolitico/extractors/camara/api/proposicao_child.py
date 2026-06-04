@@ -24,7 +24,7 @@ class ProposicaoChildRouteExtractor(CamaraBaseExtractor):
         for pid in proposicao_ids:
             endpoint = f"{ApiRoutes.PROPOSICOES.value}/{pid}/{self.route_suffix}"
             try:
-                data = await self.fetch_paginated(endpoint, {})
+                data = await self.fetch_unpaginated(endpoint, {})
                 if not data:
                     continue
                 for item in data:
