@@ -73,3 +73,32 @@ class TestProposicoesDetalheTransform:
         result = transformer.transform(raw, sub_domain=DomainType.PROPOSICOES_DETALHE.value)
 
         assert result.is_empty()
+
+
+class TestDeputadosDetalheTransform:
+    """Testes do CamaraDetalheTransformer com schema deputados_detalhe."""
+
+    def test_data_falecimento_null_nao_quebra(self, transformer):
+        """dataFalecimento null para deputados vivos nao deve quebrar str.slice."""
+        raw = pl.DataFrame(
+            {
+                "id": [1, 2],
+                "nome": ["Alice", "Bob"],
+                "dataFalecimento": [None, None],
+                "dataNascimento": ["1970-01-15", "1980-06-20"],
+                "cpf": ["123.456.789-00", "987.654.321-00"],
+                "siglaPartido": ["PT", "PSDB"],
+                "siglaUf": ["SP", "RJ"],
+                "sexo": ["F", "M"],
+                "site": ["https://alice", "https://bob"],
+                "situacao": ["Ativo", "Ativo"],
+                "condicaoEleitoral": ["Titular", "Titular"],
+                "gabinete": ['{"nome":"A"}', '{"nome":"B"}'],
+            }
+        )
+        result = transformer.transform(raw, sub_domain=DomainType.DEPUTADOS_DETALHE.value)
+
+        assert result.height == 2
+        assert result["dataFalecimento"].dtype == pl.String
+        assert result["dataFalecimento"].to_list() == [None, None]
+        assert result["dataNascimento"].to_list() == ["1970-01-15", "1980-06-20"]

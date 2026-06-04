@@ -36,6 +36,9 @@ def _jsonify_nested(df: pl.DataFrame) -> pl.DataFrame:
                         pl.col(col).list.eval(pl.element().struct.json_encode()).list.join(","),
                     ).alias(col)
                 )
+            else:
+                # Lista não-Struct (ex: List[String]) — serializa como JSON
+                df = df.with_columns(pl.col(col).list.join(","))
     return df
 
 
@@ -61,7 +64,11 @@ class CamaraDetalheTransformer(BaseTransformer):
             df = df.with_columns(pl.col("data").str.to_datetime(strict=False))
         for col in ("dataInicio", "dataFim", "dataNascimento", "dataFalecimento"):
             if col in df.columns:
-                df = df.with_columns(pl.col(col).str.slice(0, 10))
+                df = df.with_columns(
+                    pl.when(pl.col(col).is_not_null())
+                    .then(pl.col(col).cast(pl.Utf8).str.slice(0, 10))
+                    .alias(col)
+                )
 
         try:
             for col in contract:

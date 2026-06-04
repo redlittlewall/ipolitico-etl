@@ -64,7 +64,7 @@ def main():
 
         # Junta tudo com perfil do deputado
         perfil = (
-            gastos_agg.join(discursos_agg, on="id_deputado", how="outer")
+            gastos_agg.join(discursos_agg, on="id_deputado", how="full")
             .join(
                 lazy_dep.select(["id", "nome", "partido", "uf"]),
                 left_on="id_deputado",

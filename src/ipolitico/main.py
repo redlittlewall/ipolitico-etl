@@ -49,7 +49,12 @@ async def main():
         default=LoadStrategy.INCREMENTAL,
     )
     parser.add_argument(
-        "--domains", nargs="+", type=DomainType, choices=list(DomainType), default=list(DomainType)
+        "--domains",
+        action="append",
+        nargs="+",
+        type=DomainType,
+        choices=list(DomainType),
+        default=None,
     )
     parser.add_argument("--start-date", type=str, default=None)
     parser.add_argument("--end-date", type=str, default=None)
@@ -63,6 +68,10 @@ async def main():
 
     args = parser.parse_args()
 
+    if args.domains is None:
+        args.domains = list(DomainType)
+    else:
+        args.domains = [d for group in args.domains for d in group]
     args.domains = expand_camara_domains_with_dependencies(args.domains)
 
     start_time = time.perf_counter()
