@@ -13,7 +13,7 @@ from pathlib import Path
 import polars as pl
 from ipolitico.core.logger import setup_logger
 
-logger = setup_logger()
+logger = setup_logger(__name__)
 DATALAKE_PATH = Path("data/datalake")
 
 
@@ -49,6 +49,7 @@ def main():
             left_on="siglaPartido",
             right_on="sigla",
             how="left",
+            suffix="_partido",
         )
 
         # Assentos por partido em cada comissão
@@ -56,8 +57,8 @@ def main():
             composicao.group_by(["sigla", "siglaPartido"])
             .agg(
                 pl.len().alias("assentos"),
-                pl.col("nome_right").first().alias("nome_partido"),
-                pl.col("nome").first().alias("nome_comissao"),
+                pl.col("nome_partido").first().alias("nome_partido"),
+                pl.col("nome_right").first().alias("nome_comissao"),
             )
             .sort(["sigla", "assentos"], descending=[False, True])
         )
@@ -84,10 +85,11 @@ def main():
 
         # Concentração geral: quantos partidos diferentes em cada comissão
         diversidade = (
-            composicao.group_by(["sigla", "nome"])
+            composicao.group_by(["sigla", "tipoOrgao"])
             .agg(
                 pl.col("siglaPartido").n_unique().alias("partidos_diferentes"),
                 pl.len().alias("total_membros"),
+                pl.col("nome_right").first().alias("nome_comissao"),
             )
             .sort("partidos_diferentes", descending=True)
         )

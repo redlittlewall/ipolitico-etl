@@ -13,7 +13,7 @@ from pathlib import Path
 import polars as pl
 from ipolitico.core.logger import setup_logger
 
-logger = setup_logger()
+logger = setup_logger(__name__)
 DATALAKE_PATH = Path("data/datalake")
 
 
@@ -61,9 +61,10 @@ def main():
             )
             .with_columns(
                 pl.when(pl.col("tipoVoto") == pl.col("orientacaoVoto"))
-                .alias("votou_com_partido")
+                .then(pl.lit(True))
                 .otherwise(pl.lit(False))
                 .fill_null(False)
+                .alias("votou_com_partido")
             )
         )
 

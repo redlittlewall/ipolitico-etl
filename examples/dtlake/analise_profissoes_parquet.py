@@ -3,7 +3,7 @@ from pathlib import Path
 import polars as pl
 from ipolitico.core.logger import setup_logger
 
-logger = setup_logger()
+logger = setup_logger(__name__)
 
 # Ajuste este caminho conforme a pasta raiz configurada no seu DataLakeSink
 DATALAKE_PATH = Path("datalake")

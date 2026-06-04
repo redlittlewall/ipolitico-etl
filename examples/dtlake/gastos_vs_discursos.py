@@ -13,7 +13,7 @@ from pathlib import Path
 import polars as pl
 from ipolitico.core.logger import setup_logger
 
-logger = setup_logger()
+logger = setup_logger(__name__)
 DATALAKE_PATH = Path("data/datalake")
 
 
@@ -54,7 +54,11 @@ def main():
         # Agrega discursos por deputado
         discursos_agg = lazy_discursos.group_by("id_deputado").agg(
             pl.len().alias("qtd_discursos"),
-            pl.col("transcricao").str.lengths().sum().alias("total_caracteres_discursos"),
+            pl.col("transcricao")
+            .fill_null("")
+            .str.len_chars()
+            .sum()
+            .alias("total_caracteres_discursos"),
             pl.col("tipoDiscurso").n_unique().alias("tipos_discurso"),
         )
 

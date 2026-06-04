@@ -22,7 +22,13 @@ class CamaraDiscursosTransformer(BaseTransformer):
 
         for col in ("dataHoraInicio", "dataHoraFim"):
             if col in df.columns:
-                df = df.with_columns(pl.col(col).str.to_datetime(strict=False))
+                # Alguns discursos não têm dataHoraFim → coluna nula;
+                # cast para Utf8 primeiro para evitar erro "expected String, got null"
+                df = df.with_columns(
+                    pl.when(pl.col(col).is_not_null())
+                    .then(pl.col(col).cast(pl.Utf8).str.to_datetime(strict=False))
+                    .alias(col)
+                )
 
         contract = SILVER_SCHEMAS[DomainType.DISCURSOS.value]
         try:
