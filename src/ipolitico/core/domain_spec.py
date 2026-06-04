@@ -159,6 +159,13 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         uk=("id_deputado", "dataStatus", "idLegislatura"),
         sub="deputados_historico",
     ),
+    DomainType.MANDATOS_EXTERNOS: _spec(
+        DomainType.MANDATOS_EXTERNOS,
+        None,
+        frozenset({DomainType.DEPUTADOS}),
+        uk=("id_deputado", "anoInicio", "cargo", "siglaPartidoEleicao"),
+        sub="mandatos_externos",
+    ),
     DomainType.EVENTOS_DEPUTADOS: _spec(
         DomainType.EVENTOS_DEPUTADOS,
         None,
@@ -272,6 +279,13 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         None,
         frozenset({DomainType.PROPOSICOES}),
         sub="proposicoes_detalhe",
+    ),
+    DomainType.EVENTOS_ORGAOS: _spec(
+        DomainType.EVENTOS_ORGAOS,
+        None,
+        frozenset({DomainType.EVENTOS}),
+        uk=("id_evento", "id"),
+        sub="eventos_orgaos",
     ),
     DomainType.ORGAOS_EVENTOS: _spec(
         DomainType.ORGAOS_EVENTOS,

@@ -73,3 +73,7 @@ class OrgaosDeputadoExtractor(DeputadoTemporalChildExtractor):
 
 class EventosDeputadoExtractor(DeputadoTemporalChildExtractor):
     route_suffix = "eventos"
+
+
+class MandatosExternosExtractor(DeputadoChildRouteExtractor):
+    route_suffix = "mandatosExternos"

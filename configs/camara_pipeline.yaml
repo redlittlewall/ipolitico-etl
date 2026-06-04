@@ -161,6 +161,12 @@ domain_configs:
     sinks:
       datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
 
+  mandatos_externos:
+    extractor: "ipolitico.extractors.camara.api.deputado_child.MandatosExternosExtractor"
+    transformer: "ipolitico.transformers.camara.deputado_child_transformer.CamaraDeputadoChildTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
   eventos_deputados:
     extractor: "ipolitico.extractors.camara.api.evento_child.EventoDeputadosExtractor"
     transformer: "ipolitico.transformers.camara.evento_child_transformer.CamaraEventoChildTransformer"
@@ -175,6 +181,12 @@ domain_configs:
 
   eventos_pauta:
     extractor: "ipolitico.extractors.camara.api.evento_child.EventoPautaExtractor"
+    transformer: "ipolitico.transformers.camara.evento_child_transformer.CamaraEventoChildTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  eventos_orgaos:
+    extractor: "ipolitico.extractors.camara.api.evento_child.EventoOrgaosExtractor"
     transformer: "ipolitico.transformers.camara.evento_child_transformer.CamaraEventoChildTransformer"
     sinks:
       datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"

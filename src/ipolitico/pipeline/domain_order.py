@@ -44,6 +44,7 @@ FULL_CAMARA_PIPELINE: tuple[DomainType, ...] = (
     DomainType.DEPUTADOS_ORGAOS,
     DomainType.DEPUTADOS_EVENTOS,
     DomainType.DEPUTADOS_HISTORICO,
+    DomainType.MANDATOS_EXTERNOS,
     DomainType.PROFISSÕES,
     DomainType.OCUPACOES,
     DomainType.VOTACOES,
@@ -55,6 +56,7 @@ FULL_CAMARA_PIPELINE: tuple[DomainType, ...] = (
     DomainType.EVENTOS_DEPUTADOS,
     DomainType.EVENTOS_VOTACOES,
     DomainType.EVENTOS_PAUTA,
+    DomainType.EVENTOS_ORGAOS,
     DomainType.REFERENCIAS,
 )
 
@@ -76,9 +78,11 @@ DOMAIN_UPSTREAM_REQUIREMENTS: dict[DomainType, frozenset[DomainType]] = {
     DomainType.DEPUTADOS_ORGAOS: frozenset({DomainType.DEPUTADOS}),
     DomainType.DEPUTADOS_EVENTOS: frozenset({DomainType.DEPUTADOS}),
     DomainType.DEPUTADOS_HISTORICO: frozenset({DomainType.DEPUTADOS}),
+    DomainType.MANDATOS_EXTERNOS: frozenset({DomainType.DEPUTADOS}),
     DomainType.EVENTOS_DEPUTADOS: frozenset({DomainType.EVENTOS}),
     DomainType.EVENTOS_VOTACOES: frozenset({DomainType.EVENTOS}),
     DomainType.EVENTOS_PAUTA: frozenset({DomainType.EVENTOS}),
+    DomainType.EVENTOS_ORGAOS: frozenset({DomainType.EVENTOS}),
     DomainType.PARTIDOS_MEMBROS: frozenset({DomainType.PARTIDOS}),
     DomainType.PARTIDOS_LIDERES: frozenset({DomainType.PARTIDOS}),
     DomainType.PROPOSICOES_VOTACOES: frozenset({DomainType.PROPOSICOES}),

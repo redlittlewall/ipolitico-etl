@@ -246,6 +246,15 @@ SILVER_SCHEMAS = {
         "oficioTitulo": pl.String,
         "presidente": pl.String,
     },
+    DomainType.MANDATOS_EXTERNOS.value: {
+        "id_deputado": pl.Int64,
+        "anoFim": pl.Int64,
+        "anoInicio": pl.Int64,
+        "cargo": pl.String,
+        "municipio": pl.String,
+        "siglaPartidoEleicao": pl.String,
+        "siglaUf": pl.String,
+    },
     DomainType.EVENTOS_DEPUTADOS.value: {
         "id_evento": pl.Int64,
         "id": pl.Int64,
@@ -408,6 +417,16 @@ SILVER_SCHEMAS = {
         "descricaoTipo": pl.String,
         "keywords": pl.String,
         "urlInteiroTeor": pl.String,
+    },
+    DomainType.EVENTOS_ORGAOS.value: {
+        "id_evento": pl.Int64,
+        "id": pl.Int64,
+        "uri": pl.String,
+        "sigla": pl.String,
+        "nome": pl.String,
+        "codTipoOrgao": pl.Int64,
+        "tipoOrgao": pl.String,
+        "apelido": pl.String,
     },
     DomainType.ORGAOS_EVENTOS.value: {
         "id_orgao": pl.Int64,

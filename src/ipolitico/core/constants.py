@@ -92,6 +92,7 @@ class DomainType(str, Enum):
     DEPUTADOS_ORGAOS = "deputados_orgaos"
     DEPUTADOS_EVENTOS = "deputados_eventos"
     DEPUTADOS_HISTORICO = "deputados_historico"
+    MANDATOS_EXTERNOS = "mandatos_externos"
     EVENTOS_DEPUTADOS = "eventos_deputados"
     EVENTOS_VOTACOES = "eventos_votacoes"
     EVENTOS_PAUTA = "eventos_pauta"
@@ -110,6 +111,7 @@ class DomainType(str, Enum):
     LEGISLATURAS_DETALHE = "legislaturas_detalhe"
     BLOCOS_DETALHE = "blocos_detalhe"
     PROPOSICOES_DETALHE = "proposicoes_detalhe"
+    EVENTOS_ORGAOS = "eventos_orgaos"
     ORGAOS_EVENTOS = "orgaos_eventos"
     ORGAOS_VOTACOES = "orgaos_votacoes"
     GRUPOS_MEMBROS = "grupos_membros"
@@ -166,6 +168,7 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.DEPUTADOS_ORGAOS: EarliestDates.DEPUTADOS,
     DomainType.DEPUTADOS_EVENTOS: EarliestDates.DEPUTADOS,
     DomainType.DEPUTADOS_HISTORICO: EarliestDates.DEPUTADOS,
+    DomainType.MANDATOS_EXTERNOS: EarliestDates.DEPUTADOS,
     DomainType.EVENTOS_DEPUTADOS: EarliestDates.EVENTOS,
     DomainType.EVENTOS_VOTACOES: EarliestDates.EVENTOS,
     DomainType.EVENTOS_PAUTA: EarliestDates.EVENTOS,
@@ -184,6 +187,7 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.LEGISLATURAS_DETALHE: EarliestDates.DEPUTADOS,
     DomainType.BLOCOS_DETALHE: EarliestDates.DEPUTADOS,
     DomainType.PROPOSICOES_DETALHE: EarliestDates.PROPOSICOES,
+    DomainType.EVENTOS_ORGAOS: EarliestDates.EVENTOS,
     DomainType.ORGAOS_EVENTOS: EarliestDates.ORGAOS,
     DomainType.ORGAOS_VOTACOES: EarliestDates.ORGAOS,
     DomainType.GRUPOS_MEMBROS: EarliestDates.DEPUTADOS,

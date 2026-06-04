@@ -45,3 +45,7 @@ class EventoVotacoesExtractor(EventoChildRouteExtractor):
 
 class EventoPautaExtractor(EventoChildRouteExtractor):
     route_suffix = "pauta"
+
+
+class EventoOrgaosExtractor(EventoChildRouteExtractor):
+    route_suffix = "orgaos"
