@@ -745,6 +745,35 @@ class ReferenciasStrategy(DomainJobStrategy):
         return jobs, referencias_mapper
 
 
+class SnapshotWindowStrategy(DomainJobStrategy):
+    """Estratégia para domínios bulk-only snapshot: 1 job sem parâmetros temporais.
+
+    Domínios snapshot (ex: funcionarios, tecad_categorias, tecad_termos) não
+    dependem de janela temporal — o bulk download retorna o snapshot completo
+    independentemente de start/end date. Esta estratégia produz um único job
+    vazio, sem start_date/end_date, que o BaseBulkExtractor ignora via **kwargs.
+    """
+
+    def build(
+        self,
+        domain: DomainType,
+        spec: DomainSpec,
+        start: str,
+        end: str,
+        current_leg: int,
+        anchor_year: int,
+        extraction_plan: ExtractionPlan,
+        state_store: StateStore,
+        lake: DataLakeRepository | None,
+    ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
+        jobs: list[dict[str, Any]] = [{}]
+
+        def snapshot_mapper(job: dict) -> dict:
+            return {}
+
+        return jobs, snapshot_mapper
+
+
 class DefaultWindowStrategy(DomainJobStrategy):
     """Estratégia fallback: 1 job com janela temporal."""
 
@@ -1072,10 +1101,10 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
         resolve_fn=_resolve_evento_ids,
         parent_col="id_evento",
     ),
-    # ── Domínios bulk-only snapshot ─────────────────────────────────────────
-    DomainType.FUNCIONARIOS: DefaultWindowStrategy(),
-    DomainType.TECAD_CATEGORIAS: DefaultWindowStrategy(),
-    DomainType.TECAD_TERMOS: DefaultWindowStrategy(),
+    # ── Domínios bulk-only snapshot (sem partição temporal) ─────────────────
+    DomainType.FUNCIONARIOS: SnapshotWindowStrategy(),
+    DomainType.TECAD_CATEGORIAS: SnapshotWindowStrategy(),
+    DomainType.TECAD_TERMOS: SnapshotWindowStrategy(),
     # ── Domínios bulk-only yearly (requerem TimeWindowStrategy para jobs por ano) ──
     DomainType.EVENTOS_PRESENCA_DEPUTADOS: TimeWindowStrategy(),
     DomainType.EVENTOS_REQUERIMENTOS: TimeWindowStrategy(),
