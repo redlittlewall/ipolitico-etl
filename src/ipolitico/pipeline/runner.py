@@ -2,8 +2,6 @@ import asyncio
 import logging
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from ipolitico.core.config import MAX_CONCURRENT_REQUESTS
 from ipolitico.core.constants import MedallionLayer
 from ipolitico.pipeline.builder import PipelineComponents
@@ -73,11 +71,43 @@ class PipelineRunner:
         log_threshold = max(1, total_items // 10)
         t_kwargs = transform_kwargs or {}
 
-        @retry(
-            wait=wait_exponential(multiplier=1, min=2, max=16),
-            stop=stop_after_attempt(5),
-            reraise=True,
-        )
+        async def _extract_with_retry(extract_args, t_kwargs):
+            """Wrapper do extract+transform com retry exponencial."""
+            for attempt in range(5):
+                try:
+                    raw_df = await components.extractor.extract(**extract_args)
+                    if raw_df is not None and not raw_df.is_empty():
+                        clean_df = components.transformer.transform(raw_df, **t_kwargs)
+                        if clean_df is None or clean_df.is_empty():
+                            logger.warning(
+                                "[%s] %s linhas brutas descartadas na transformação "
+                                "(contrato Silver ou filtro temporal).",
+                                table_name,
+                                raw_df.height,
+                            )
+                            return None
+                        return clean_df
+                    return None
+                except Exception as e:
+                    if attempt < 4:
+                        wait = min(16, 2**attempt)
+                        logger.warning(
+                            "[%s] Retry %d/5 para job %s: %s",
+                            table_name,
+                            attempt + 1,
+                            extract_args,
+                            e,
+                        )
+                        await asyncio.sleep(wait)
+                    else:
+                        logger.error(
+                            "Erro fatal processando job %s em %s (5 tentativas): %s",
+                            extract_args,
+                            table_name,
+                            e,
+                        )
+                        return None
+
         async def worker():
             nonlocal processed_count
             while True:
@@ -86,36 +116,20 @@ class PipelineRunner:
                 except asyncio.QueueEmpty:
                     break
 
-                try:
-                    # EXTRAÇÃO (Camada "Burra" de I/O)
-                    extract_args = extract_kwargs_mapper(job_item)
-                    raw_df = await components.extractor.extract(**extract_args)
+                extract_args = extract_kwargs_mapper(job_item)
+                clean_df = await _extract_with_retry(extract_args, t_kwargs)
 
-                    if raw_df is not None and not raw_df.is_empty():
-                        clean_df = components.transformer.transform(raw_df, **t_kwargs)
+                if clean_df is not None:
+                    await df_queue.put(clean_df)
 
-                        if clean_df is None or clean_df.is_empty():
-                            logger.warning(
-                                "[%s] %s linhas brutas descartadas na transformação "
-                                "(contrato Silver ou filtro temporal).",
-                                table_name,
-                                raw_df.height,
-                            )
-                        else:
-                            await df_queue.put(clean_df)
-
-                except Exception as e:
-                    logger.error(f"Erro fatal processando job {job_item} em {table_name}: {e}")
-                    raise
-                finally:
-                    processed_count += 1
-                    if processed_count % log_threshold == 0 or processed_count == total_items:
-                        percent = (processed_count / total_items) * 100
-                        logger.info(
-                            f"       [Progresso - {table_name}] {processed_count}/{total_items} "
-                            f"({percent:.1f}%) concluído."
-                        )
-                    job_queue.task_done()
+                processed_count += 1
+                if processed_count % log_threshold == 0 or processed_count == total_items:
+                    percent = (processed_count / total_items) * 100
+                    logger.info(
+                        f"       [Progresso - {table_name}] {processed_count}/{total_items} "
+                        f"({percent:.1f}%) concluído."
+                    )
+                job_queue.task_done()
 
         async def consumer():
             while True:
