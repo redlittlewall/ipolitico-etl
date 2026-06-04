@@ -2,6 +2,8 @@
 Testes para transformers de entidades institucionais e novos domínios bulk-only.
 """
 
+import logging
+
 import polars as pl
 import pytest
 from ipolitico.core.constants import DomainType
@@ -10,6 +12,7 @@ from ipolitico.transformers.camara.institutional_transformer import (
     CamaraFuncionariosTransformer,
     CamaraTecadCategoriasTransformer,
     CamaraTecadTermosTransformer,
+    _apply_contract,
 )
 
 
@@ -625,3 +628,81 @@ class TestCamaraVotacoesProposicoesTransformer:
         assert result.schema["proposicao_id"] == pl.Int64
         assert result["proposicao_numero"].to_list() == [742, 761]
         assert result["proposicao_ano"].to_list() == [2015, 2015]
+
+
+class TestApplyContractLogging:
+    """Testes de logging do _apply_contract sobre perda silenciosa de dados."""
+
+    def test_data_loss_on_unparseable_value_logs_warning(self, caplog):
+        """Valor inparseável no cast gera WARNING com nome da coluna e contagem."""
+        caplog.set_level(logging.WARNING)
+        df = pl.DataFrame(
+            {
+                "id": ["1", "abc", "3"],
+                "idLegislatura": ["56", "57", "58"],
+                "nome": ["Bloco A", "Bloco B", "Bloco C"],
+                "uri": ["http://a", "http://b", "http://c"],
+            }
+        )
+
+        _apply_contract(df, DomainType.BLOCOS.value)
+
+        warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
+        assert len(warnings) >= 1, "Deveria ter emitido ao menos um WARNING"
+        assert any(
+            "id" in w.message for w in warnings
+        ), "WARNING deveria citar a coluna 'id' com perda de dados"
+
+    def test_clean_cast_emits_no_warning(self, caplog):
+        """Cast bem-sucedido de todas as colunas não gera WARNING."""
+        caplog.set_level(logging.WARNING)
+        df = pl.DataFrame(
+            {
+                "id": ["1", "2", "3"],
+                "idLegislatura": ["56", "57", "58"],
+                "nome": ["Bloco A", "Bloco B", "Bloco C"],
+                "uri": ["http://a", "http://b", "http://c"],
+            }
+        )
+
+        _apply_contract(df, DomainType.BLOCOS.value)
+
+        warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
+        assert len(warnings) == 0, "Cast limpo não deveria gerar WARNING"
+
+    def test_missing_column_added_no_warning(self, caplog):
+        """Coluna do contrato ausente no input é adicionada como null sem WARNING."""
+        caplog.set_level(logging.WARNING)
+        df = pl.DataFrame(
+            {
+                "id": ["1", "2", "3"],
+                "idLegislatura": ["56", "57", "58"],
+                "nome": ["Bloco A", "Bloco B", "Bloco C"],
+                # 'uri' ausente — será adicionada como null
+            }
+        )
+
+        _apply_contract(df, DomainType.BLOCOS.value)
+
+        warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
+        assert len(warnings) == 0, "Coluna ausente adicionada como null não é perda de dados"
+
+    def test_multiple_columns_with_data_loss(self, caplog):
+        """Múltiplas colunas com valores inparseáveis geram WARNING para cada uma."""
+        caplog.set_level(logging.WARNING)
+        df = pl.DataFrame(
+            {
+                "id": ["1", "abc", "3"],
+                "idLegislatura": ["xyz", "57", "58"],
+                "nome": ["Bloco A", "Bloco B", "Bloco C"],
+                "uri": ["http://a", "http://b", "http://c"],
+            }
+        )
+
+        _apply_contract(df, DomainType.BLOCOS.value)
+
+        warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
+        assert len(warnings) == 2, "Duas colunas com perda deveriam gerar 2 WARNINGs"
+        messages = [w.message for w in warnings]
+        assert any("id" in m for m in messages)
+        assert any("idLegislatura" in m for m in messages)

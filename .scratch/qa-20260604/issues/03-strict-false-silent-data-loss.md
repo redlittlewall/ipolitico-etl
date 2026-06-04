@@ -1,10 +1,12 @@
 ---
-Status: needs-triage
+Status: resolved
 Date: 2026-06-04
 Area: schemas
 Severity: low
 Source: code-review (angle G)
 Type: tech-debt
+ResolvedBy: TDD (4 testes, RED→GREEN→REFACTOR)
+TestsAdded: 4 (TestApplyContractLogging)
 ---
 
 # strict=False em _apply_contract silencia perda de dados sem logging

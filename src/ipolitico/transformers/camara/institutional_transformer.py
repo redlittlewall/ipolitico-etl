@@ -15,11 +15,49 @@ logger = logging.getLogger(__name__)
 
 
 def _apply_contract(df: pl.DataFrame, domain_key: str) -> pl.DataFrame:
+    """
+    Aplica o schema SILVER_SCHEMAS[domain_key] ao DataFrame via cast.
+
+    Colunas faltantes no input são adicionadas como NULL. Colunas existentes
+    com tipos incompatíveis são convertidas com ``strict=False``, e valores
+    inparseáveis tornam-se NULL. Um WARNING é emitido quando colunas que
+    continham dados não-nulos no input resultam em nulls após o cast,
+    sinalizando perda silenciosa de dados.
+
+    Args:
+        df: DataFrame bruto (tipicamente lido de CSV ou API).
+        domain_key: Chave no SILVER_SCHEMAS que define o contrato de tipos.
+
+    Returns:
+        DataFrame com as colunas do contrato nos tipos especificados.
+    """
     contract = SILVER_SCHEMAS[domain_key]
+    input_cols = set(df.columns)
+
     for col in contract:
         if col not in df.columns:
             df = df.with_columns(pl.lit(None).alias(col))
-    return df.select([pl.col(c).cast(contract[c], strict=False) for c in contract])
+
+    result = df.select([pl.col(c).cast(contract[c], strict=False) for c in contract])
+
+    for col in contract:
+        if col not in input_cols:
+            continue
+        nulls = result[col].is_null().sum()
+        if nulls > 0:
+            non_null_input = df[col].is_not_null().sum()
+            if non_null_input > 0:
+                logger.warning(
+                    "Perda de dados em '%s.%s': %d null(s) após cast para %s "
+                    "(de %d valores não-nulos no input)",
+                    domain_key,
+                    col,
+                    nulls,
+                    contract[col],
+                    non_null_input,
+                )
+
+    return result
 
 
 class CamaraBlocosTransformer(BaseTransformer):
