@@ -28,24 +28,30 @@ domain_configs:
     transformer: "ipolitico.transformers.camara.deputado_child_transformer.CamaraDeputadoChildTransformer"
   orgaos:
     extractor: "ipolitico.extractors.camara.api.orgaos.OrgaosExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
     transformer: "ipolitico.transformers.camara.orgaos_transformer.CamaraOrgaosTransformer"
   partidos:
     extractor: "ipolitico.extractors.camara.api.partidos.PartidosExtractor"
     transformer: "ipolitico.transformers.camara.partidos_transformer.CamaraPartidosTransformer"
   eventos:
     extractor: "ipolitico.extractors.camara.api.eventos.EventosExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
     transformer: "ipolitico.transformers.camara.eventos_transformer.CamaraEventosTransformer"
   blocos:
     extractor: "ipolitico.extractors.camara.api.blocos.BlocosExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
     transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraBlocosTransformer"
   frentes:
     extractor: "ipolitico.extractors.camara.api.frentes.FrentesExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
     transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraFrentesTransformer"
   grupos:
     extractor: "ipolitico.extractors.camara.api.grupos.GruposExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
     transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraGruposTransformer"
   legislaturas:
     extractor: "ipolitico.extractors.camara.api.legislaturas.LegislaturasExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
     transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraLegislaturasTransformer"
   discursos:
     extractor: "ipolitico.extractors.camara.api.deputado_child.DiscursosExtractor"
