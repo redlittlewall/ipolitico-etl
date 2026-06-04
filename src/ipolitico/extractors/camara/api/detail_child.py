@@ -63,3 +63,15 @@ class GruposDetalheExtractor(DetailByIdExtractor):
 
 class LegislaturasDetalheExtractor(DetailByIdExtractor):
     base_route = "legislaturas"
+
+
+class BlocosDetalheExtractor(DetailByIdExtractor):
+    """Extrator para o endpoint GET /blocos/{id} (detalhe de bloco parlamentar)."""
+
+    base_route = "blocos"
+
+
+class ProposicoesDetalheExtractor(DetailByIdExtractor):
+    """Extrator para o endpoint GET /proposicoes/{id} (detalhe de proposição legislativa)."""
+
+    base_route = "proposicoes"

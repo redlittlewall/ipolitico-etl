@@ -702,6 +702,19 @@ class DetailStrategy(DomainJobStrategy):
                 return list(range(1, current_leg + 1)), DomainType.LEGISLATURAS.value
             return [current_leg], DomainType.LEGISLATURAS.value
 
+        if domain_val == DomainType.BLOCOS_DETALHE.value:
+            if lake:
+                return lake.list_bloco_ids_silver_or_gold(current_leg), DomainType.BLOCOS.value
+            return [], DomainType.BLOCOS.value
+
+        if domain_val == DomainType.PROPOSICOES_DETALHE.value:
+            if lake:
+                return (
+                    lake.list_proposicao_ids_silver_or_gold(start, end),
+                    DomainType.PROPOSICOES.value,
+                )
+            return [], DomainType.PROPOSICOES.value
+
         return [], ""
 
 
@@ -1046,6 +1059,8 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     DomainType.PARTIDOS_DETALHE: DetailStrategy(),
     DomainType.GRUPOS_DETALHE: DetailStrategy(),
     DomainType.LEGISLATURAS_DETALHE: DetailStrategy(),
+    DomainType.BLOCOS_DETALHE: DetailStrategy(),
+    DomainType.PROPOSICOES_DETALHE: DetailStrategy(),
     # Referências
     DomainType.REFERENCIAS: ReferenciasStrategy(),
 }

@@ -108,6 +108,8 @@ class DomainType(str, Enum):
     PARTIDOS_DETALHE = "partidos_detalhe"
     GRUPOS_DETALHE = "grupos_detalhe"
     LEGISLATURAS_DETALHE = "legislaturas_detalhe"
+    BLOCOS_DETALHE = "blocos_detalhe"
+    PROPOSICOES_DETALHE = "proposicoes_detalhe"
     ORGAOS_EVENTOS = "orgaos_eventos"
     ORGAOS_VOTACOES = "orgaos_votacoes"
     GRUPOS_MEMBROS = "grupos_membros"
@@ -180,6 +182,8 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.PARTIDOS_DETALHE: EarliestDates.PARTIDOS,
     DomainType.GRUPOS_DETALHE: EarliestDates.DEPUTADOS,
     DomainType.LEGISLATURAS_DETALHE: EarliestDates.DEPUTADOS,
+    DomainType.BLOCOS_DETALHE: EarliestDates.DEPUTADOS,
+    DomainType.PROPOSICOES_DETALHE: EarliestDates.PROPOSICOES,
     DomainType.ORGAOS_EVENTOS: EarliestDates.ORGAOS,
     DomainType.ORGAOS_VOTACOES: EarliestDates.ORGAOS,
     DomainType.GRUPOS_MEMBROS: EarliestDates.DEPUTADOS,

@@ -257,6 +257,18 @@ domain_configs:
     sinks:
       datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
 
+  blocos_detalhe:
+    extractor: "ipolitico.extractors.camara.api.detail_child.BlocosDetalheExtractor"
+    transformer: "ipolitico.transformers.camara.detalhe_transformer.CamaraDetalheTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
+  proposicoes_detalhe:
+    extractor: "ipolitico.extractors.camara.api.detail_child.ProposicoesDetalheExtractor"
+    transformer: "ipolitico.transformers.camara.detalhe_transformer.CamaraDetalheTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+
   orgaos_eventos:
     extractor: "ipolitico.extractors.camara.api.orgao_child.OrgaoEventosExtractor"
     transformer: "ipolitico.transformers.camara.evento_child_transformer.CamaraEventoChildTransformer"

@@ -261,6 +261,18 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         frozenset({DomainType.LEGISLATURAS}),
         sub="legislaturas_detalhe",
     ),
+    DomainType.BLOCOS_DETALHE: _spec(
+        DomainType.BLOCOS_DETALHE,
+        None,
+        frozenset({DomainType.BLOCOS}),
+        sub="blocos_detalhe",
+    ),
+    DomainType.PROPOSICOES_DETALHE: _spec(
+        DomainType.PROPOSICOES_DETALHE,
+        None,
+        frozenset({DomainType.PROPOSICOES}),
+        sub="proposicoes_detalhe",
+    ),
     DomainType.ORGAOS_EVENTOS: _spec(
         DomainType.ORGAOS_EVENTOS,
         None,
