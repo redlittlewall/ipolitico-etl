@@ -9,7 +9,11 @@ import pytest
 from ipolitico.core.constants import DomainType
 from ipolitico.core.schemas import SILVER_SCHEMAS
 from ipolitico.transformers.camara.institutional_transformer import (
+    CamaraBlocosTransformer,
+    CamaraFrentesTransformer,
     CamaraFuncionariosTransformer,
+    CamaraGruposTransformer,
+    CamaraLegislaturasTransformer,
     CamaraTecadCategoriasTransformer,
     CamaraTecadTermosTransformer,
     _apply_contract,
@@ -706,3 +710,176 @@ class TestApplyContractLogging:
         messages = [w.message for w in warnings]
         assert any("id" in m for m in messages)
         assert any("idLegislatura" in m for m in messages)
+
+
+class TestCamaraBlocosTransformer:
+    """Transformer para blocos parlamentares."""
+
+    @pytest.fixture
+    def transformer(self):
+        return CamaraBlocosTransformer()
+
+    def test_transform_empty_df(self, transformer):
+        """DataFrame vazio retorna vazio."""
+        df = pl.DataFrame(
+            {
+                col: pl.Series([], dtype=t)
+                for col, t in SILVER_SCHEMAS[DomainType.BLOCOS.value].items()
+            }
+        )
+        result = transformer.transform(df)
+        assert result.is_empty()
+
+    def test_transform_minimal_columns(self, transformer):
+        """Campos mínimos são tipados e selecionados corretamente."""
+        raw = pl.DataFrame(
+            {
+                "id": ["1", "2"],
+                "idLegislatura": ["57", "57"],
+                "nome": ["Bloco A", "Bloco B"],
+                "uri": [
+                    "https://dadosabertos.camara.leg.br/api/v2/blocos/1",
+                    "https://dadosabertos.camara.leg.br/api/v2/blocos/2",
+                ],
+                "federacao": [True, False],
+            }
+        )
+        result = transformer.transform(raw)
+        assert result.height == 2
+        assert result.schema["id"] == pl.Int64
+        assert result.schema["federacao"] == pl.Boolean
+
+    def test_transform_adds_missing_columns(self, transformer):
+        """Coluna 'federacao' ausente no input é adicionada como null."""
+        raw = pl.DataFrame(
+            {
+                "id": ["1"],
+                "idLegislatura": ["57"],
+                "nome": ["Bloco A"],
+                "uri": ["http://u"],
+            }
+        )
+        result = transformer.transform(raw)
+        assert result.height == 1
+        assert "federacao" in result.columns
+        assert result["federacao"].is_null().all()
+
+
+class TestCamaraFrentesTransformer:
+    """Transformer para frentes parlamentares."""
+
+    @pytest.fixture
+    def transformer(self):
+        return CamaraFrentesTransformer()
+
+    def test_transform_empty_df(self, transformer):
+        """DataFrame vazio retorna vazio."""
+        df = pl.DataFrame(
+            {
+                col: pl.Series([], dtype=t)
+                for col, t in SILVER_SCHEMAS[DomainType.FRENTES.value].items()
+            }
+        )
+        result = transformer.transform(df)
+        assert result.is_empty()
+
+    def test_transform_minimal_columns(self, transformer):
+        """Campos mínimos são tipados e selecionados corretamente."""
+        raw = pl.DataFrame(
+            {
+                "id": ["10"],
+                "idLegislatura": ["57"],
+                "titulo": ["Frente Parlamentar X"],
+                "uri": ["https://dadosabertos.camara.leg.br/api/v2/frentes/10"],
+            }
+        )
+        result = transformer.transform(raw)
+        assert result.height == 1
+        assert result.schema["id"] == pl.Int64
+        assert result.schema["titulo"] == pl.String
+
+
+class TestCamaraGruposTransformer:
+    """Transformer para grupos parlamentares."""
+
+    @pytest.fixture
+    def transformer(self):
+        return CamaraGruposTransformer()
+
+    def test_transform_empty_df(self, transformer):
+        """DataFrame vazio retorna vazio."""
+        df = pl.DataFrame(
+            {
+                col: pl.Series([], dtype=t)
+                for col, t in SILVER_SCHEMAS[DomainType.GRUPOS.value].items()
+            }
+        )
+        result = transformer.transform(df)
+        assert result.is_empty()
+
+    def test_transform_minimal_columns(self, transformer):
+        """Campos mínimos com ultimoStatus Struct são serializados."""
+        raw = pl.DataFrame(
+            {
+                "id": ["1"],
+                "nome": ["Grupo A"],
+                "uri": ["http://u"],
+                "anoCriacao": ["2023"],
+                "ativo": ["Sim"],
+                "ultimoStatus": [{"codSituacao": 1, "descricaoSituacao": "Ativo"}],
+            }
+        )
+        result = transformer.transform(raw)
+        assert result.height == 1
+        assert result.schema["ultimoStatus"] == pl.String
+        assert '"descricaoSituacao"' in result["ultimoStatus"][0]
+
+    def test_transform_ultimo_status_absent(self, transformer):
+        """Coluna ultimoStatus ausente não quebra."""
+        raw = pl.DataFrame(
+            {
+                "id": ["1"],
+                "nome": ["Grupo A"],
+                "uri": ["http://u"],
+                "anoCriacao": ["2023"],
+                "ativo": ["Sim"],
+            }
+        )
+        result = transformer.transform(raw)
+        assert result.height == 1
+        assert result["ultimoStatus"].is_null().all()
+
+
+class TestCamaraLegislaturasTransformer:
+    """Transformer para legislaturas."""
+
+    @pytest.fixture
+    def transformer(self):
+        return CamaraLegislaturasTransformer()
+
+    def test_transform_empty_df(self, transformer):
+        """DataFrame vazio retorna vazio."""
+        df = pl.DataFrame(
+            {
+                col: pl.Series([], dtype=t)
+                for col, t in SILVER_SCHEMAS[DomainType.LEGISLATURAS.value].items()
+            }
+        )
+        result = transformer.transform(df)
+        assert result.is_empty()
+
+    def test_transform_minimal_columns(self, transformer):
+        """Campos mínimos são tipados e datas truncadas para 10 chars."""
+        raw = pl.DataFrame(
+            {
+                "id": ["57"],
+                "uri": ["http://u"],
+                "dataInicio": ["2023-02-01T00:00:00Z"],
+                "dataFim": ["2027-01-31T23:59:59Z"],
+            }
+        )
+        result = transformer.transform(raw)
+        assert result.height == 1
+        assert result.schema["id"] == pl.Int64
+        assert result["dataInicio"][0] == "2023-02-01"
+        assert result["dataFim"][0] == "2027-01-31"
