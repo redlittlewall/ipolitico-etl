@@ -8,7 +8,16 @@
     "/deputados": {
       "get": {
         "summary": "Lista de deputados",
-        "tags": ["Deputados"]
+        "tags": ["Deputados"],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Deputado" }
+              }
+            }
+          }
+        }
       }
     },
     "/deputados/{id}": {
@@ -26,7 +35,19 @@
     "/blocos": {
       "get": {
         "summary": "Lista de blocos",
-        "tags": ["Blocos"]
+        "tags": ["Blocos"],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Bloco" }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/recurso_novo": {
@@ -45,6 +66,25 @@
       "get": {
         "summary": "Lista de UF",
         "tags": ["Referências"]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Deputado": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "nome": { "type": "string" },
+          "siglaPartido": { "type": "string" }
+        }
+      },
+      "Bloco": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "nome": { "type": "string" }
+        }
       }
     }
   }

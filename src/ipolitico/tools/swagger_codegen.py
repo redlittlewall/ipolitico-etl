@@ -76,6 +76,33 @@ class RouteInfo:
     already_mapped: bool = False
 
 
+@dataclass
+class AuditEntry:
+    """Entrada do relatório de cobertura --audit.
+
+    Attributes:
+        path: Caminho da rota Swagger.
+        http_method: Método HTTP.
+        summary: Descrição da rota.
+        path_type: Tipo classificado da rota.
+        domain: Nome do domínio candidato (primeiro candidato).
+        covered: True se o domínio já está mapeado.
+        extractor: Caminho do extrator (se covered).
+        transformer: Caminho do transformer (se covered).
+        swagger_fields: Nomes das propriedades no schema Swagger.
+    """
+
+    path: str
+    http_method: str
+    summary: Optional[str]
+    path_type: str
+    domain: Optional[str]
+    covered: bool
+    extractor: Optional[str] = None
+    transformer: Optional[str] = None
+    swagger_fields: list[str] = field(default_factory=list)
+
+
 def _to_snake_case(name: str) -> str:
     """
     Converte camelCase ou CamelCase para snake_case.
@@ -347,6 +374,130 @@ def _try_add_route(
         )
 
 
+def _resolve_swagger_fields(
+    swagger: dict,
+    path: str,
+    http_method: str,
+) -> list[str]:
+    """
+    Extrai nomes de propriedades do schema de resposta da rota.
+
+    Resolve referencias ``$ref`` em ``components/schemas`` quando possivel.
+    Lida com schemas diretos e com ``items.$ref`` (arrays tipados).
+
+    Args:
+        swagger: Dict do Swagger (parsed JSON).
+        path: Caminho da rota (ex: '/deputados').
+        http_method: Metodo HTTP (ex: 'GET').
+
+    Returns:
+        Lista de nomes de campos, ou [] se nao for possivel extrair.
+    """
+    try:
+        method = swagger["paths"][path][http_method.lower()]
+        resp = method["responses"]["200"]["content"]["application/json"]["schema"]
+    except (KeyError, TypeError):
+        return []
+
+    def _resolve(ref: str) -> dict:
+        """Resolve $ref no formato #/components/schemas/Nome."""
+        parts = ref.lstrip("#/").split("/")
+        schema_dict = swagger
+        for part in parts:
+            schema_dict = schema_dict.get(part, {})
+        return schema_dict
+
+    schema = resp
+    if "$ref" in resp:
+        schema = _resolve(resp["$ref"])
+    elif "items" in resp and "$ref" in resp.get("items", {}):
+        schema = _resolve(resp["items"]["$ref"])
+    elif "items" in resp and "properties" in resp.get("items", {}):
+        schema = resp["items"]
+
+    return list(schema.get("properties", {}).keys())
+
+
+def audit_coverage(
+    swagger: dict,
+    existing_domains: set[str],
+    provider: str = "camara",
+) -> list[AuditEntry]:
+    """
+    Gera relatorio de cobertura: para cada rota Swagger, mostra status.
+
+    Para cada rota, determina o dominio candidato, se ja esta mapeado,
+    e extrai os campos do schema de resposta do Swagger.
+
+    Args:
+        swagger: Dict do Swagger (parsed JSON).
+        existing_domains: Conjunto de dominios ja implementados.
+        provider: Nome do provider para templates de extrator/transformer.
+
+    Returns:
+        Lista de AuditEntry, uma por rota.
+    """
+    tpl = PROVIDER_TEMPLATES.get(provider, PROVIDER_TEMPLATES["camara"])
+    entries: list[AuditEntry] = []
+    paths = swagger.get("paths", {})
+
+    for route_path, methods in paths.items():
+        for http_method, details in methods.items():
+            segments = [s for s in route_path.split("/") if s]
+            path_type, candidates = _classify_segments(segments)
+            domain = candidates[0] if candidates else None
+            covered = domain in existing_domains if domain else False
+
+            extractor: Optional[str] = None
+            transformer: Optional[str] = None
+            if covered and domain:
+                class_name = _to_class_name(domain)
+                extractor = tpl.extractor_tpl.format(domain=domain, class_name=class_name)
+                transformer = tpl.transformer_tpl.format(domain=domain, class_name=class_name)
+
+            fields = _resolve_swagger_fields(swagger, route_path, http_method)
+
+            entries.append(
+                AuditEntry(
+                    path=route_path,
+                    http_method=http_method.upper(),
+                    summary=details.get("summary"),
+                    path_type=path_type.value if isinstance(path_type, PathType) else path_type,
+                    domain=domain,
+                    covered=covered,
+                    extractor=extractor,
+                    transformer=transformer,
+                    swagger_fields=fields,
+                )
+            )
+
+    return entries
+
+
+def format_audit_report(entries: list[AuditEntry]) -> str:
+    """
+    Formata relatorio tabular de cobertura das rotas Swagger.
+
+    Args:
+        entries: Lista de AuditEntry do audit_coverage().
+
+    Returns:
+        String formatada como tabela.
+    """
+    lines = [
+        f"{'Rota':<45} {'Tipo':<10} {'Dominio':<25} {'Coberto':<10} {'Campos'}",
+        "-" * 120,
+    ]
+    for e in entries:
+        domain_str = e.domain or "-"
+        covered_str = "SIM" if e.covered else "NAO"
+        fields_str = ", ".join(e.swagger_fields) if e.swagger_fields else "-"
+        lines.append(
+            f"{e.path:<45} {e.path_type:<10} {domain_str:<25} {covered_str:<10} {fields_str}"
+        )
+    return "\n".join(lines)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """
     Constroi o parser de argumentos da CLI.
@@ -356,8 +507,8 @@ def build_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         description=(
-            "Gera stubs de codigo para rotas Swagger nao implementadas "
-            "de um provider (Camara, Senado, etc.)."
+            "Gera stubs de codigo e relatorios de cobertura para "
+            "rotas Swagger de um provider (Camara, Senado, etc.)."
         ),
     )
     parser.add_argument(
@@ -370,6 +521,11 @@ def build_parser() -> argparse.ArgumentParser:
         default="camara",
         choices=list(PROVIDER_TEMPLATES.keys()),
         help="Provider da API (default: camara)",
+    )
+    parser.add_argument(
+        "--audit",
+        action="store_true",
+        help="Gera relatorio de cobertura em vez de stubs de codigo",
     )
     return parser
 
@@ -387,6 +543,11 @@ def main() -> None:
     from ipolitico.core.constants import DomainType
 
     existing = {v.value for v in DomainType}
+
+    if args.audit:
+        entries = audit_coverage(swagger, existing, provider=args.provider)
+        print(format_audit_report(entries))
+        return
 
     routes = find_unmapped_routes(swagger, existing)
     print(format_report(routes, provider=args.provider), end="")

@@ -10,10 +10,13 @@ from pathlib import Path
 
 import pytest
 from ipolitico.tools.swagger_codegen import (
+    AuditEntry,
     PathType,
     RouteInfo,
+    audit_coverage,
     build_parser,
     find_unmapped_routes,
+    format_audit_report,
     format_report,
     generate_domain_spec_stub,
     generate_silver_schema_stub,
@@ -283,3 +286,89 @@ class TestFindUnmappedRoutes:
         assert r.path_type == PathType.LIST
         assert "recurso_novo" in r.candidate_domains
         assert r.already_mapped is False
+
+
+# ── Cycle NEW: --audit coverage report ──────────────────────────────────
+
+
+class TestAuditCoverage:
+    """audit_coverage() scanning and reporting."""
+
+    def test_build_parser_has_audit_flag(self):
+        """CLI parser tem --audit flag (store_true)."""
+        parser = build_parser()
+        actions = {a.dest: a for a in parser._actions}
+        assert "audit" in actions
+        assert actions["audit"].default is False
+        assert actions["audit"].const is True
+
+    def test_audit_coverage_empty_swagger_returns_empty(self):
+        """Swagger sem paths retorna lista vazia."""
+        entries = audit_coverage({"paths": {}}, set())
+        assert entries == []
+
+    def test_audit_coverage_mapped_route(self, minimal_swagger):
+        """Rota mapeada tem covered=True e domain preenchido."""
+        existing = {"deputados", "deputados_detalhe", "deputados_eventos", "blocos", "referencias"}
+        entries = audit_coverage(minimal_swagger, existing)
+        deputados = [e for e in entries if e.path == "/deputados"]
+        assert len(deputados) == 1
+        assert deputados[0].covered is True
+        assert deputados[0].domain == "deputados"
+
+    def test_audit_coverage_unmapped_route(self, minimal_swagger):
+        """Rota nao mapeada tem covered=False."""
+        existing = {"deputados", "deputados_detalhe", "blocos", "referencias"}
+        entries = audit_coverage(minimal_swagger, existing)
+        unmapped = [e for e in entries if not e.covered]
+        assert any(e.path == "/recurso_novo" for e in unmapped)
+        rec = [e for e in unmapped if e.path == "/recurso_novo"][0]
+        assert rec.domain == "recurso_novo"
+
+    def test_audit_coverage_includes_all_routes(self, minimal_swagger):
+        """Todos os 7 paths do fixture aparecem no audit."""
+        existing = {"deputados", "deputados_detalhe", "deputados_eventos", "blocos", "referencias"}
+        entries = audit_coverage(minimal_swagger, existing)
+        assert len(entries) == 7
+
+    def test_format_audit_report_has_table_structure(self):
+        """Relatorio tabular tem cabecalho, separador, e linhas."""
+        entries = [
+            AuditEntry(
+                path="/deputados",
+                http_method="GET",
+                summary="Lista de deputados",
+                path_type="list",
+                domain="deputados",
+                covered=True,
+                extractor="ipolitico.extractors.camara.api.deputados.DeputadosExtractor",
+                transformer="ipolitico.transformers.camara.deputados_transformer.CamaraDeputadosTransformer",
+                swagger_fields=["id", "nome", "siglaPartido"],
+            ),
+            AuditEntry(
+                path="/recurso_novo",
+                http_method="GET",
+                summary="Novo recurso",
+                path_type="list",
+                domain="recurso_novo",
+                covered=False,
+                extractor=None,
+                transformer=None,
+                swagger_fields=[],
+            ),
+        ]
+        report = format_audit_report(entries)
+        assert "Rota" in report
+        assert "Dominio" in report or "Dominio" in report
+        assert "Coberto" in report or "Status" in report
+        assert "/deputados" in report
+        assert "/recurso_novo" in report
+
+    def test_audit_coverage_extracts_swagger_fields(self, minimal_swagger):
+        """Rota com response schema no Swagger tem swagger_fields populado."""
+        existing = {"deputados", "deputados_detalhe", "deputados_eventos", "blocos", "referencias"}
+        entries = audit_coverage(minimal_swagger, existing)
+        blocos = [e for e in entries if e.path == "/blocos"]
+        assert len(blocos) == 1
+        assert "id" in blocos[0].swagger_fields
+        assert "nome" in blocos[0].swagger_fields
