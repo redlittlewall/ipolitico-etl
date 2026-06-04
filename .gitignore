@@ -32,4 +32,21 @@ datalake/
 *.db-journal
 *.parquet
 *.csv
-*.zipdata_backup_*/
+*.zip
+
+# Backups
+data_backup_*/
+
+# Claude Code — pessoal do desenvolvedor
+.claude/projects/
+.claude/worktrees/
+
+# Claude Code — skills pessoais (cada dev tem as suas)
+.claude/skills/diagnose/
+.claude/skills/grill-me/
+.claude/skills/grill-with-docs/
+.claude/skills/in-progress/
+.claude/skills/setup-matt-pocock-skills/
+.claude/skills/tdd/
+.claude/skills/to-issues/
+.claude/skills/to-prd/
