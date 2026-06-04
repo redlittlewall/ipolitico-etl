@@ -110,6 +110,89 @@ def _print_domain_tree() -> None:
     print()
 
 
+def _print_audit_coverage() -> None:
+    """
+    Audita a cobertura dos dados no datalake (Silver e Gold).
+
+    Para cada domínio conhecido, conta registros nas camadas Silver e Gold
+    e exibe um status: OK, SILVER APENAS, SEM DADOS ou NUNCA EXTRAÍDO.
+    Domínios bulk-only são identificados com marcador (B).
+    """
+    import duckdb
+
+    from ipolitico.extractors.camara.bulk.registry import BULK_REGISTRY
+
+    DATALAKE = Path("data/datalake")
+    conn = duckdb.connect()
+
+    bulk_only: set[DomainType] = {
+        DomainType(k) for k, v in BULK_REGISTRY.items() if v.get("bulk_only")
+    }
+
+    # Ordena pela pipeline canônica; domínios fora da lista vão ao final
+    pipeline_order = {d: i for i, d in enumerate(FULL_CAMARA_PIPELINE)}
+
+    sorted_domains = sorted(DomainType, key=lambda d: pipeline_order.get(d, 9999))
+
+    header = f"{'DOMÍNIO':<36} {'SILVER':>8} {'GOLD':>8}  STATUS"
+    print("=" * len(header))
+    print(header)
+    print("=" * len(header))
+
+    for domain in sorted_domains:
+        name = domain.value
+        tag = " (B)" if domain in bulk_only else ""
+        display_name = name + tag
+
+        silver_dir = DATALAKE / "silver" / name
+        gold_dir = DATALAKE / "gold" / name
+        gold_file = gold_dir / f"{name}.parquet"
+
+        silver_count = 0
+        gold_count = 0
+
+        # Conta Silver (multi-file parquet)
+        if silver_dir.is_dir() and list(silver_dir.glob("*.parquet")):
+            try:
+                silver_count = conn.execute(
+                    f"SELECT COUNT(*) FROM read_parquet('{silver_dir}/*.parquet')"
+                ).fetchone()[0]
+            except Exception:
+                silver_count = -1  # erro de leitura
+
+        # Conta Gold (parquet consolidado)
+        if gold_file.exists():
+            try:
+                gold_count = conn.execute(
+                    f"SELECT COUNT(*) FROM read_parquet('{gold_file}')"
+                ).fetchone()[0]
+            except Exception:
+                gold_count = -1
+
+        # Determina status
+        if gold_count > 0 and silver_count > 0:
+            status = "OK"
+        elif gold_count > 0 and silver_count == 0:
+            status = "OK (gold only)"
+        elif gold_count == 0 and silver_count > 0:
+            status = "SILVER APENAS"
+        elif silver_count == 0 and gold_dir.is_dir():
+            status = "DADOS VAZIOS"
+        elif silver_dir.is_dir() and not gold_dir.is_dir():
+            status = "SILVER APENAS"
+        elif silver_count == -1 or gold_count == -1:
+            status = "ERRO LEITURA"
+        else:
+            status = "NUNCA EXTRAÍDO"
+
+        silver_str = f"{silver_count:,}".replace(",", ".") if silver_count >= 0 else "ERR"
+        gold_str = f"{gold_count:,}".replace(",", ".") if gold_count >= 0 else "ERR"
+
+        print(f"{display_name:<36} {silver_str:>8} {gold_str:>8}  {status}")
+
+    conn.close()
+
+
 async def main():
     """
     Ponto de Entrada (CLI).
@@ -124,6 +207,11 @@ async def main():
         "--list-domains",
         action="store_true",
         help="Lista todos os domínios disponíveis com descrição e hierarquia.",
+    )
+    parser.add_argument(
+        "--audit-coverage",
+        action="store_true",
+        help="Audita cobertura dos dados: registros em Silver e Gold por domínio.",
     )
     parser.add_argument(
         "--optimize",
@@ -158,6 +246,10 @@ async def main():
 
     if args.list_domains:
         _print_domain_tree()
+        return
+
+    if args.audit_coverage:
+        _print_audit_coverage()
         return
 
     if args.domains is None:
