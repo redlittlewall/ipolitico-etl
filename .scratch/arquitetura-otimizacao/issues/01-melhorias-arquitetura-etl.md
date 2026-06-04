@@ -68,22 +68,31 @@ detail). O if-elif vira `registry[domain_type].build(...)`.
 
 ---
 
-### 4. [Vale Explorar] Bulk Extractors — Classes Rasas
+### 4. [Vale Explorar] Bulk Extractors — Classes Rasas ✅ CONCLUÍDO
 
 **Problema**: 5 subclasses de `BaseBulkExtractor` com 5-10 linhas cada,
 só definindo `domain_name`. Módulos rasos — interface ≈ implementação.
 
-**Solução**: Passar `domain_name` como parâmetro do construtor (vindo do
-YAML). Eliminar as 5 subclasses. `PipelineBuilder` instancia
-`BaseBulkExtractor` diretamente.
+**Solução**: `BaseBulkExtractor.__init__` agora aceita `domain_name` como
+parâmetro do construtor. As 5 subclasses foram deletadas. `PipelineBuilder`
+injeta `domain_name` dinamicamente via `domain.value` do `PipelineManager`.
+`CamaraExtractorFactory` instancia `BaseBulkExtractor` diretamente com
+`domain_name=key`.
 
-**Arquivos**:
+**Arquivos modificados**:
+- `extractors/camara/bulk/base_bulk.py` — `__init__` aceita `domain_name`
+- `extractors/camara/bulk/factory.py` — usa `BaseBulkExtractor` direto
+- `pipeline/builder.py` — `build()` aceita `domain_name` kwarg
+- `pipeline/manager.py` — passa `domain.value` na build
+- `configs/camara_pipeline.yaml` — todos `extractor_bulk` → `BaseBulkExtractor`
+
+**Arquivos deletados**:
 - `extractors/camara/bulk/deputados_bulk.py`
 - `extractors/camara/bulk/despesas_bulk.py`
 - `extractors/camara/bulk/proposicoes_bulk.py`
 - `extractors/camara/bulk/votacoes_bulk.py`
-- `pipeline/builder.py`
-- `configs/camara_pipeline.yaml`
+
+**Resultado**: 124/124 testes passando.
 
 ---
 

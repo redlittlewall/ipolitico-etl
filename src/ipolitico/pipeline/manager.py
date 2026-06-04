@@ -108,6 +108,7 @@ class PipelineManager:
             domain_config=domain_cfg,
             sink_type=sink_type,
             source_type=extraction_plan.source_type,
+            domain_name=domain.value,
         )
 
         jobs, extract_kwargs_mapper = self._job_planner.build(

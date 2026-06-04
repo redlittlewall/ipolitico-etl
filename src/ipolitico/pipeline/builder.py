@@ -69,6 +69,7 @@ class PipelineBuilder:
         domain_config: Dict[str, Any],
         sink_type: SinkType,
         source_type: SourceType = SourceType.API,
+        domain_name: str | None = None,
     ) -> PipelineComponents:
         """
         Instancia Extractor, Transformer e Sink, injetando suas dependências.
@@ -77,6 +78,8 @@ class PipelineBuilder:
             domain_config (Dict[str, str]): Dicionário com os paths mapeados do YAML.
                 Ex: {"extractor": "path.to.Ext", "transformer": "path.to.Trans"}
             sink_type (SinkType): O destino escolhido pelo usuário (SQLite ou DataLake).
+            source_type (SourceType): Fonte de extração (API ou Bulk).
+            domain_name (str, optional): Nome do domínio para extratores Bulk.
 
         Returns:
             PipelineComponents: Objeto contendo as três instâncias acopladas e prontas.
@@ -89,7 +92,11 @@ class PipelineBuilder:
             else "extractor"
         )
         extractor_class = self._import_class(domain_config[extractor_path_key])
-        extractor_instance = extractor_class(client=self.client)
+
+        extractor_kwargs: dict[str, Any] = {"client": self.client}
+        if domain_name and source_type == SourceType.BULK:
+            extractor_kwargs["domain_name"] = domain_name
+        extractor_instance = extractor_class(**extractor_kwargs)
 
         # Instancia o Transformer (Puro, sem dependências de I/O)
         transformer_class = self._import_class(domain_config["transformer"])

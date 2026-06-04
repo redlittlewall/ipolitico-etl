@@ -24,16 +24,17 @@ class BaseBulkExtractor(BaseExtractor):
     memória, sem aplicar padronizações de regras de negócio ou realizar persistência.
     """
 
-    domain_name = ""  # Deve ser sobrescrito nas classes filhas (ex: "despesas")
-
-    def __init__(self, client: CamaraClient):
+    def __init__(self, client: CamaraClient, domain_name: str = ""):
         """
-        Inicializa o extrator com seu cliente HTTP.
+        Inicializa o extrator com seu cliente HTTP e nome de domínio.
 
         Args:
             client (CamaraClient): Cliente HTTP configurado para requisições e retries.
+            domain_name (str): Nome do domínio para lookup no BULK_REGISTRY.
+                Ex: "deputados", "despesas", "proposicoes", "votacoes", "votos".
         """
         self.client = client
+        self.domain_name = domain_name
 
     def _build_url(self, year: Optional[int] = None) -> str:
         """
@@ -67,7 +68,7 @@ class BaseBulkExtractor(BaseExtractor):
                           Retorna um DataFrame vazio em caso de falha ou arquivo inexistente.
         """
         if not self.domain_name:
-            raise NotImplementedError("domain_name deve ser definido na classe filha.")
+            raise NotImplementedError("domain_name deve ser fornecido no construtor.")
 
         url = self._build_url(year)
 

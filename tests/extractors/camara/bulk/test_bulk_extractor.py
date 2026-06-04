@@ -9,35 +9,6 @@ import pytest
 from ipolitico.extractors.camara.bulk.base_bulk import BaseBulkExtractor
 
 
-class UnmappedBulk(BaseBulkExtractor):
-    domain_name = "dominio_fantasma"
-
-
-class MissingYearBulk(BaseBulkExtractor):
-    domain_name = "despesas"
-
-
-class EmptyDomainBulk(BaseBulkExtractor):
-    domain_name = ""
-
-
-class ValidZipBulk(BaseBulkExtractor):
-    domain_name = "despesas"
-
-
-class ValidCsvBulk(BaseBulkExtractor):
-    domain_name = "deputados"
-
-
-class DummyBulkExtractor(BaseBulkExtractor):
-    """Domínio não registrado; URL fixa termina em .zip para exercitar o ramo ZIP."""
-
-    domain_name = "dummy"
-
-    def _build_url(self, year=None):
-        return "http://dadosabertos.camara.leg.br/arquivos/dummy/csv/dummy.csv.zip"
-
-
 @pytest.fixture
 def mock_client():
     client = AsyncMock()
@@ -46,6 +17,17 @@ def mock_client():
 
 
 @pytest.mark.asyncio
+@patch(
+    "ipolitico.extractors.camara.bulk.base_bulk.BULK_REGISTRY",
+    new={
+        "dummy": {
+            "requires_year": False,
+            "url": "http://dadosabertos.camara.leg.br/arquivos/dummy/csv/dummy.csv.zip",
+            "bulk_granularity": "snapshot",
+            "bulk_filter_date_column": None,
+        },
+    },
+)
 @patch("ipolitico.extractors.camara.bulk.base_bulk.pl.read_csv")
 @patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.ZipFile")
 @patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.is_zipfile")
@@ -66,7 +48,7 @@ async def test_base_bulk_extraction_flow_zip(
     )
     mock_read_csv.return_value = df_sujo
 
-    ext = DummyBulkExtractor(mock_client)
+    ext = BaseBulkExtractor(mock_client, domain_name="dummy")
     result = await ext.extract()
 
     mock_client.download_file.assert_called_once()
@@ -77,21 +59,21 @@ async def test_base_bulk_extraction_flow_zip(
 
 
 def test_base_bulk_build_url_unmapped():
-    ext = UnmappedBulk(None)
+    ext = BaseBulkExtractor(None, domain_name="dominio_fantasma")
     with pytest.raises(ValueError, match="não mapeado no registry"):
         ext._build_url()
 
 
 def test_base_bulk_build_url_missing_year():
-    ext = MissingYearBulk(None)
+    ext = BaseBulkExtractor(None, domain_name="despesas")
     with pytest.raises(ValueError, match="exige o parâmetro 'year'"):
         ext._build_url()
 
 
 @pytest.mark.asyncio
 async def test_base_bulk_extract_missing_domain():
-    ext = EmptyDomainBulk(None)
-    with pytest.raises(NotImplementedError, match="domain_name deve ser definido"):
+    ext = BaseBulkExtractor(None, domain_name="")
+    with pytest.raises(NotImplementedError, match="domain_name deve ser fornecido no construtor"):
         await ext.extract()
 
 
@@ -99,7 +81,7 @@ async def test_base_bulk_extract_missing_domain():
 async def test_base_bulk_extract_download_fails():
     client = AsyncMock()
     client.download_file.return_value = False
-    ext = ValidCsvBulk(client)
+    ext = BaseBulkExtractor(client, domain_name="deputados")
 
     result = await ext.extract()
 
@@ -116,7 +98,7 @@ async def test_base_bulk_extract_bad_zip_file():
         return True
 
     client.download_file.side_effect = fake_download
-    ext = ValidZipBulk(client)
+    ext = BaseBulkExtractor(client, domain_name="despesas")
 
     result = await ext.extract(year=2026)
 
@@ -130,7 +112,7 @@ async def test_base_bulk_extract_csv_parsing_exception(mock_read_csv):
     client.download_file.return_value = True
     mock_read_csv.side_effect = Exception("Erro catastrófico de disco simulado")
 
-    ext = ValidCsvBulk(client)
+    ext = BaseBulkExtractor(client, domain_name="deputados")
 
     result = await ext.extract()
 

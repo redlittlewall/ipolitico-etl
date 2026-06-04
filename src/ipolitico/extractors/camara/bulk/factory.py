@@ -26,13 +26,7 @@ class CamaraExtractorFactory:
         from ipolitico.extractors.camara.api.despesas import DespesasExtractor
         from ipolitico.extractors.camara.api.proposicoes import ProposicoesExtractor
         from ipolitico.extractors.camara.api.votacoes import VotacoesExtractor
-        from ipolitico.extractors.camara.bulk.deputados_bulk import DeputadosBulkExtractor
-        from ipolitico.extractors.camara.bulk.despesas_bulk import DespesasBulkExtractor
-        from ipolitico.extractors.camara.bulk.proposicoes_bulk import ProposicoesBulkExtractor
-        from ipolitico.extractors.camara.bulk.votacoes_bulk import (
-            VotacoesBulkExtractor,
-            VotosBulkExtractor,
-        )
+        from ipolitico.extractors.camara.bulk.base_bulk import BaseBulkExtractor
 
         cls._API = {
             DomainType.DEPUTADOS.value: DeputadosExtractor,
@@ -41,11 +35,11 @@ class CamaraExtractorFactory:
             DomainType.VOTACOES.value: VotacoesExtractor,
         }
         cls._BULK = {
-            DomainType.DEPUTADOS.value: DeputadosBulkExtractor,
-            DomainType.DESPESAS.value: DespesasBulkExtractor,
-            DomainType.PROPOSICOES.value: ProposicoesBulkExtractor,
-            DomainType.VOTACOES.value: VotacoesBulkExtractor,
-            DomainType.VOTOS.value: VotosBulkExtractor,
+            DomainType.DEPUTADOS.value: BaseBulkExtractor,
+            DomainType.DESPESAS.value: BaseBulkExtractor,
+            DomainType.PROPOSICOES.value: BaseBulkExtractor,
+            DomainType.VOTACOES.value: BaseBulkExtractor,
+            DomainType.VOTOS.value: BaseBulkExtractor,
         }
 
     @classmethod
@@ -80,6 +74,6 @@ class CamaraExtractorFactory:
             ext_cls = cls._BULK.get(key)
             if not ext_cls:
                 raise ValueError(f"Extrator não suportado para domínio {key!r}")
-            return ext_cls(client)
+            return ext_cls(client, domain_name=key)
 
         raise ValueError(f"Extrator não suportado para combinação {key}/{sval}")

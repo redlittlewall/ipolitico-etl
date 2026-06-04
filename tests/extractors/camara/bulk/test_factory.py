@@ -10,11 +10,8 @@ from ipolitico.extractors.camara.api.proposicoes import ProposicoesExtractor
 from ipolitico.extractors.camara.api.votacoes import VotacoesExtractor
 
 # Bulk Extractors
-from ipolitico.extractors.camara.bulk.deputados_bulk import DeputadosBulkExtractor
-from ipolitico.extractors.camara.bulk.despesas_bulk import DespesasBulkExtractor
+from ipolitico.extractors.camara.bulk.base_bulk import BaseBulkExtractor
 from ipolitico.extractors.camara.bulk.factory import CamaraExtractorFactory
-from ipolitico.extractors.camara.bulk.proposicoes_bulk import ProposicoesBulkExtractor
-from ipolitico.extractors.camara.bulk.votacoes_bulk import VotacoesBulkExtractor, VotosBulkExtractor
 
 
 def test_factory_api_routing():
@@ -60,26 +57,17 @@ def test_factory_bulk_routing():
     client = MagicMock()
 
     # Testa o mapeamento de todos os domínios Bulk
-    assert isinstance(
-        CamaraExtractorFactory.get_extractor(DomainType.DEPUTADOS, SourceType.BULK, client),
-        DeputadosBulkExtractor,
-    )
-    assert isinstance(
-        CamaraExtractorFactory.get_extractor(DomainType.DESPESAS, SourceType.BULK, client),
-        DespesasBulkExtractor,
-    )
-    assert isinstance(
-        CamaraExtractorFactory.get_extractor(DomainType.PROPOSICOES, SourceType.BULK, client),
-        ProposicoesBulkExtractor,
-    )
-    assert isinstance(
-        CamaraExtractorFactory.get_extractor(DomainType.VOTACOES, SourceType.BULK, client),
-        VotacoesBulkExtractor,
-    )
-    assert isinstance(
-        CamaraExtractorFactory.get_extractor(DomainType.VOTOS, SourceType.BULK, client),
-        VotosBulkExtractor,
-    )
+    for dom in [
+        DomainType.DEPUTADOS,
+        DomainType.DESPESAS,
+        DomainType.PROPOSICOES,
+        DomainType.VOTACOES,
+        DomainType.VOTOS,
+    ]:
+        assert isinstance(
+            CamaraExtractorFactory.get_extractor(dom, SourceType.BULK, client),
+            BaseBulkExtractor,
+        )
 
 
 def test_factory_unsupported_routing():
