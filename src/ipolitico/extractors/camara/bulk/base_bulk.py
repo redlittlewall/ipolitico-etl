@@ -58,7 +58,11 @@ class BaseBulkExtractor(BaseExtractor):
         if config["requires_year"] and not year:
             raise ValueError(f"O domínio {self.domain_name} exige o parâmetro 'year'.")
 
-        return config["url"].format(year=year) if config["requires_year"] else config["url"]
+        return (
+            config["url_template"].format(year=year)
+            if config["requires_year"]
+            else config["url_template"]
+        )
 
     async def extract(self, year: Optional[int] = None, **kwargs: Any) -> pl.DataFrame:
         """

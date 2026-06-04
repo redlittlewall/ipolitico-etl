@@ -4,7 +4,7 @@ URLs e metadados dos arquivos estáticos (dumps) da Câmara dos Deputados.
 Cada entrada mapeia um domínio Bulk e pode conter:
 
 - ``requires_year``: se o dump é particionado por ano.
-- ``url``: template de URL para download (pode conter ``{year}``).
+- ``url_template``: template de URL para download (pode conter ``{year}``).
 - ``bulk_granularity``: ``"snapshot"`` ou ``"year"``.
 - ``bulk_filter_date_column``: coluna usada para filtro temporal, ou ``None``.
 - ``schema_overrides``: dict de nome de coluna CSV → ``pl.*`` dtype para tipagem
@@ -21,7 +21,7 @@ import polars as pl
 BULK_REGISTRY: dict[str, dict] = {
     "deputados": {
         "requires_year": False,
-        "url": (
+        "url_template": (
             "https://dadosabertos.camara.leg.br/arquivos/deputados/cadastroDeputadosLegislaturaAtual/"
             "cadastro_Deputados_legislatura_inicial_-fim_-na_legislatura_atual.csv"
         ),
@@ -32,7 +32,7 @@ BULK_REGISTRY: dict[str, dict] = {
     "despesas": {
         "requires_year": True,
         # Padrão CEAP documentado: http://www.camara.leg.br/cotas/Ano-{ano}.csv.zip
-        "url": "http://www.camara.leg.br/cotas/Ano-{year}.csv.zip",
+        "url_template": "http://www.camara.leg.br/cotas/Ano-{year}.csv.zip",
         "bulk_granularity": "year",
         "bulk_filter_date_column": "dataDocumento",
         "schema_overrides": {
@@ -50,7 +50,7 @@ BULK_REGISTRY: dict[str, dict] = {
     },
     "proposicoes": {
         "requires_year": True,
-        "url": (
+        "url_template": (
             "https://dadosabertos.camara.leg.br/arquivos/proposicoes/csv/proposicoes{year}.csv.zip"
         ),
         "bulk_granularity": "year",
@@ -59,7 +59,7 @@ BULK_REGISTRY: dict[str, dict] = {
     },
     "votacoes": {
         "requires_year": True,
-        "url": (
+        "url_template": (
             "https://dadosabertos.camara.leg.br/arquivos/votacoes/csv/" "votacoes-{year}.csv.zip"
         ),
         "bulk_granularity": "year",
@@ -68,12 +68,129 @@ BULK_REGISTRY: dict[str, dict] = {
     },
     "votos": {
         "requires_year": True,
-        "url": (
+        "url_template": (
             "https://dadosabertos.camara.leg.br/arquivos/votacoesOrientacoes/"
             "csv/votacoesOrientacoes_{year}.csv.zip"
         ),
         "bulk_granularity": "year",
         "bulk_filter_date_column": None,
         "schema_overrides": {"idDeputado": pl.Int64},
+    },
+    # ── Expansão: domínios institucionais com dump Bulk ────────────────────────
+    "eventos": {
+        "requires_year": True,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/eventos/csv/eventos-{year}.csv"
+        ),
+        "bulk_granularity": "year",
+        "bulk_filter_date_column": "dataHoraInicio",
+        "schema_overrides": {},
+    },
+    "frentes": {
+        "requires_year": False,
+        "url_template": "https://dadosabertos.camara.leg.br/arquivos/frentes/csv/frentes.csv",
+        "bulk_granularity": "snapshot",
+        "bulk_filter_date_column": None,
+        "schema_overrides": {},
+    },
+    "grupos": {
+        "requires_year": False,
+        "url_template": "https://dadosabertos.camara.leg.br/arquivos/grupos/csv/grupos.csv",
+        "bulk_granularity": "snapshot",
+        "bulk_filter_date_column": None,
+        "schema_overrides": {},
+    },
+    "grupos_membros": {
+        "requires_year": False,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/gruposMembros/csv/gruposMembros.csv"
+        ),
+        "bulk_granularity": "snapshot",
+        "bulk_filter_date_column": None,
+        "schema_overrides": {},
+    },
+    "grupos_historico": {
+        "requires_year": False,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/gruposHistorico/csv/gruposHistorico.csv"
+        ),
+        "bulk_granularity": "snapshot",
+        "bulk_filter_date_column": None,
+        "schema_overrides": {},
+    },
+    "legislaturas": {
+        "requires_year": False,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/legislaturas/csv/legislaturas.csv"
+        ),
+        "bulk_granularity": "snapshot",
+        "bulk_filter_date_column": None,
+        "schema_overrides": {},
+    },
+    "legislaturas_mesa": {
+        "requires_year": False,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/legislaturasMesas/"
+            "csv/legislaturasMesas.csv"
+        ),
+        "bulk_granularity": "snapshot",
+        "bulk_filter_date_column": None,
+        "schema_overrides": {},
+    },
+    "orgaos": {
+        "requires_year": False,
+        "url_template": "https://dadosabertos.camara.leg.br/arquivos/orgaos/csv/orgaos.csv",
+        "bulk_granularity": "snapshot",
+        "bulk_filter_date_column": None,
+        "schema_overrides": {},
+    },
+    "deputados_orgaos": {
+        "requires_year": False,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/orgaosDeputados/" "csv/orgaosDeputados.csv"
+        ),
+        "bulk_granularity": "snapshot",
+        "bulk_filter_date_column": None,
+        "schema_overrides": {},
+    },
+    "deputados_frentes": {
+        "requires_year": False,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/frentesDeputados/"
+            "csv/frentesDeputados.csv"
+        ),
+        "bulk_granularity": "snapshot",
+        "bulk_filter_date_column": None,
+        "schema_overrides": {},
+    },
+    "ocupacoes": {
+        "requires_year": False,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/deputadosOcupacoes/"
+            "csv/deputadosOcupacoes.csv"
+        ),
+        "bulk_granularity": "snapshot",
+        "bulk_filter_date_column": None,
+        "schema_overrides": {},
+    },
+    "profissoes": {
+        "requires_year": False,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/deputadosProfissoes/"
+            "csv/deputadosProfissoes.csv"
+        ),
+        "bulk_granularity": "snapshot",
+        "bulk_filter_date_column": None,
+        "schema_overrides": {},
+    },
+    "orientacoes": {
+        "requires_year": True,
+        "url_template": (
+            "https://dadosabertos.camara.leg.br/arquivos/votacoesOrientacoes/"
+            "csv/votacoesOrientacoes_{year}.csv.zip"
+        ),
+        "bulk_granularity": "year",
+        "bulk_filter_date_column": "dataHoraVotacao",
+        "schema_overrides": {},
     },
 }

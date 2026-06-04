@@ -20,6 +20,12 @@ class CamaraExtractorFactory:
 
     @classmethod
     def _load_maps(cls) -> None:
+        """
+        Carrega lazy os mapas de extratores API e Bulk.
+
+        Executa uma única vez; chamadas subsequentes são no-op.
+        Popula ``cls._API`` e ``cls._BULK`` com classes concretas de extração.
+        """
         if cls._API:
             return
         from ipolitico.extractors.camara.api.deputados import DeputadosExtractor
@@ -40,6 +46,20 @@ class CamaraExtractorFactory:
             DomainType.PROPOSICOES.value: BaseBulkExtractor,
             DomainType.VOTACOES.value: BaseBulkExtractor,
             DomainType.VOTOS.value: BaseBulkExtractor,
+            # Expansão — domínios institucionais com dump Bulk
+            DomainType.EVENTOS.value: BaseBulkExtractor,
+            DomainType.FRENTES.value: BaseBulkExtractor,
+            DomainType.GRUPOS.value: BaseBulkExtractor,
+            DomainType.GRUPOS_MEMBROS.value: BaseBulkExtractor,
+            DomainType.GRUPOS_HISTORICO.value: BaseBulkExtractor,
+            DomainType.LEGISLATURAS.value: BaseBulkExtractor,
+            DomainType.LEGISLATURAS_MESA.value: BaseBulkExtractor,
+            DomainType.ORGAOS.value: BaseBulkExtractor,
+            DomainType.DEPUTADOS_ORGAOS.value: BaseBulkExtractor,
+            DomainType.DEPUTADOS_FRENTES.value: BaseBulkExtractor,
+            DomainType.OCUPACOES.value: BaseBulkExtractor,
+            DomainType.PROFISSÕES.value: BaseBulkExtractor,
+            DomainType.ORIENTACOES.value: BaseBulkExtractor,
         }
 
     @classmethod
@@ -50,6 +70,21 @@ class CamaraExtractorFactory:
         client: CamaraClient,
         state_store=None,
     ) -> BaseExtractor:
+        """
+        Retorna instância do extrator adequado para domínio + tipo de fonte.
+
+        Args:
+            domain: DomainType ou string do valor do enum.
+            source: SourceType (API ou Bulk).
+            client: Cliente HTTP compartilhado para requisições.
+            state_store: Opcional, repassado apenas para extratores API.
+
+        Returns:
+            Instância concreta de BaseExtractor.
+
+        Raises:
+            ValueError: Se o par de domínio/fonte não tiver extrator registrado.
+        """
         cls._load_maps()
         dval = getattr(domain, "value", domain)
         sval = getattr(source, "value", source)

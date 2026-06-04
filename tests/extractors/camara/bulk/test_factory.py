@@ -63,6 +63,20 @@ def test_factory_bulk_routing():
         DomainType.PROPOSICOES,
         DomainType.VOTACOES,
         DomainType.VOTOS,
+        # Expansão
+        DomainType.EVENTOS,
+        DomainType.FRENTES,
+        DomainType.GRUPOS,
+        DomainType.GRUPOS_MEMBROS,
+        DomainType.GRUPOS_HISTORICO,
+        DomainType.LEGISLATURAS,
+        DomainType.LEGISLATURAS_MESA,
+        DomainType.ORGAOS,
+        DomainType.DEPUTADOS_ORGAOS,
+        DomainType.DEPUTADOS_FRENTES,
+        DomainType.OCUPACOES,
+        DomainType.PROFISSÕES,
+        DomainType.ORIENTACOES,
     ]:
         assert isinstance(
             CamaraExtractorFactory.get_extractor(dom, SourceType.BULK, client),

@@ -5,7 +5,56 @@ Testes estruturais do BULK_REGISTRY e seus schema_overrides.
 import polars as pl
 from ipolitico.extractors.camara.bulk.registry import BULK_REGISTRY
 
-REQUIRED_SCHEMA_OVERRIDE_DOMAINS = {"deputados", "despesas", "proposicoes", "votacoes", "votos"}
+# 5 legados + 13 novos domínios institucionais = 18
+REQUIRED_SCHEMA_OVERRIDE_DOMAINS = {
+    "deputados",
+    "despesas",
+    "proposicoes",
+    "votacoes",
+    "votos",
+    # Expansão — domínios institucionais com dump Bulk
+    "eventos",
+    "frentes",
+    "grupos",
+    "grupos_membros",
+    "grupos_historico",
+    "legislaturas",
+    "legislaturas_mesa",
+    "orgaos",
+    "deputados_orgaos",
+    "deputados_frentes",
+    "ocupacoes",
+    "profissoes",
+    "orientacoes",
+}
+
+REQUIRED_KEYS = frozenset(
+    {
+        "requires_year",
+        "url_template",
+        "bulk_granularity",
+        "bulk_filter_date_column",
+        "schema_overrides",
+    }
+)
+
+SNAPSHOT_DOMAINS = frozenset(
+    {
+        "frentes",
+        "grupos",
+        "grupos_membros",
+        "grupos_historico",
+        "legislaturas",
+        "legislaturas_mesa",
+        "orgaos",
+        "deputados_orgaos",
+        "deputados_frentes",
+        "ocupacoes",
+        "profissoes",
+    }
+)
+
+YEARLY_DOMAINS = frozenset({"eventos", "orientacoes"})
 
 
 def test_all_bulk_domains_have_schema_overrides():
@@ -15,7 +64,8 @@ def test_all_bulk_domains_have_schema_overrides():
     sempre encontre o campo ao chamar ``config.get("schema_overrides")``.
     """
     registered = set(BULK_REGISTRY.keys())
-    assert REQUIRED_SCHEMA_OVERRIDE_DOMAINS.issubset(registered)
+    missing = REQUIRED_SCHEMA_OVERRIDE_DOMAINS - registered
+    assert not missing, f"Domínios faltando no BULK_REGISTRY: {missing}"
 
     for domain in REQUIRED_SCHEMA_OVERRIDE_DOMAINS:
         entry = BULK_REGISTRY[domain]
@@ -23,6 +73,80 @@ def test_all_bulk_domains_have_schema_overrides():
         assert isinstance(
             entry["schema_overrides"], dict
         ), f"{domain}.schema_overrides deve ser um dict"
+
+
+def test_all_bulk_domains_have_required_keys():
+    """
+    [COMPLETUDE] Todo domínio no BULK_REGISTRY deve ter todas as chaves
+    obrigatórias: requires_year, url_template, bulk_granularity,
+    bulk_filter_date_column e schema_overrides.
+    """
+    for domain in REQUIRED_SCHEMA_OVERRIDE_DOMAINS:
+        entry = BULK_REGISTRY[domain]
+        missing_keys = REQUIRED_KEYS - entry.keys()
+        assert not missing_keys, f"{domain} faltando chaves: {missing_keys}"
+
+
+def test_new_snapshot_domains_granularity():
+    """
+    [GRANULARIDADE] Domínios snapshot devem ter bulk_granularity='snapshot'
+    e requires_year=False.
+    """
+    for domain in SNAPSHOT_DOMAINS:
+        entry = BULK_REGISTRY[domain]
+        assert entry["bulk_granularity"] == "snapshot", f"{domain} deveria ser snapshot"
+        assert entry["requires_year"] is False, f"{domain} deveria ter requires_year=False"
+
+
+def test_new_yearly_domains_granularity():
+    """
+    [GRANULARIDADE] Domínios anuais devem ter bulk_granularity='year'
+    e requires_year=True.
+    """
+    for domain in YEARLY_DOMAINS:
+        entry = BULK_REGISTRY[domain]
+        assert entry["bulk_granularity"] == "year", f"{domain} deveria ser year"
+        assert entry["requires_year"] is True, f"{domain} deveria ter requires_year=True"
+
+
+def test_snapshot_domains_no_filter_date_column():
+    """
+    [FILTRO] Domínios snapshot não devem ter bulk_filter_date_column (é None)
+    pois não há data para filtrar.
+    """
+    for domain in SNAPSHOT_DOMAINS:
+        entry = BULK_REGISTRY[domain]
+        assert (
+            entry["bulk_filter_date_column"] is None
+        ), f"{domain} não deveria ter bulk_filter_date_column"
+
+
+def test_yearly_domains_have_filter_date_column():
+    """
+    [FILTRO] Domínios anuais com bulk_granularity='year' devem ter
+    bulk_filter_date_column definida.
+    """
+    for domain in YEARLY_DOMAINS:
+        entry = BULK_REGISTRY[domain]
+        assert (
+            entry["bulk_filter_date_column"] is not None
+        ), f"{domain} deveria ter bulk_filter_date_column"
+
+
+def test_eventos_filter_date_column():
+    """
+    [FILTRO EVENTOS] eventos usa dataHoraInicio como coluna de filtro temporal.
+    """
+    entry = BULK_REGISTRY["eventos"]
+    assert entry["bulk_filter_date_column"] == "dataHoraInicio"
+
+
+def test_orientacoes_filter_date_column():
+    """
+    [FILTRO ORIENTACOES] orientacoes não possui coluna de data no CSV.
+    """
+    entry = BULK_REGISTRY["orientacoes"]
+    assert entry["bulk_filter_date_column"] is not None
 
 
 def test_deputados_schema_overrides_types():

@@ -25,16 +25,20 @@ _BULK_YEARLY_DOMAINS = frozenset(
         DomainType.DESPESAS,
         DomainType.PROPOSICOES,
         DomainType.VOTACOES,
+        DomainType.EVENTOS,
+        DomainType.ORIENTACOES,
     }
 )
 
 
 class SourceRouter:
     """
-    Incremental sempre API (watermark + granularidade já calibradas no Planner).
+    Decide entre fonte API vs Bulk com base na estratégia e granularidade.
 
-    Full load em domínios com dump anual passa por Bulk quando a janela cobre mais de um
-    ano civil; caso contrário mantém API (evita ZIP gigante só para cortar dias).
+    **Snapshot** (dump único, sem partição anual): FULL_LOAD → Bulk; incremental → API.
+
+    **Yearly** (dump particionado por ano): FULL_LOAD multi-ano → Bulk; janela curta ou
+    incremental → API (evita ZIP gigante só para cortar dias).
     """
 
     @classmethod
@@ -45,9 +49,37 @@ class SourceRouter:
         effective_start_iso: str,
         effective_end_iso: str,
     ) -> ExtractionPlan:
+        """
+        Decide entre fonte API vs Bulk com base em domínio, estratégia e janela.
+
+        Args:
+            domain: Tipo de domínio (ex: DESPESAS, EVENTOS, FRENTES).
+            strategy: Estratégia de carga (FULL_LOAD vs INCREMENTAL).
+            effective_start_iso: Início da janela de extração (ISO 8601).
+            effective_end_iso: Fim da janela de extração (ISO 8601).
+
+        Returns:
+            ExtractionPlan com source_type e, se Bulk, coluna de filtro e janela.
+
+        Comportamento:
+            - Domínios snapshot em FULL_LOAD → Bulk; incremental → API.
+            - Domínios anuais com FULL_LOAD e janela multi-ano → Bulk.
+            - Domínios anuais com INCREMENTAL ou janela curta → API.
+        """
         spec = spec_for(domain)
         meta = bulk_meta_for_domain(domain)
         granularity = (spec.bulk_granularity if spec else None) or meta.get("bulk_granularity")
+
+        if granularity == "snapshot":
+            if strategy == LoadStrategy.FULL_LOAD:
+                col = meta.get("bulk_filter_date_column")
+                return ExtractionPlan(
+                    SourceType.BULK,
+                    bulk_temporal_column=col if isinstance(col, str) else None,
+                    bulk_eff_start_iso=effective_start_iso,
+                    bulk_eff_end_iso=effective_end_iso,
+                )
+            return ExtractionPlan(SourceType.API)
 
         if domain not in _BULK_YEARLY_DOMAINS or granularity != "year":
             return ExtractionPlan(SourceType.API)

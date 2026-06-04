@@ -22,7 +22,7 @@ def mock_client():
     new={
         "dummy": {
             "requires_year": False,
-            "url": "http://dadosabertos.camara.leg.br/arquivos/dummy/csv/dummy.csv.zip",
+            "url_template": "http://dadosabertos.camara.leg.br/arquivos/dummy/csv/dummy.csv.zip",
             "bulk_granularity": "snapshot",
             "bulk_filter_date_column": None,
         },
@@ -64,7 +64,7 @@ async def test_base_bulk_extraction_flow_zip(
     new={
         "dummy": {
             "requires_year": False,
-            "url": "http://dadosabertos.camara.leg.br/arquivos/dummy/csv/dummy.csv.zip",
+            "url_template": "http://dadosabertos.camara.leg.br/arquivos/dummy/csv/dummy.csv.zip",
             "bulk_granularity": "snapshot",
             "bulk_filter_date_column": None,
             "schema_overrides": {"id": pl.Int64, "ano": pl.Int32},
@@ -96,6 +96,48 @@ async def test_extract_passes_schema_overrides_to_read_csv(
     mock_read_csv.assert_called_once()
     _args, kwargs = mock_read_csv.call_args
     assert kwargs.get("schema_overrides") == {"id": pl.Int64, "ano": pl.Int32}
+
+
+@patch(
+    "ipolitico.extractors.camara.bulk.base_bulk.BULK_REGISTRY",
+    new={
+        "test_url_template": {
+            "requires_year": False,
+            "url_template": "https://dadosabertos.camara.leg.br/arquivos/teste/csv/teste.csv",
+            "bulk_granularity": "snapshot",
+            "bulk_filter_date_column": None,
+        },
+    },
+)
+def test_base_bulk_build_url_uses_url_template():
+    """
+    [URL TEMPLATE] Verifica que o _build_url() lê o campo ``url_template``
+    do BULK_REGISTRY (em substituição ao campo ``url``).
+    """
+    ext = BaseBulkExtractor(None, domain_name="test_url_template")
+    url = ext._build_url()
+    expected = "https://dadosabertos.camara.leg.br/arquivos/teste/csv/teste.csv"
+    assert url == expected
+
+
+@patch(
+    "ipolitico.extractors.camara.bulk.base_bulk.BULK_REGISTRY",
+    new={
+        "test_yearly": {
+            "requires_year": True,
+            "url_template": "https://example.com/data-{year}.csv",
+            "bulk_granularity": "year",
+            "bulk_filter_date_column": "data",
+        },
+    },
+)
+def test_base_bulk_build_url_year_template():
+    """
+    [URL TEMPLATE YEAR] Verifica que _build_url formata {year} no template.
+    """
+    ext = BaseBulkExtractor(None, domain_name="test_yearly")
+    url = ext._build_url(year=2026)
+    assert url == "https://example.com/data-2026.csv"
 
 
 def test_base_bulk_build_url_unmapped():
