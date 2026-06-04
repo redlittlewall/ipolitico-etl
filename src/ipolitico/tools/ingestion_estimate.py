@@ -63,7 +63,7 @@ class IngestionEstimate:
         ]
         for d in self.domain_estimates:
             lines.append(
-                f"  • {d.domain}: {d.http_requests:,} HTTP, " f"{d.bulk_downloads} bulk — {d.notes}"
+                f"  • {d.domain}: {d.http_requests:,} HTTP, {d.bulk_downloads} bulk — {d.notes}"
             )
         return lines
 

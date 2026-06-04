@@ -88,6 +88,26 @@ dados na camada Gold e cria uma tabela SQL para cada um. No formato SQLite,
 índices são criados nas colunas de chave primária de cada tabela para
 performance em consultas relacionais.
 
+## Utilitários de Descoberta e Auditoria
+
+### Listar domínios disponíveis
+
+Exibe a árvore hierárquica de todos os domínios com labels descritivos,
+organizados em seções (Entidades Principais, Referências, Carga Massiva).
+
+```bash
+python -m ipolitico.main --list-domains
+```
+
+### Auditar cobertura dos dados
+
+Varre as camadas Silver e Gold do Data Lake e exibe contagem de registros
+por domínio, com status (OK, SILVER APENAS, NUNCA EXTRAÍDO, etc.).
+
+```bash
+python -m ipolitico.main --audit-coverage
+```
+
 ## Ordem sugerida (smoke local)
 
 1. Instale dependências (`pip install -e .`).

@@ -18,7 +18,7 @@ def test_builder_default_sink_when_not_configured(builder: PipelineBuilder):
     domain_cfg = {
         "extractor": ("ipolitico.extractors.camara.api.deputados.DeputadosExtractor"),
         "transformer": (
-            "ipolitico.transformers.camara.deputados_transformer." "CamaraDeputadosTransformer"
+            "ipolitico.transformers.camara.deputados_transformer.CamaraDeputadosTransformer"
         ),
     }
     components = builder.build(domain_cfg, SinkType.DATALAKE)
@@ -30,7 +30,7 @@ def test_builder_custom_sink_still_works(builder: PipelineBuilder):
     domain_cfg = {
         "extractor": ("ipolitico.extractors.camara.api.deputados.DeputadosExtractor"),
         "transformer": (
-            "ipolitico.transformers.camara.deputados_transformer." "CamaraDeputadosTransformer"
+            "ipolitico.transformers.camara.deputados_transformer.CamaraDeputadosTransformer"
         ),
         "sinks": {
             "datalake": "ipolitico.sinks.datalake_sink.DataLakeSink",

@@ -18,7 +18,7 @@ def test_builder_fallback_extractor_bulk(builder: PipelineBuilder):
     domain_cfg = {
         "extractor": ("ipolitico.extractors.camara.api.deputados.DeputadosExtractor"),
         "transformer": (
-            "ipolitico.transformers.camara.deputados_transformer." "CamaraDeputadosTransformer"
+            "ipolitico.transformers.camara.deputados_transformer.CamaraDeputadosTransformer"
         ),
     }
     components = builder.build(domain_cfg, SinkType.DATALAKE, source_type=SourceType.BULK)
@@ -34,7 +34,7 @@ def test_builder_explicit_extractor_bulk_still_works(builder: PipelineBuilder):
         "extractor": ("ipolitico.extractors.camara.api.deputados.DeputadosExtractor"),
         "extractor_bulk": ("ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"),
         "transformer": (
-            "ipolitico.transformers.camara.deputados_transformer." "CamaraDeputadosTransformer"
+            "ipolitico.transformers.camara.deputados_transformer.CamaraDeputadosTransformer"
         ),
     }
     components = builder.build(domain_cfg, SinkType.DATALAKE, source_type=SourceType.BULK)

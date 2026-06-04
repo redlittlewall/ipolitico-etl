@@ -40,14 +40,14 @@ PROVIDER_TEMPLATES: dict[str, ProviderTemplate] = {
         name="camara",
         extractor_tpl="ipolitico.extractors.camara.api.{domain}.{class_name}Extractor",
         transformer_tpl=(
-            "ipolitico.transformers.camara.{domain}_transformer." "Camara{class_name}Transformer"
+            "ipolitico.transformers.camara.{domain}_transformer.Camara{class_name}Transformer"
         ),
     ),
     "senado": ProviderTemplate(
         name="senado",
         extractor_tpl="ipolitico.extractors.senado.{domain}.{class_name}Extractor",
         transformer_tpl=(
-            "ipolitico.transformers.senado.{domain}_transformer." "Senado{class_name}Transformer"
+            "ipolitico.transformers.senado.{domain}_transformer.Senado{class_name}Transformer"
         ),
         domain_type_class="SenadoDomainType",
         swagger_doc_ref="docs/senado_swagger.json",
@@ -307,7 +307,7 @@ def generate_yaml_block(route: RouteInfo, provider: str = "camara") -> str:
         [
             f"  {domain}:",
             f'    extractor: "{extractor}"',
-            f"    transformer: " f'"{transformer}"',
+            f'    transformer: "{transformer}"',
             "    sinks:",
             f'      datalake: "{tpl.sink_tpl}"',
         ]

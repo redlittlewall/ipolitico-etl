@@ -175,6 +175,7 @@ implementado pelo `DataLakeRepository`. Veja `storage/state_store.py`.
 | `CamaraJobPlanner` | Gera lista de jobs e mappers de kwargs |
 | `PipelineRunner` | Motor assíncrono Producer-Consumer com backpressure |
 | `DataLakeOptimizer` | Compacta Silver → Gold via DuckDB (ROW_NUMBER + PARTITION BY) |
+| `GoldExporter` | Exporta Gold consolidada para SQLite ou DuckDB via `--export-gold` |
 | `CamaraMetadataService` | Consultas à API para metadados (legislatura atual, datas) |
 | `DataLakeRepository` | Leituras out-of-core no lake (Polars Lazy / DuckDB) |
 
@@ -333,11 +334,38 @@ automaticamente via `expand_camara_domains_with_dependencies()`.
 
 ---
 
+## 7.3 Testes
+
+A suíte de testes usa **Pytest** com `pytest-asyncio` (modo `asyncio_mode = auto`).
+Todos os testes de extratores usam `respx` para mockar respostas HTTP sem rede.
+
+**Estrutura** (`tests/`):
+- `tests/core/` — Testes de constantes, schemas, client
+- `tests/extractors/camara/api/` — Testes de extratores (deputados, despesas,
+  proposicoes, orgaos, partidos, eventos, blocos, frentes, grupos, legislaturas)
+- `tests/extractors/camara/bulk/` — Testes de extratores bulk (CSV/ZIP)
+- `tests/transformers/` — Testes de transformers (DataFrame conhecido, sem I/O)
+- `tests/pipeline/` — Testes de orquestração (manager, runner, router, builder)
+- `tests/sinks/` — Testes de sinks
+- `tests/storage/` — Testes de state store e datalake repository
+- `tests/tools/` — Testes de ferramentas (estimador)
+
+**Novos testes nesta iteração (US6):**
+- `tests/extractors/camara/api/test_orgaos_partidos_eventos.py` — testes com
+  `@respx.mock` para blocos, frentes, grupos, legislaturas (cada um com
+  mock da API + assertion de `.height == 1`)
+- `tests/transformers/test_institutional_transformer.py` — testes para
+  blocos (coluna `federacao` Boolean), frentes (colunas mínimas), grupos
+  (`ultimoStatus` Struct → `json_encode`), legislaturas (`dataInicio`/`dataFim`
+  truncadas para 10 chars)
+
 ## 8. Configuração e CLI
 
 ### 8.1 YAML de Pipeline (`configs/camara_pipeline.yaml`)
 
-Mapeia cada domínio para suas classes:
+Mapeia cada domínio para suas classes. Domínios que participam de FULL_LOAD via Bulk
+precisam de `extractor_bulk` (tanto os com dump anual quanto os snapshot):
+
 ```yaml
 domain_configs:
   deputados:
@@ -346,18 +374,62 @@ domain_configs:
     transformer: "ipolitico.transformers.camara.deputados_transformer.CamaraDeputadosTransformer"
     sinks:
       datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
+  orgaos:
+    extractor: "ipolitico.extractors.camara.api.orgaos.OrgaosExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.orgaos_transformer.CamaraOrgaosTransformer"
+    sinks:
+      datalake: "ipolitico.sinks.datalake_sink.DataLakeSink"
 ```
 
 ### 8.2 CLI (`python -m ipolitico.main`)
 
 ```bash
+# Ingestão incremental (padrão)
 python -m ipolitico.main \
-  --strategy {full_load, incremental} \
+  --strategy full_load \
   --domains deputados despesas proposicoes \
   --start-date 2025-01-01 \
   --end-date 2025-12-31 \
   --optimize
+
+# Listar árvore hierárquica de domínios
+python -m ipolitico.main --list-domains
+
+# Auditar cobertura Silver vs Gold
+python -m ipolitico.main --audit-coverage
+
+# Exportar Gold para SQLite
+python -m ipolitico.main --export-gold sqlite
+
+# Exportar Gold para DuckDB
+python -m ipolitico.main --export-gold duckdb
 ```
+
+### 8.3 DOMAIN_LABELS
+
+O dicionário `DOMAIN_LABELS` em `core/constants.py` mapeia cada `DomainType` para
+um label descritivo em português, usado pelo `--list-domains` e `--audit-coverage`.
+Organizado em categorias (Entidades Principais, Referências, Carga Massiva).
+
+### 8.4 `--list-domains` (US1)
+
+Exibe a árvore hierárquica de todos os domínios com labels descritivos, seções
+agrupadas (Entidades Principais, Referências, Carga Massiva) e indentação com
+`├──`/`└──` para domínios filhos. Usa `DOMAIN_SPECS.depends_on` para determinar
+parentesco e `FULL_CAMARA_PIPELINE` para ordenação canônica.
+
+### 8.5 `--audit-coverage` (US4)
+
+Varre `data/datalake/silver/` e `data/datalake/gold/`, conta registros por
+domínio via DuckDB `read_parquet()`. Status possíveis: `OK`, `SILVER APENAS`,
+`NUNCA EXTRAÍDO`, `DADOS VAZIOS`, `ERRO LEITURA`. Domínios bulk-only marcados
+com `(B)`.
+
+### 8.6 `--export-gold` (US2)
+
+Exporta a camada Gold consolidada para banco SQL (SQLite ou DuckDB) após a
+ingestão. Útil para análises ad-hoc com SQL e integração com BI tools.
 
 ---
 

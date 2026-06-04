@@ -33,9 +33,9 @@ class DataLakeOptimizer:
             cols = [
                 row[0]
                 for row in con.execute(
-                    "SELECT column_name"
-                    " FROM (DESCRIBE"
-                    " SELECT * FROM read_parquet('{}'))".format(source_path)
+                    "SELECT column_name FROM (DESCRIBE SELECT * FROM read_parquet('{}'))".format(
+                        source_path
+                    )
                 ).fetchall()
                 if row[0] not in _EXCLUDED_COLS_DEDUP
             ]

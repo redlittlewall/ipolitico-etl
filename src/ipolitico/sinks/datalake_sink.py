@@ -198,8 +198,7 @@ class DataLakeSink:
         df.write_parquet(file_path)
 
         logger.debug(
-            f"[{table_name} | {layer.upper()}] FLUSH: {df.height} registros "
-            f"em {file_path.name}."
+            f"[{table_name} | {layer.upper()}] FLUSH: {df.height} registros em {file_path.name}."
         )
 
     async def _maybe_flush(self, key: str, table_name: str, layer: str) -> None:

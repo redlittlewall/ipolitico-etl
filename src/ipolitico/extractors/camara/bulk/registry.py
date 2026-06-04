@@ -60,7 +60,7 @@ BULK_REGISTRY: dict[str, dict] = {
     "votacoes": {
         "requires_year": True,
         "url_template": (
-            "https://dadosabertos.camara.leg.br/arquivos/votacoes/csv/" "votacoes-{year}.csv.zip"
+            "https://dadosabertos.camara.leg.br/arquivos/votacoes/csv/votacoes-{year}.csv.zip"
         ),
         "bulk_granularity": "year",
         "bulk_filter_date_column": "data",
@@ -147,7 +147,7 @@ BULK_REGISTRY: dict[str, dict] = {
     "deputados_orgaos": {
         "requires_year": False,
         "url_template": (
-            "https://dadosabertos.camara.leg.br/arquivos/orgaosDeputados/" "csv/orgaosDeputados.csv"
+            "https://dadosabertos.camara.leg.br/arquivos/orgaosDeputados/csv/orgaosDeputados.csv"
         ),
         "bulk_granularity": "snapshot",
         "bulk_filter_date_column": None,
@@ -156,8 +156,7 @@ BULK_REGISTRY: dict[str, dict] = {
     "deputados_frentes": {
         "requires_year": False,
         "url_template": (
-            "https://dadosabertos.camara.leg.br/arquivos/frentesDeputados/"
-            "csv/frentesDeputados.csv"
+            "https://dadosabertos.camara.leg.br/arquivos/frentesDeputados/csv/frentesDeputados.csv"
         ),
         "bulk_granularity": "snapshot",
         "bulk_filter_date_column": None,
