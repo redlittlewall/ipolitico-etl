@@ -134,6 +134,12 @@ class BaseBulkExtractor(BaseExtractor):
                 )
                 df = df.with_columns(cs.string().str.replace_all('"', "").str.strip_chars())
 
+                rename_map = config_registry.get("rename_map", {})
+                if rename_map:
+                    existing = {k: v for k, v in rename_map.items() if k in df.columns}
+                    if existing:
+                        df = df.rename(existing)
+
                 return df
 
             except Exception as e:

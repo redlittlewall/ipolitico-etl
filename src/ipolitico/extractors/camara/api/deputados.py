@@ -77,7 +77,7 @@ class DeputadosExtractor(CamaraBaseExtractor):
         endpoint = f"{ApiRoutes.DEPUTADOS.value}/{deputado_id}/{route_suffix}"
         data = await self.client.fetch(endpoint)
 
-        return pl.DataFrame(data) if data else pl.DataFrame()
+        return pl.DataFrame(data, infer_schema_length=None) if data else pl.DataFrame()
 
     async def extract_temporal_route(
         self, deputado_id: int, route_suffix: str, start_date: str, end_date: str
@@ -101,4 +101,4 @@ class DeputadosExtractor(CamaraBaseExtractor):
         }
 
         data = await self.fetch_paginated(endpoint, self.build_params(raw_params))
-        return pl.DataFrame(data) if data else pl.DataFrame()
+        return pl.DataFrame(data, infer_schema_length=None) if data else pl.DataFrame()

@@ -103,9 +103,14 @@ class CamaraClient:
                             continue
 
                         # Defesa contra Falsos Positivos da API - Aborta tentativa
-                        if response.status_code == 404:
+                        # 404: endpoint não tem dados (ex: deputado sem discursos).
+                        # 400: mesmo caso em alguns endpoints inconsistentes da API
+                        # (ex: /partidos/{id}/lideres para partidos extintos,
+                        # /deputados/{id}/discursos para deputados históricos).
+                        if response.status_code in (400, 404):
                             logger.debug(
-                                f"Recurso inexistente (404) em {url}. Assumindo lista vazia."
+                                f"Recurso inexistente ({response.status_code}) em {url}. "
+                                "Assumindo lista vazia."
                             )
                             return []
 

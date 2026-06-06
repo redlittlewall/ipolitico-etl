@@ -29,7 +29,11 @@ class CamaraDeputadoChildTransformer(BaseTransformer):
                     df = df.with_columns(pl.col(col).str.to_datetime(strict=False))
         for col in ("dataInicio", "dataFim"):
             if col in df.columns:
-                df = df.with_columns(pl.col(col).str.slice(0, 10))
+                df = df.with_columns(
+                    pl.when(pl.col(col).is_not_null())
+                    .then(pl.col(col).cast(pl.Utf8).str.slice(0, 10))
+                    .alias(col)
+                )
 
         for col, dtype in contract.items():
             if col not in df.columns:

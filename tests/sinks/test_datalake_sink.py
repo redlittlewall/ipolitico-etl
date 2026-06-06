@@ -96,33 +96,6 @@ async def test_datalake_save_and_append(temp_datalake):
 
 
 @pytest.mark.asyncio
-async def test_datalake_delete_period_is_noop(temp_datalake):
-    """delete_period está desabilitado no modo append-only."""
-    from datetime import datetime
-
-    df_bulk = pl.DataFrame(
-        {
-            "id": [1, 2, 3],
-            "data_fatura": [
-                datetime(2026, 1, 5),
-                datetime(2026, 2, 10),
-                datetime(2026, 3, 15),
-            ],
-        }
-    )
-
-    file_path = Path(temp_datalake.base_dir) / "legacy.parquet"
-    df_bulk.write_parquet(file_path)
-
-    await temp_datalake.delete_period(
-        table="compras", start_date="2026-02-01", end_date="2026-02-28", date_column="data_fatura"
-    )
-
-    df_result = pl.read_parquet(file_path)
-    assert df_result.height == 3
-
-
-@pytest.mark.asyncio
 async def test_datalake_save_empty_df(temp_datalake):
     """DataFrame vazio não grava arquivo."""
     df_vazio = pl.DataFrame()
@@ -145,11 +118,6 @@ async def test_datalake_save_with_composite_keys_appends_batches(temp_datalake):
     await temp_datalake.flush("composta", layer)
     df_result = _read_all_batches(temp_datalake, layer, "composta")
     assert df_result.height == 2
-
-
-@pytest.mark.asyncio
-async def test_datalake_delete_period_no_file(temp_datalake):
-    await temp_datalake.delete_period("nao_existo", "2026-01-01", "2026-12-31", "data")
 
 
 @pytest.mark.asyncio

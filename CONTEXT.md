@@ -30,9 +30,23 @@ São os blocos de construção do ETL. A enumeração `DomainType` em
 | `grupos`         | Grupos parlamentares (Bancadas)                              | — (dimensional)     |
 | `legislaturas`   | Legislaturas (ciclos de 4 anos)                              | — (dimensional)     |
 | `referencias`    | Catálogos de referência (tipos de proposição, situação, etc.) | — (dimensional)   |
-| `funcionarios`   | Servidores da Câmara (nome, cargo, lotação, snapshot)        | — (snapshot)        |
-| `tecadCategorias`| Categorias do Tesauro TECAD (classificação temática)         | — (snapshot)        |
-| `tecadTermos`    | Termos do Tesauro TECAD (vocabulário controlado)             | — (snapshot)        |
+
+**Domínios bulk-only** (sem endpoint REST; ingestão exclusivamente via dump CSV):
+
+| Domínio                     | Descrição                                             | Granularidade |
+|-----------------------------|-------------------------------------------------------|---------------|
+| `funcionarios`              | Servidores da Câmara (nome, cargo, lotação)           | Snapshot      |
+| `tecad_categorias`          | Categorias do Tesauro TECAD (classificação temática)  | Snapshot      |
+| `tecad_termos`              | Termos do Tesauro TECAD (vocabulário controlado)      | Snapshot      |
+| `eventos_presenca_deputados`| Presença de deputados em eventos                      | Anual         |
+| `eventos_requerimentos`     | Requerimentos de eventos                              | Anual         |
+| `votacoes_objetos`          | Objetos de votação                                    | Anual         |
+| `votacoes_proposicoes`      | Proposições afetadas por votação                      | Anual         |
+| `licitacoes`                | Licitações da Câmara                                  | Anual         |
+| `licitacoes_contratos`      | Contratos de licitação                                | Anual         |
+| `licitacoes_itens`          | Itens de licitação                                    | Anual         |
+| `licitacoes_pedidos`        | Pedidos de licitação                                  | Anual         |
+| `licitacoes_propostas`      | Propostas de licitação                                | Anual         |
 
 **Domínios de detalhe** (adicional de um domínio raiz, acessado via `/{id}`):
 
@@ -112,19 +126,18 @@ FederationOrchestrator ──► CamaraSourceProvider
     │                     │          │
     │                     │          ├── WindowResolver (StateStore→janela)
     │                     │          ├── SourceRouter (API vs Bulk)
-    │               state_store      ├── PipelineBuilder (YAML → classes)
-    │               (BaseSink)       ├── CamaraJobPlanner (StateStore)
-    │               save/flush       └── PipelineRunner (execução)
+    │               DataLake         ├── PipelineBuilder (YAML → classes)
+    │               Repository       ├── CamaraJobPlanner (StateStore)
+    │               (StateStore)     └── PipelineRunner (execução)
     │                     │                   │
     │                     │         ┌─────────┼─────────┐
     │                     ▼         ▼         ▼         ▼
     │               DataLake    Extractor  Transformer  Sink
-    │               Repository  (I/O bruto) (regras) (persistência)
-    │               (StateStore)   │                     │
-    │               watermarks     ▼                     ▼
-    │               + IDs     API / Bulk         DataLake (Parquet)
-    │                                           bronze/  silver/  gold/
-    │
+    │               Repository  (I/O bruto) (regras)  (persistência)
+    │               consultas       │                  save/flush
+    │               (StateStore)    ▼
+    │               watermarks  API / Bulk
+    │               + IDs
     └── Opcional: DataLakeOptimizer (DuckDB) — bronze/silver → gold
 ```
 
@@ -210,8 +223,8 @@ O `SourceRouter` decide:
 
 Nota: **Bulk** só para os domínios que o tem disponível, para os outros o consumo é via API.
 
-**Bulk-only**: domínios como `funcionarios`, `tecadCategorias` e `tecadTermos` não
-possuem rota na API REST. O `SourceRouter` sempre retorna BULK para estes
+**Bulk-only**: domínios que não possuem rota na API REST (listados na seção 1.1
+como "Domínios bulk-only"). O `SourceRouter` sempre retorna BULK para estes
 (`bulk_only=True` no `BULK_REGISTRY`), independentemente da estratégia.
 ---
 
@@ -348,16 +361,7 @@ Todos os testes de extratores usam `respx` para mockar respostas HTTP sem rede.
 - `tests/pipeline/` — Testes de orquestração (manager, runner, router, builder)
 - `tests/sinks/` — Testes de sinks
 - `tests/storage/` — Testes de state store e datalake repository
-- `tests/tools/` — Testes de ferramentas (estimador)
-
-**Novos testes nesta iteração (US6):**
-- `tests/extractors/camara/api/test_orgaos_partidos_eventos.py` — testes com
-  `@respx.mock` para blocos, frentes, grupos, legislaturas (cada um com
-  mock da API + assertion de `.height == 1`)
-- `tests/transformers/test_institutional_transformer.py` — testes para
-  blocos (coluna `federacao` Boolean), frentes (colunas mínimas), grupos
-  (`ultimoStatus` Struct → `json_encode`), legislaturas (`dataInicio`/`dataFim`
-  truncadas para 10 chars)
+- `tests/tools/` — Testes de ferramentas (estimador, swagger_codegen)
 
 ## 8. Configuração e CLI
 
@@ -505,6 +509,10 @@ o Data Lake já foi populado via `python -m ipolitico.main`.
 
 ### 10.4 Análises sobre SQLite
 
+> **Nota:** desde a remoção do `SQLiteSink`, o SQLite não é mais um destino de
+> ingestão (sink) primário. As análises abaixo consomem a Gold exportada
+> opcionalmente via `--export-gold sqlite`.
+
 | Script | O que valida / analisa |
 |---|---|
 | `sqlite/perfil_escolaridade.py` | Perfil de escolaridade dos deputados (via SQLite). |
@@ -584,6 +592,7 @@ ipolitico-etl/
 |---|---|
 | **Domínio** | Categoria de dados da Câmara (ex: deputados, despesas) |
 | **Domínio raiz** | Recurso principal da API (`/deputados`, `/proposicoes`) |
+| **Domínio bulk-only** | Domínio sem endpoint REST, ingerido exclusivamente via dump CSV |
 | **Domínio aninhado** | Filho de um domínio raiz (`/deputados/{id}/despesas`) |
 | **Domínio de detalhe** | Metadados adicionais (`/deputados/{id}`) |
 | **Job** | Unidade mínima de trabalho (ex: um par deputado×ano) |

@@ -6,87 +6,139 @@ Area: arquitetura
 
 # PRD: iPolitico ETL — Roadmap de Expansão (Fases 0–4)
 
+> **Nota:** Este documento foi revisado em 2026-06-04 para refletir o estado real
+> do código. As Fases 0–3 foram concluídas; o conteúdo original foi preservado
+> como histórico, com anotações de status. A Fase 4 (Senado) permanece como
+> próximo trabalho.
+
+## Status Atual
+
+| Fase | Descrição | Status | Evidência |
+|---|---|---|---|
+| **0** | Remoção das subclasses Bulk rasas | ✅ CONCLUÍDO | Subclasses removidas, `BaseBulkExtractor` unificado |
+| **1** | Bulk CSV schema_overrides + StateStore + remoção SQLiteSink | ✅ CONCLUÍDO | `schema_overrides` em `BULK_REGISTRY`, `StateStore` em `storage/state_store.py`, `DataLakeRepository implements StateStore`, `SQLiteSink` removido |
+| **2** | 4 endpoints API faltantes + Swagger-to-code + expansão Bulk | ✅ CONCLUÍDO | `blocos_detalhe`, `proposicoes_detalhe`, `eventos_orgaos`, `mandatos_externos` — todos com extrator/transformer/YAML. `tools/swagger_codegen.py` com testes. `BULK_REGISTRY` expandido com 13 datasets institucionais |
+| **3** | Bulk-only domains | ✅ CONCLUÍDO | 12 domínios (licitacoes, funcionarios, tecad, eventos_*, votacoes_*) com YAML, transformer, SILVER_SCHEMA, BULK_REGISTRY |
+| **3.5** | Validação Integrada do ETL | ⚠️ PARCIAL | 23 domínios 100%, 12 abortados (bulk mapping), 28 não iniciados, 1 parcial. 4 bugs corrigidos. |
+| **4** | Senado API Adapter | ⏳ PENDENTE | Documentação da API do Senado ainda não coletada |
+
+### Métricas (atualizado 2026-06-05)
+
+- **64 domínios registrados** no `DomainType`
+- **23 domínios validados** contra API real (Silver populado)
+- **19 domínios** com `extractor_bulk` no YAML (rota Bulk disponível)
+- **351 testes** passando (`pytest -q`)
+- **78 rotas Swagger** da Câmara — todas cobertas
+- **Gold exporter** (`--export-gold sqlite|duckdb`) já implementado
+- **4 bugs** encontrados e corrigidos durante validação integrada
+- **249 MB** de dados Silver gerados na execução parcial
+
+---
+
 ## Problem Statement
 
-O ETL da Câmara dos Deputados do iPolitico já cobre 48 domínios de dados entre
-rotas raiz, detalhe e aninhadas. Porém:
+O ETL da Câmara dos Deputados do iPolitico foi expandido para cobrir todos os
+domínios da API, com suporte Bulk e arquitetura preparada para múltiplos providers.
+Porém, nunca foi executado de ponta a ponta com todos os domínios simultaneamente:
 
-1. **Itens arquiteturais pendentes** — o Bulk CSV lê tudo como string (duas
-   passagens de transformação), e o `BaseSink` acumula responsabilidades de
-   escrita + consulta de estado (violação de SRP), além de carregar o legado
-   do `SQLiteSink` que foi descontinuado como destino.
+1. **Validação integrada nunca realizada** — os 351 testes unitários cobrem cada
+   peça isoladamente, mas nenhuma execução real contra a API da Câmara validou
+   o encadeamento de extratores + transformers + sinks + state store + gold
+   em cenário real.
 
-2. **Cobertura incompleta da API Câmara** — 4 rotas Swagger ainda não
-   implementadas (blocos_detalhe, proposicoes_detalhe, eventos_orgaos,
-   mandatos_externos) e apenas 5 dos 32 datasets bulk disponíveis estão
-   registrados.
+2. **Risco de regressão silenciosa** — sem uma execução E2E de referência,
+   mudanças futuras (especialmente a Fase 4 — Senado) podem quebrar o pipeline
+   Câmara sem que os testes unitários percebam.
 
-3. **Ausência de cobertura Bulk para domínios institucionais** — domínios como
-   `eventos`, `frentes`, `orgaos` e seus filhos só têm rota API. Full loads
-   históricos poderiam usar dumps CSV e seriam muito mais rápidos.
+3. **✅ Parcialmente endereçado** — a 1ª execução full load (2026-06-05) rodou
+   23/64 domínios (100%) antes de ser interrompida. 4 bugs foram corrigidos.
+   Faltam 44 domínios para cobertura completa.
 
-4. **Inexistência de suporte a outras fontes** — a arquitetura foi desenhada
-   para suportar múltiplos providers (Câmara, Senado futuro), mas só o
-   `CamaraSourceProvider` existe. O próximo passo natural é a API do Senado.
+---
 
-## Solution
+## Resultados da 1ª Execução Full Load (2026-06-05)
 
-Executar um roadmap em 5 fases que fecha pendências arquiteturais, expande a
-cobertura da Câmara e prepara o terreno para novos providers:
+### Status por Domínio
 
-- **Fase 0**: Commitar o Item 4 (remoção das subclasses Bulk rasas, já feita)
-- **Fase 1**: Bulk CSV com schema_overrides + StateStore (separação de
-  responsabilidade + remoção SQLiteSink)
-- **Fase 2**: Swagger-to-code para rotas Câmara faltantes + expansão de
-  cobertura Bulk para domínios institucionais
-- **Fase 3**: Domínios Bulk-only (licitações, funcionários, tecad, etc.)
-- **Fase 4**: Adapter para API do Senado
+| Status | Qtd | Domínios |
+|---|---|---|
+| ✅ 100% concluído | **23** | deputados, deputados_detalhe, legislaturas, legislaturas_detalhe, legislaturas_lideres, legislaturas_mesa, blocos, blocos_partidos, frentes, frentes_detalhe, frentes_membros, grupos, orgaos, partidos, partidos_detalhe, partidos_membros, partidos_lideres, despesas, proposicoes, discursos, deputados_frentes, deputados_orgaos, deputados_eventos |
+| ❌ Abortado (bulk mapping) | **12** | grupos_detalhe, grupos_membros, grupos_historico, orgaos_detalhe, orgaos_membros, orgaos_eventos, orgaos_votacoes, tramitacoes, autores, relacionadas, temas, proposicoes_votacoes |
+| ⏳ Parcial (40%) | **1** | deputados_historico |
+| ⬜ Nunca iniciado | **28** | eventos + 5 filhos, bulk-only (funcionarios, tecad_*, licitacoes_*), votacoes + 2 filhos + objetos/proposicoes, votos, profissoes, ocupacoes, orientacoes, proposicoes_detalhe, referencias, blocos_detalhe, mandatos_externos, uf_no_voto, partido_no_voto |
 
-## User Stories
+### Bugs Encontrados e Corrigidos
 
-1. As a developer, I want the Bulk CSV reader to apply schema_overrides with
-   locale BR support, so that the extractor outputs typed DataFrames instead of
-   all-string, eliminating one pass of conversion in the transformer.
+| Bug | Arquivo | Perda | Status |
+|---|---|---|---|
+| `list.join` em `List(Null)` | detalhe_transformer.py | Impeditivo (todos _detalhe) | ✅ Corrigido |
+| `str.slice` em coluna Null | membros/institucional/deputado_child | Impeditivo (frentes_membros etc) | ✅ Corrigido |
+| `infer_schema_length` ausente | deputados.py:80,104 | 579 registros perdidos | ✅ Corrigido |
+| HTTP 400 como erro | client.py:106 | Degradação (retries desnecessários) | ✅ Corrigido |
+| Bulk column mapping | registry.py (idGrupo/idOrgao) | 12 domínios abortados | ❌ Pendente |
 
-2. As a developer, I want a `StateStore` interface separated from `BaseSink`,
-   so that `WindowResolver` and `CamaraJobPlanner` depend only on the state
-   queries they need, not on a full Sink.
+### Métricas da Execução
 
-3. As a maintainer, I want the `SQLiteSink` removed from the codebase, so that
-   there is no dead code or dead conditional branches in the PipelineBuilder.
+| Métrica | Valor |
+|---|---|
+| Início | 2026-06-05 06:59 |
+| Término | 2026-06-05 14:59 (interrompida) |
+| Duração | ~8h |
+| Silver salvos | 249 MB, 2.384 lotes |
+| 504s | 1.137 (todos resolvidos por retry) |
+| Erros fatais | 579 (schema inference — corrigido) |
+| Bronze/Gold | 0 (não executado) |
 
-4. As a developer, I want the `DataLakeRepository` to implement the new
-   `StateStore` interface, so that there is a single class for reading state
-   from the Data Lake.
+---
 
-5. As a data analyst, I want the `/blocos/{id}`, `/proposicoes/{id}`,
-   `/eventos/{id}/orgaos` and `/deputados/{id}/mandatosExternos` endpoints
-   implemented, so that all 78 documented Swagger routes of the Câmara are
-   covered.
+## Solução Proposta — Continuação da Fase 3.5 + Fase 4 (Senado)
 
-6. As a developer, I want a tool that reads the local Swagger file and
-   generates the minimal glue code (DomainType entry, DomainSpec, YAML config
-   entry, SILVER_SCHEMA entry) for a new endpoint, so that adding routes is
-   fast and mechanical.
+### Fase 3.5 — Validação Integrada do ETL (Continuação)
 
-7. As a data engineer, I want Bulk dumps registered for all domains that have
-   them (`eventos`, `frentes`, `grupos`, `legislaturas`, `orgaos` and their
-   children), so that full load historical ingestions use the faster Bulk route
-   instead of month-by-month API pagination.
+### User Stories (atualizado)
 
-8. As a developer, I want the URL patterns in `BULK_REGISTRY` to use generic
-   templates (yearly or snapshot), so that adding new Bulk datasets requires
-   only the dataset name and granularity, not a full URL for each entry.
+13. ✅ As a developer, I want a smoke test que execute uma janela pequena (1 mês)
+    contra a API real da Câmara — **CONCLUÍDO** (7 domínios, janela 2025-01-01 a 2025-01-31).
 
-9. As a data citizen, I want the Bulk-only domains (`licitacoes`,
-   `funcionarios`, `tecadCategorias`, `tecadTermos`, `eventosPresencaDeputados`,
-   `eventosRequerimentos`, `votacoesObjetos`, `votacoesProposicoes`) available
-   as new domain types, so that I can analyze spending, staffing, and legislative
-   agenda data from the Câmara.
+14. As a maintainer, I want a full load completo de todos os 64 domínios contra
+    a API e Bulk da Câmara — **PARCIAL** (23/64 completos, 4 bugs corrigidos,
+    reexecução necessária com correções aplicadas e bulk mapping resolvido).
 
-10. As a user, I want the Gold layer to be exportable to SQL (SQLite / DuckDB),
-    so that I can choose between Parquet and relational output depending on my
-    analysis tools.
+15. As a developer, I want um script de continuação que permita reprocessar
+    apenas os domínios faltantes após correções, sem recomeçar do zero.
+
+### Plano de Execução — Continuação
+
+**Etapa 2b — Reparo dos domínios abortados (bulk mapping)**
+
+Antes de reexecutar o full load, corrigir o mapeamento de colunas CSV
+no `BULK_REGISTRY` para que `orgaos` e `grupos` exportem IDs com
+nomenclatura compatível com `DomainSpec.id_column = "id"`.
+
+**Etapa 2c — Reexecução do Full Load (completo)**
+
+- Limpar `data/datalake/` (começar do zero)
+- Rodar `python -m ipolitico.main --strategy full_load --all-domains --optimize`
+- Rodar `--audit-coverage` e validar que todos os 64 domínios têm dados Silver
+- Rodar `--export-gold duckdb` para validar exportação SQL
+- Varrer logs em busca de warnings de perda de dados
+- Medir e registrar tempo de execução total como baseline
+
+**Critérios de aceite (revisados):**
+- [ ] Bulk column mapping corrigido (idOrgao → id, idGrupo → id)
+- [ ] `pytest -q` 100% antes da execução
+- [ ] Full load executa sem interrupção ou crash
+- [ ] Zero erros fatais de schema inference (correção 1.3 aplicada)
+- [ ] Zero erros de `list.join` (correção 1.1 aplicada)
+- [ ] Zero erros de `str.slice` (correção 1.2 aplicada)
+- [ ] `--audit-coverage` mostra 0 domínios como `NUNCA EXTRAÍDO`
+- [ ] Dados Gold gerados para todos os domínios
+- [ ] `--export-gold duckdb` produz arquivo `.db` legível
+- [ ] Tempo de execução registrado como baseline
+
+### Fase 4 — Senado
+
+### User Stories
 
 11. As an architect, I want a `SenadoSourceProvider` following the same
     `SourceProvider` protocol as `CamaraSourceProvider`, so that the
@@ -97,184 +149,145 @@ cobertura da Câmara e prepara o terreno para novos providers:
     spec fetched, so that implementation planning can begin with a concrete
     understanding of the endpoints available.
 
-## Implementation Decisions
+### Plano de Execução — Fase 4 (Senado)
 
-### Fase 0 — Commit Bulk Subclass Removal (1–2h)
+**Etapa 1 — Pesquisa e documentação (issue 12)**
+- Buscar documentação oficial da API de Dados Abertos do Senado Federal
+  (provável URL: `https://legis.senado.leg.br/dadosabertos/`)
+- Baixar spec OpenAPI/Swagger se disponível, salvar em
+  `docs/senado_swagger.json`
+- Analisar endpoints disponíveis e mapear para domínios iPolitico
+- Documentar diferenças de schema entre Câmara e Senado
 
-- Já implementado e testado (124/124 testes passando).
-- Commitar as alterações no working tree (12 arquivos modificados).
+**Etapa 2 — Implementação (issue 13)**
+- Criar `core/senado_constants.py` com `SenadoDomainType` e `ApiRoutes`
+- Criar `core/senado_schemas.py` com `SILVER_SCHEMAS`
+- Criar `core/senado_domain_spec.py` com `DomainSpec`
+- Implementar extratores e transformers para primeiros 3–5 domínios Senado
+  (senadores, proposições, votações, despesas)
+- Criar `sources/senado_provider.py` com `SenadoSourceProvider`
+- Adicionar ao `FederationOrchestrator`
+- Testes unitários (mock httpx)
 
-### Fase 1 — Item 5 + Item 6 (3–5 dias)
+### Nota sobre Estimativas
 
-**Item 5 — Bulk CSV Schema Overrides (Opção B: completos com locale BR)**
+**Fase 3.5:** A execução real mostrou que o full load leva **~8-10h** para
+cobrir todos os 64 domínios (vs estimativa original de 2-4h). O gargalo principal
+é o endpoint `/deputados/{id}/historico` que sofre cache miss do servidor da
+Câmara (504 na primeira tentativa para ~60% dos deputados). O backoff exponencial
+responde em segundos e recupera todos os dados, mas adiciona ~15-30 min ao total.
 
-O `BULK_REGISTRY` ganha um campo `schema_overrides` por dataset:
+**Fase 4 (Senado):** A estimativa abaixo permanece válida, mas a Fase 3.5 deve
+ser concluída primeiro — incluindo a correção do bulk column mapping (Passo 1
+do addendum).
 
-```python
-BULK_REGISTRY: dict[str, dict] = {
-    "despesas": {
-        ...
-        "schema_overrides": {
-            "ano": pl.Int32,
-            "mes": pl.Int32,
-            "numDeputadoID": pl.Int64,
-            "vlrDocumento": pl.Utf8,        # moeda BR, vira Float64 no transformer
-            "vlrLiquido": pl.Utf8,           # moeda BR, vira Float64 no transformer
-            "numDocumento": pl.Int64,
-            "codDocumento": pl.Int64,
-            "codLote": pl.Int64,
-            "codTipoDocumento": pl.Int64,
-            "indTipoDocumento": pl.Utf8,
-            "cnpjCpfFornecedor": pl.Utf8,
-            "txtFornecedor": pl.Utf8,
-            "txtDescricao": pl.Utf8,
-            "txtDescricaoEspecificacao": pl.Utf8,
-            "datDocumento": pl.Utf8,         # data ISO, transformer normaliza
-        },
-    },
-    ...
-}
-```
+### Estimativa
 
-O `BaseBulkExtractor.extract()` passa `schema_overrides` para `pl.read_csv()`:
+| Etapa | Esforço estimado |
+|---|---|
+| Pesquisa e documentação (issue 12) | 2–4 h (requer pesquisa humana) |
+| Implementação primeiros 3–5 domínios (issue 13) | 3–5 dias |
+| **Total** | **3–6 dias** |
 
-```python
-config = BULK_REGISTRY.get(self.domain_name)
-overrides = config.get("schema_overrides", {})
-df = pl.read_csv(..., schema_overrides=overrides)
-```
+---
 
-A lógica de locale BR (moeda `1.234,56` → string → `str.replace(",", ".")` →
-`cast(pl.Float64)`) continua no transformer mas é centralizada via helper.
+### Documentos Relacionados
 
-**Item 6 — StateStore + Remoção SQLiteSink**
+- **Addendum Fase 3.5:** `.scratch/roadmap-etl-expansion/FASE-35-ADDENDUM.md`
+  Contém bugs encontrados, análise de 504s, ADRs, métricas da execução
+  e plano de continuação detalhado com comandos executáveis.
 
-Nova interface em `storage/state_store.py`:
+---
 
-```python
-class StateStore(ABC):
-    """Responsabilidade única: consultar estado (watermark, IDs existentes)."""
+## Histórico — Fases 0–3 (concluídas)
 
-    @abstractmethod
-    async def get_watermark(self, domain: str) -> str | None: ...
+### Fase 0 — Remoção das Subclasses Bulk Rasas (✅ concluído)
 
-    @abstractmethod
-    async def get_existing_ids(
-        self, domain: str, id_column: str = "id"
-    ) -> set[str]: ...
-```
+Subclasses rasas de `BaseBulkExtractor` foram removidas. O `BaseBulkExtractor`
+unificado cobre todos os datasets Bulk via configuração declarativa no
+`BULK_REGISTRY`.
 
-O `DataLakeRepository` (em `storage/datalake_repository.py`) implementa
-`StateStore`. O método `from_sink()` do `DataLakeRepository` é mantido.
+### Fase 1 — Bulk CSV Schema Overrides + StateStore (✅ concluído)
 
-`BaseSink` perde `get_watermark()` e `get_existing_ids()` — fica apenas com
-`save()` e `flush()`.
+**O que foi implementado:**
+- Campo `schema_overrides` no `BULK_REGISTRY` para tipagem na leitura via
+  `pl.read_csv(schema_overrides=...)`, eliminando o segundo passe de cast.
+- Helper de locale BR (`convert_br_currency_columns`) para tratar moeda
+  `1.234,56` → `Float64` nos transformers de despesas.
+- Interface `StateStore` em `storage/state_store.py` com `get_watermark()` e
+  `get_existing_ids()`.
+- `DataLakeRepository` implementa `StateStore` — única classe responsável por
+  consultar estado persistido.
+- `BaseSink` perdeu `get_watermark()` e `get_existing_ids()` — ficou apenas
+  com `save()` e `flush()`.
+- `SQLiteSink` removido (arquivo, enum `SinkType.SQLITE`, branch condicional
+  no `PipelineBuilder`).
+- `DataLakeSink` sem métodos de estado — `get_existing_ids`, `get_watermark` e
+  `delete_period` foram removidos.
 
-`WindowResolver` e `CamaraJobPlanner` passam a receber `StateStore` em vez de
-`BaseSink` no construtor.
+**Arquivos criados/modificados (referência):**
+- `storage/state_store.py` — criado
+- `storage/datalake_repository.py` — modificado (implementa StateStore)
+- `sinks/base.py` — simplificado
+- `sinks/datalake_sink.py` — limpo (removeu get_watermark, get_existing_ids, delete_period)
+- `pipeline/window_resolver.py` — recebe StateStore
+- `pipeline/planners/camara_jobs.py` e `strategies.py` — recebem StateStore
+- `pipeline/manager.py` — injeta `self._lake` como StateStore
+- `pipeline/builder.py` — simplificado (sem branch SQLite)
+- `sinks/sqlite_sink.py` — removido
+- `tests/sinks/test_sqlite_sink.py` — removido
 
-`PipelineManager` injeta `self._lake` (que é `DataLakeRepository implements
-StateStore`) nos resolvedores/planners.
+### Fase 2 — Swagger-to-Code + Bulk Expansion (✅ concluído)
 
-`SQLiteSink` é removido. O enum `SinkType.SQLITE` é removido. O ramo
-condicional no `PipelineBuilder.build()` é simplificado para sempre construir
-`DataLakeSink`.
-
-### Fase 2 — Swagger-to-Code + Bulk Expansion (4–7 dias)
-
-**Rotas API faltantes (4 endpoints)**
+**Rotas API implementadas:**
 
 | Domínio | Endpoint | Extractor | Transformer |
 |---|---|---|---|
-| `blocos_detalhe` | `/blocos/{id}` | `detail_child` (existe) | `detalhe_transformer` (existe) |
-| `proposicoes_detalhe` | `/proposicoes/{id}` | `detail_child` (existe) | `detalhe_transformer` (existe) |
-| `eventos_orgaos` | `/eventos/{id}/orgaos` | novo `evento_child` variant | novo ou `evento_child_transformer` |
-| `mandatos_externos` | `/deputados/{id}/mandatosExternos` | novo `deputado_child` variant | novo ou `deputado_child_transformer` |
+| `blocos_detalhe` | `/blocos/{id}` | `detail_child.BlocosDetalheExtractor` | `detalhe_transformer.CamaraDetalheTransformer` |
+| `proposicoes_detalhe` | `/proposicoes/{id}` | `detail_child.ProposicoesDetalheExtractor` | `detalhe_transformer.CamaraDetalheTransformer` |
+| `eventos_orgaos` | `/eventos/{id}/orgaos` | `evento_child.EventoOrgaosExtractor` | `evento_child_transformer.CamaraEventoChildTransformer` |
+| `mandatos_externos` | `/deputados/{id}/mandatosExternos` | `deputado_child.MandatosExternosExtractor` | `deputado_child_transformer.CamaraDeputadoChildTransformer` |
 
-Nota: Se os schemas retornados pela API forem idênticos aos de domínios já
-existentes, os extratores/transformers genéricos reutilizam-se. Caso contrário,
-criam-se classes filhas específicas (padrão já estabelecido no código).
+**Swagger-to-code generator:**
+- `tools/swagger_codegen.py` — lê `docs/camara_swagger.json`, identifica rotas
+  não mapeadas e gera blocos de código prontos para revisão.
+- Testes unitários em `tests/tools/test_swagger_codegen.py`.
 
-**Swagger-to-code generator**
+**Expansão Bulk — domínios institucionais adicionados ao `BULK_REGISTRY`:**
+`eventos`, `frentes`, `grupos`, `grupos_membros`, `grupos_historico`,
+`legislaturas`, `legislaturas_mesa`, `orgaos`, `deputados_orgaos`,
+`deputados_frentes`, `ocupacoes`, `profissoes`, `orientacoes`.
 
-Criar script em `tools/swagger_codegen.py` que:
+**YAML config:** Todos os 19 domínios com dump Bulk disponível têm
+`extractor_bulk` no `camara_pipeline.yaml`.
 
-1. Lê `docs/camara_swagger.json`
-2. Identifica rotas não mapeadas comparando com `DomainType` e YAML existente
-3. Gera blocos de configuração YAML para cada rota faltante
-4. Gera stubs de `Extractor`, `Transformer`, `SILVER_SCHEMA` e `DomainSpec`
-5. Output: blocos de código prontos para copiar, não arquivos sobrescritos
-   automaticamente (o desenvolvedor revisa antes de aplicar)
+### Fase 3 — Bulk-only Domains (✅ concluído)
 
-**Expansão Bulk**
+**12 novos domínios** sem rota API REST, apenas dump CSV, todos com
+`bulk_only=True` no `BULK_REGISTRY`:
 
-O `BULK_REGISTRY` recebe entradas para todos os datasets do HTML da Câmara que
-correspondem a domínios já implementados via API. Padrão de URL genérico:
-
-- **Anuais**: `https://dadosabertos.camara.leg.br/arquivos/{dataset}/csv/{dataset}-{year}.csv`
-- **Snapshot**: `https://dadosabertos.camara.leg.br/arquivos/{dataset}/csv/{dataset}.csv`
-
-A estrutura do registry é simplificada para suportar templates:
-
-```python
-"eventos": {
-    "url_template": "https://dadosabertos.camara.leg.br/arquivos/eventos/csv/eventos-{year}.csv",
-    "requires_year": True,
-    "bulk_granularity": "year",
-    "bulk_filter_date_column": "dataHoraInicio",
-}
-```
-
-O `SourceRouter` já usa o `BULK_REGISTRY` para decidir Bulk vs API; com mais
-domínios registrados, a decisão automática cobre mais casos.
-
-Domínios a adicionar: `eventos`, `frentes`, `grupos`, `gruposMembros`,
-`gruposHistorico`, `legislaturas`, `legislaturasMesas`, `orgaos`,
-`orgaosDeputados`, `frentesDeputados`, `deputadosOcupacoes`,
-`deputadosProfissoes`, `votacoesOrientacoes`.
-
-### Fase 3 — Dominios Bulk-only (5–8 dias)
-
-Novos domínios que **não têm rota na API REST**, apenas dump CSV:
-
-| Dataset | Descrição | Granularidade |
+| Dataset | Granularidade | Transformer |
 |---|---|---|
-| `funcionarios` | Servidores da Câmara | Snapshot |
-| `licitacoes` | Licitações | Anual |
-| `licitacoesContratos` | Contratos de licitação | Anual |
-| `licitacoesItens` | Itens de licitação | Anual |
-| `licitacoesPedidos` | Pedidos de licitação | Anual |
-| `licitacoesPropostas` | Propostas de licitação | Anual |
-| `tecadCategorias` | Categorias da pauta legislativa | Snapshot |
-| `tecadTermos` | Termos da pauta legislativa | Snapshot |
-| `eventosPresencaDeputados` | Presença de deputados em eventos | Anual |
-| `eventosRequerimentos` | Requerimentos de eventos | Anual |
-| `votacoesObjetos` | Objetos de votação | Anual |
-| `votacoesProposicoes` | Proposições afetadas por votação | Anual |
+| `funcionarios` | Snapshot | `CamaraFuncionariosTransformer` |
+| `tecad_categorias` | Snapshot | `CamaraTecadCategoriasTransformer` |
+| `tecad_termos` | Snapshot | `CamaraTecadTermosTransformer` |
+| `licitacoes` | Anual | `CamaraLicitacoesTransformer` |
+| `licitacoes_contratos` | Anual | `CamaraLicitacoesContratosTransformer` |
+| `licitacoes_itens` | Anual | `CamaraLicitacoesItensTransformer` |
+| `licitacoes_pedidos` | Anual | `CamaraLicitacoesPedidosTransformer` |
+| `licitacoes_propostas` | Anual | `CamaraLicitacoesPropostasTransformer` |
+| `eventos_presenca_deputados` | Anual | `CamaraEventosPresencaDeputadosTransformer` |
+| `eventos_requerimentos` | Anual | `CamaraEventosRequerimentosTransformer` |
+| `votacoes_objetos` | Anual | `CamaraVotacoesObjetosTransformer` |
+| `votacoes_proposicoes` | Anual | `CamaraVotacoesProposicoesTransformer` |
 
-Cada domínio requer:
-- `DomainType` + `DomainSpec` em `core/constants.py` e `core/domain_spec.py`
-- `SILVER_SCHEMA` em `core/schemas.py`
-- Entrada em `BULK_REGISTRY`
-- `Transformer` (ou reúso de genérico)
-- Entrada no YAML (`configs/camara_pipeline.yaml`)
-- Testes unitários
+**Funcionalidades extras nesta fase:**
+- CLI `--export-gold sqlite|duckdb` — exporta Gold consolidada para SQL.
+- CLI `--list-domains` — árvore hierárquica de domínios com labels descritivos.
+- CLI `--audit-coverage` — auditoria de dados Silver vs Gold.
+- `GoldExporter` em `storage/gold_exporter.py`.
 
-### Fase 4 — Senado API Adapter (pré-planejamento, 2–4 dias)
-
-- Buscar documentação oficial da API de Dados Abertos do Senado Federal
-- Criar spec local em `docs/senado_swagger.json` (quando disponível)
-- Analisar endpoints e mapear para `DomainType` (novos ou compatíveis com Câmara)
-- Criar `SenadoSourceProvider` seguindo protocolo `SourceProvider`
-- Criar `core/senado_constants.py`, `core/senado_schemas.py`
-- Implementar extratores e transformers para os primeiros domínios Senado
-- Adicionar ao `FederationOrchestrator`
-
-### Gold Layer Export SQL (Futuro, pós Fase 4)
-
-- Utilizar DuckDB `ATTACH 'gold.db' AS gold_db` para criar schema relacional
-- Exportar cada tabela Gold como tabela SQL
-- CLI flag: `--export-gold sqlite|duckdb`
+---
 
 ## Testing Decisions
 
@@ -287,19 +300,6 @@ Cada domínio requer:
 - Para transformers: DataFrame conhecido de entrada → DataFrame esperado de
   saída. Teste puro, sem I/O.
 
-### Módulos a testar
-
-| Fase | Módulo | Tipo de Teste | Prior Art |
-|---|---|---|---|
-| 1 | `storage/state_store.py` | Unitário (tempdir + Parquet) | `tests/storage/test_datalake_repository.py` |
-| 1 | `sinks/datalake_sink.py` | Unitário (após remoção SQLite) | `tests/sinks/test_datalake_sink.py` |
-| 1 | `pipeline/window_resolver.py` | Unitário com StateStore mock | `tests/pipeline/test_window_resolver.py` |
-| 1 | `pipeline/builder.py` | Unitário (após remoção SQLite) | `tests/pipeline/test_builder.py` |
-| 1 | `extractors/camara/bulk/base_bulk.py` | Unitário (schema_overrides) | `tests/extractors/camara/bulk/test_bulk_extractor.py` |
-| 2 | `tools/swagger_codegen.py` | Unitário (Swagger fixture local) | Novo (primeiro script de geração) |
-| 2 | Novos extratores/transformers | Unitário + mock httpx | Padrão existente em `tests/extractors/` e `tests/transformers/` |
-| 3 | Novos domínios Bulk-only | Unitário + fixture CSV | `tests/extractors/camara/bulk/test_bulk_extractor.py` |
-
 ### Seams de teste
 
 Para as rotas Bulk, o seam mais alto é o `PipelineRunner` com mock de
@@ -307,6 +307,22 @@ Para as rotas Bulk, o seam mais alto é o `PipelineRunner` com mock de
 
 Para rotas API, o seam mais alto são os extratores individuais com `respx`
 mockando a resposta JSON da Câmara.
+
+### Testes de integração (Fase 3.5)
+
+A validação integrada usa **testes de execução real** contra a API da Câmara
+(com rede), em contraste com os testes unitários que mockam tudo:
+
+- **Smoke E2E** — janela de 1 mês para 7 domínios representativos, validando
+  o encadeamento extrator → transformer → sink → state store → gold.
+- **Full load** — todos os 64 domínios do zero, validando cobertura completa,
+  integridade referencial e performance.
+- **Reexecução incremental** — segunda execução sem `--start-date` valida que
+  watermarks persistem e não há duplicação.
+- Os resultados de cada etapa são registrados e armazenados como baseline no
+  diretório `.scratch/roadmap-etl-expansion/validation/`.
+
+---
 
 ## Out of Scope
 
@@ -318,14 +334,11 @@ mockando a resposta JSON da Câmara.
   abertas sem autenticação.
 - **Migração de dados existentes** — dados já ingeridos permanecem intactos.
   Novos domínios começam do zero.
-- **Bulk para domínios Bulk-only que tenham overlap com API** — se um dataset
-  bulk-only eventualmente ganhar endpoint REST, isso é custódia de uma fase
-  futura.
+
+---
 
 ## Further Notes
 
-- A Fase 3 (Bulk-only) pode ser executada em paralelo com a Fase 2, pois os
-  datasets são independentes dos domínios API existentes.
 - A Fase 4 (Senado) depende de documentação externa a ser obtida — pode sofrer
   atraso se a API do Senado não estiver disponível ou documentada.
 - A separação `StateStore` desacopla a leitura de estado da escrita de dados.
@@ -333,7 +346,6 @@ mockando a resposta JSON da Câmara.
   `StateStore` sem carregar um `BaseSink` completo.
 - O formato CSV foi escolhido para Bulk porque Polars o lê nativamente com
   engine paralelizado, é mais compacto que JSON/XML, e não exige dependências
-  extras. Os transformers já estão preparados para entrada CSV.
-- A nomenclatura de domínio `mandatos_externos` (ao invés de `mandatosexternos`
-  ou `mandatosExternos`) segue o padrão snake_case dos demais domínios no
-  `DomainType`.
+  extras.
+- A nomenclatura de todos os domínios segue snake_case uniforme no `DomainType`,
+  consistente com o padrão estabelecido.

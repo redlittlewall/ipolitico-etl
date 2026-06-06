@@ -4,11 +4,9 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import polars as pl
-
-from ipolitico.core.constants import MedallionLayer
 
 logger = logging.getLogger(__name__)
 
@@ -105,71 +103,7 @@ class DataLakeSink:
                 await self._do_flush(key, table_name, layer)
 
     # ------------------------------------------------------------------
-    #  Métodos de consulta (inalterados)
-    # ------------------------------------------------------------------
-
-    async def delete_period(self, *args, **kwargs) -> None:
-        """
-        Desabilitado no padrão Append-Only.
-        Deleções lógicas devem ocorrer na camada Gold.
-        """
-        pass
-
-    def get_existing_ids(self, table_name: str, layer: str, column: str = "id") -> List[Any]:
-        """
-        Recupera chaves usando Polars Lazy API (scan) para evitar Out-Of-Memory.
-        """
-        layer_dir = self.base_dir / layer / table_name
-        if not layer_dir.exists() or not list(layer_dir.glob("*.parquet")):
-            return []
-
-        try:
-            lazy_df = pl.scan_parquet(layer_dir / "*.parquet")
-            series = lazy_df.select(column).unique().collect()[column].drop_nulls()
-            return [v for v in series.to_list() if v is not None and v != ""]
-        except Exception as e:
-            logger.error(f"Erro ao ler IDs do DataLake ({layer}/{table_name}): {e}")
-            return []
-
-    def read_columns(self, table_name: str, layer: str, columns: List[str]) -> pl.DataFrame:
-        """
-        Lê colunas específicas otimizadas via Lazy Evaluation.
-        """
-        layer_dir = self.base_dir / layer / table_name
-        if not layer_dir.exists() or not list(layer_dir.glob("*.parquet")):
-            return pl.DataFrame()
-
-        return pl.scan_parquet(layer_dir / "*.parquet").select(columns).collect()
-
-    def get_watermark(self, table_name: str, watermark_column: str) -> Optional[str]:
-        """
-        Descobre a data mais recente processada varrendo os metadados dos Parquets.
-        Usa Lazy Evaluation (Out-of-Core) para não estourar a RAM.
-        """
-        layer_dir = self.base_dir / MedallionLayer.SILVER / table_name
-
-        if not layer_dir.exists() or not list(layer_dir.glob("*.parquet")):
-            logger.debug(f"StateStore (Lake): Nenhum dado anterior encontrado para '{table_name}'.")
-            return None
-
-        try:
-            lazy_df = pl.scan_parquet(layer_dir / "*.parquet")
-            max_val = lazy_df.select(pl.col(watermark_column).max()).collect().item()
-
-            if max_val:
-                data_iso = str(max_val).replace(" ", "T")
-                logger.debug(
-                    f"StateStore (Lake): Watermark encontrado para '{table_name}': {data_iso}"
-                )
-                return data_iso
-
-            return None
-
-        except Exception as e:
-            logger.warning(
-                f"StateStore (Lake): Falha ao ler watermark da tabela '{table_name}'. Erro: {e}"
-            )
-            return None
+    #  Métodos de apoio
 
     # ------------------------------------------------------------------
     #  Métodos internos

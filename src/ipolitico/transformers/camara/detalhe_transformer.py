@@ -16,6 +16,12 @@ def _jsonify_nested(df: pl.DataFrame) -> pl.DataFrame:
     Usa expressões nativas Polars (struct.json_encode, list.eval) em vez de
     map_elements para preservar paralelismo vetorizado.
 
+    Trata casos de borda:
+    - List(Null): cast explícito para Utf8 antes do list.join, evitando
+      "attempted list join with non-string dtype".
+    - List(Struct): serializa cada elemento com struct.json_encode, depois
+      join com ",".
+
     Args:
         df: DataFrame com possíveis colunas aninhadas.
 
@@ -37,8 +43,13 @@ def _jsonify_nested(df: pl.DataFrame) -> pl.DataFrame:
                     ).alias(col)
                 )
             else:
-                # Lista não-Struct (ex: List[String]) — serializa como JSON
-                df = df.with_columns(pl.col(col).list.join(","))
+                # Lista não-Struct (ex: List[String], List[Null]) — serializa como string
+                # Cast explícito para Utf8 nos elementos antes do join evita o erro
+                # "attempted list join with non-string dtype" quando o conteúdo da
+                # lista é Null (inferido como List(Null)) ou numérico.
+                df = df.with_columns(
+                    pl.col(col).list.eval(pl.element().cast(pl.Utf8)).list.join(",")
+                )
     return df
 
 

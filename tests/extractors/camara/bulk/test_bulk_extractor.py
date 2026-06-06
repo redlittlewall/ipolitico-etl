@@ -163,7 +163,7 @@ async def test_base_bulk_extract_missing_domain():
 async def test_base_bulk_extract_download_fails():
     client = AsyncMock()
     client.download_file.return_value = False
-    ext = BaseBulkExtractor(client, domain_name="deputados")
+    ext = BaseBulkExtractor(client, domain_name="grupos")
 
     result = await ext.extract()
 
@@ -188,13 +188,56 @@ async def test_base_bulk_extract_bad_zip_file():
 
 
 @pytest.mark.asyncio
+@patch(
+    "ipolitico.extractors.camara.bulk.base_bulk.BULK_REGISTRY",
+    new={
+        "orgaos_test": {
+            "requires_year": False,
+            "url_template": ("https://dadosabertos.camara.leg.br/arquivos/orgaos/csv/orgaos.csv"),
+            "bulk_granularity": "snapshot",
+            "bulk_filter_date_column": None,
+            "schema_overrides": {"idOrgao": pl.Int64},
+            "rename_map": {"idOrgao": "id"},
+        },
+    },
+)
+@patch("ipolitico.extractors.camara.bulk.base_bulk.pl.read_csv")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.ZipFile")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.is_zipfile")
+async def test_extract_applies_rename_map(
+    mock_is_zipfile, mock_zipfile, mock_read_csv, mock_client
+):
+    """
+    [RENAME MAP] Verifica que o extract() aplica o rename_map do BULK_REGISTRY
+    após a leitura do CSV, renomeando colunas como idOrgao → id.
+    """
+    mock_is_zipfile.return_value = True
+    mock_zip_instance = MagicMock()
+    mock_zip_instance.namelist.return_value = ["orgaos.csv"]
+    mock_zipfile.return_value.__enter__.return_value = mock_zip_instance
+
+    # CSV com coluna idOrgao em vez de id
+    df_bruto = pl.DataFrame(
+        {"idOrgao": [1, 2], "sigla": ["CD", "SF"], "nome": ["Câmara", "Senado"]}
+    )
+    mock_read_csv.return_value = df_bruto
+
+    ext = BaseBulkExtractor(mock_client, domain_name="orgaos_test")
+    result = await ext.extract()
+
+    assert "id" in result.columns
+    assert "idOrgao" not in result.columns
+    assert result["id"].to_list() == [1, 2]
+
+
+@pytest.mark.asyncio
 @patch("ipolitico.extractors.camara.bulk.base_bulk.pl.read_csv")
 async def test_base_bulk_extract_csv_parsing_exception(mock_read_csv):
     client = AsyncMock()
     client.download_file.return_value = True
     mock_read_csv.side_effect = Exception("Erro catastrófico de disco simulado")
 
-    ext = BaseBulkExtractor(client, domain_name="deputados")
+    ext = BaseBulkExtractor(client, domain_name="grupos")
 
     result = await ext.extract()
 

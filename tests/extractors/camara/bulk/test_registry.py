@@ -5,9 +5,9 @@ Testes estruturais do BULK_REGISTRY e seus schema_overrides.
 import polars as pl
 from ipolitico.extractors.camara.bulk.registry import BULK_REGISTRY
 
-# 5 legados + 13 institucionais + 3 funcionarios/tecad + 5 licitacoes + 4 eventos = 30
+# 4 legados + 13 institucionais + 3 funcionarios/tecad + 5 licitacoes + 4 eventos = 29
+# NOTA: deputados removido — não há Bulk CSV compatível (dados cadastrais, não políticos)
 REQUIRED_SCHEMA_OVERRIDE_DOMAINS = {
-    "deputados",
     "despesas",
     "proposicoes",
     "votacoes",
@@ -20,7 +20,7 @@ REQUIRED_SCHEMA_OVERRIDE_DOMAINS = {
     "grupos_historico",
     "legislaturas",
     "legislaturas_mesa",
-    "orgaos",
+    # NOTA: orgaos removido intencionalmente — CSV bulk não tem id numérica
     "deputados_orgaos",
     "deputados_frentes",
     "ocupacoes",
@@ -61,7 +61,7 @@ SNAPSHOT_DOMAINS = frozenset(
         "grupos_historico",
         "legislaturas",
         "legislaturas_mesa",
-        "orgaos",
+        # NOTA: orgaos removido — Bulk CSV inviável
         "deputados_orgaos",
         "deputados_frentes",
         "ocupacoes",
@@ -194,13 +194,6 @@ def test_orientacoes_filter_date_column():
     assert entry["bulk_filter_date_column"] is not None
 
 
-def test_deputados_schema_overrides_types():
-    """deputados: colunas numéricas conhecidas têm override Int64."""
-    overrides = BULK_REGISTRY["deputados"]["schema_overrides"]
-    assert overrides.get("Id") == pl.Int64
-    assert overrides.get("idLegislatura") == pl.Int64
-
-
 def test_despesas_currency_columns_stay_utf8():
     """
     despesas: colunas de moeda BR (vlrLiquido, vlrDocumento, vlrGlosa)
@@ -237,3 +230,21 @@ def test_votos_schema_overrides_types():
     """votos: colunas numéricas conhecidas têm override Int64."""
     overrides = BULK_REGISTRY["votos"]["schema_overrides"]
     assert overrides.get("idDeputado") == pl.Int64
+
+
+def test_orgaos_not_in_bulk_registry():
+    """
+    [RENAME MAP] orgaos não está no BULK_REGISTRY — o CSV bulk não tem
+    coluna id numérica e o campo uri contém dados corrompidos. Usar sempre API.
+    """
+    assert "orgaos" not in BULK_REGISTRY
+
+
+def test_grupos_rename_map():
+    """
+    [RENAME MAP] grupos deve ter rename_map de idGrupo → id
+    para compatibilidade com SILVER_SCHEMAS e domínios filhos.
+    """
+    entry = BULK_REGISTRY["grupos"]
+    assert "rename_map" in entry
+    assert entry["rename_map"] == {"idGrupo": "id"}

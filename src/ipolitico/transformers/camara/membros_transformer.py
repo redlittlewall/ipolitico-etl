@@ -21,7 +21,14 @@ class CamaraMembrosTransformer(BaseTransformer):
         contract = SILVER_SCHEMAS[sub]
         for col in ("dataInicio", "dataFim"):
             if col in df.columns:
-                df = df.with_columns(pl.col(col).str.slice(0, 10))
+                # Colunas data podem vir como null dtype quando todos valores são
+                # null — .str.slice() falha nesse caso, então converte para Utf8
+                # antes de tentar qualquer operação de string.
+                df = df.with_columns(
+                    pl.when(pl.col(col).is_not_null())
+                    .then(pl.col(col).cast(pl.Utf8).str.slice(0, 10))
+                    .alias(col)
+                )
 
         try:
             for col in contract:

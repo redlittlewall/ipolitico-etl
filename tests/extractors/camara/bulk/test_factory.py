@@ -57,8 +57,8 @@ def test_factory_bulk_routing():
     client = MagicMock()
 
     # Testa o mapeamento de todos os domínios Bulk
+    # NOTA: DEPUTADOS removido — não há Bulk CSV compatível (dados cadastrais, não políticos)
     for dom in [
-        DomainType.DEPUTADOS,
         DomainType.DESPESAS,
         DomainType.PROPOSICOES,
         DomainType.VOTACOES,
@@ -71,7 +71,7 @@ def test_factory_bulk_routing():
         DomainType.GRUPOS_HISTORICO,
         DomainType.LEGISLATURAS,
         DomainType.LEGISLATURAS_MESA,
-        DomainType.ORGAOS,
+        # NOTA: ORGAOS removido — Bulk CSV inviável
         DomainType.DEPUTADOS_ORGAOS,
         DomainType.DEPUTADOS_FRENTES,
         DomainType.OCUPACOES,

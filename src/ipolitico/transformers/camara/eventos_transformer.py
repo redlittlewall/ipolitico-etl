@@ -33,7 +33,7 @@ class CamaraEventosTransformer(BaseTransformer):
 
         for col in ("dataHoraInicio", "dataHoraFim"):
             if col in df.columns:
-                df = df.with_columns(pl.col(col).str.to_datetime(strict=False))
+                df = df.with_columns(pl.col(col).cast(pl.String).str.to_datetime(strict=False))
 
         contract = SILVER_SCHEMAS[DomainType.EVENTOS.value]
         try:

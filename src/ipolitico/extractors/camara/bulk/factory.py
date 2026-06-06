@@ -41,7 +41,7 @@ class CamaraExtractorFactory:
             DomainType.VOTACOES.value: VotacoesExtractor,
         }
         cls._BULK = {
-            DomainType.DEPUTADOS.value: BaseBulkExtractor,
+            # NOTA: deputados não tem Bulk CSV compatível (dados cadastrais, não políticos)
             DomainType.DESPESAS.value: BaseBulkExtractor,
             DomainType.PROPOSICOES.value: BaseBulkExtractor,
             DomainType.VOTACOES.value: BaseBulkExtractor,
@@ -54,7 +54,7 @@ class CamaraExtractorFactory:
             DomainType.GRUPOS_HISTORICO.value: BaseBulkExtractor,
             DomainType.LEGISLATURAS.value: BaseBulkExtractor,
             DomainType.LEGISLATURAS_MESA.value: BaseBulkExtractor,
-            DomainType.ORGAOS.value: BaseBulkExtractor,
+            # NOTA: orgaos removido — bulk CSV inviável (sem id, uri corrompida)
             DomainType.DEPUTADOS_ORGAOS.value: BaseBulkExtractor,
             DomainType.DEPUTADOS_FRENTES.value: BaseBulkExtractor,
             DomainType.OCUPACOES.value: BaseBulkExtractor,

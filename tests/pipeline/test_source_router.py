@@ -58,9 +58,9 @@ def test_snapshot_full_load_selects_bulk():
     assert plan.source_type == SourceType.BULK
 
 
-def test_snapshot_full_load_orgaos():
+def test_orgaos_always_api():
     """
-    [SNAPSHOT BULK] orgaos (snapshot) em FULL_LOAD deve usar Bulk.
+    [ORGAOS API] orgaos não tem Bulk CSV confiável. Deve usar API sempre.
     """
     plan = SourceRouter.plan(
         DomainType.ORGAOS,
@@ -68,7 +68,7 @@ def test_snapshot_full_load_orgaos():
         "1946-02-01",
         "2026-12-31",
     )
-    assert plan.source_type == SourceType.BULK
+    assert plan.source_type == SourceType.API
 
 
 def test_snapshot_incremental_stays_api():

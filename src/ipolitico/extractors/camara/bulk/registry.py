@@ -11,6 +11,9 @@ Cada entrada mapeia um domínio Bulk e pode conter:
   na leitura (via ``pl.read_csv(schema_overrides=...)``), eliminando o segundo
   passe de cast nos transformers. Colunas de moeda BR (ex: ``vlrLiquido``) são
   mantidas como ``pl.Utf8`` e convertidas pelo helper ``convert_br_currency_columns``.
+- ``rename_map``: dict opcional de nome original → nome destino para renomear
+  colunas do CSV antes da transformação (ex: ``{"idOrgao": "id"}`` para que o
+  ``SILVER_SCHEMAS`` que espera ``id`` funcione corretamente).
 
 As URLs seguem o portal de Dados Abertos; ajuste caso o órgão altere o layout.
 """
@@ -19,16 +22,9 @@ import polars as pl
 
 # Base documentada: https://dadosabertos.camara.leg.br/
 BULK_REGISTRY: dict[str, dict] = {
-    "deputados": {
-        "requires_year": False,
-        "url_template": (
-            "https://dadosabertos.camara.leg.br/arquivos/deputados/cadastroDeputadosLegislaturaAtual/"
-            "cadastro_Deputados_legislatura_inicial_-fim_-na_legislatura_atual.csv"
-        ),
-        "bulk_granularity": "snapshot",
-        "bulk_filter_date_column": None,
-        "schema_overrides": {"Id": pl.Int64, "idLegislatura": pl.Int64},
-    },
+    # NOTA: deputados não tem Bulk CSV compatível com o transformer.
+    # O CSV disponível (dados cadastrais) não contém colunas políticas
+    # (partido, uf, url_foto, email). Usar rota API sempre para deputados.
     "despesas": {
         "requires_year": True,
         # Padrão CEAP documentado: http://www.camara.leg.br/cotas/Ano-{ano}.csv.zip
@@ -98,7 +94,8 @@ BULK_REGISTRY: dict[str, dict] = {
         "url_template": "https://dadosabertos.camara.leg.br/arquivos/grupos/csv/grupos.csv",
         "bulk_granularity": "snapshot",
         "bulk_filter_date_column": None,
-        "schema_overrides": {},
+        "schema_overrides": {"idGrupo": pl.Int64},
+        "rename_map": {"idGrupo": "id"},
     },
     "grupos_membros": {
         "requires_year": False,
@@ -137,13 +134,10 @@ BULK_REGISTRY: dict[str, dict] = {
         "bulk_filter_date_column": None,
         "schema_overrides": {},
     },
-    "orgaos": {
-        "requires_year": False,
-        "url_template": "https://dadosabertos.camara.leg.br/arquivos/orgaos/csv/orgaos.csv",
-        "bulk_granularity": "snapshot",
-        "bulk_filter_date_column": None,
-        "schema_overrides": {},
-    },
+    # NOTA: orgaos removido do BULK_REGISTRY intencionalmente.
+    # O CSV bulk de orgaos não tem coluna id numérica e o campo uri contém
+    # dados corrompidos (texto legislativo em vez de URIs) devido a linhas
+    # com número irregular de colunas. Usar sempre rota API para orgaos.
     "deputados_orgaos": {
         "requires_year": False,
         "url_template": (
