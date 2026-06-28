@@ -46,19 +46,15 @@ jobs:
 
       - name: Verificar conectividade com API
         run: |
-          echo "Testando DNS..."
-          # Força DNS estável (Google + Cloudflare) para resolver a Câmara
-          sudo resolvectl dns eth0 8.8.8.8 1.1.1.1 2>/dev/null || \
-          sudo resolvectl dns ens* 8.8.8.8 1.1.1.1 2>/dev/null || \
-          echo "⚠️ Não foi possível configurar DNS via resolvectl"
-          echo ""
-          echo "Resolvendo dadosabertos.camara.leg.br..."
-          host dadosabertos.camara.leg.br 8.8.8.8 || echo "⚠️ DNS não respondeu"
+          echo "Verificando conectividade com a API da Câmara..."
+          echo "Resolvendo DNS..."
+          host dadosabertos.camara.leg.br 8.8.8.8 || echo "⚠️ DNS via 8.8.8.8 falhou, tentando resolver padrão..."
+          host dadosabertos.camara.leg.br || echo "⚠️ DNS padrão falhou"
           echo ""
           echo "Testando HTTP..."
           curl -s -o /dev/null -w "HTTP %{http_code} em %{time_total}s\n" \
-            "https://dadosabertos.camara.leg.br/api/v2/deputados?pagina=1&itens=1" || \
-            echo "⚠️ API não respondeu — pipeline usará retry automático"
+            "https://dadosabertos.camara.leg.br/api/v2/deputados?pagina=1&itens=1" \
+            --connect-timeout 10 || echo "⚠️ API não respondeu — pipeline usará retry automático"
 
       - name: Baixar dados Gold da release anterior
         id: download
