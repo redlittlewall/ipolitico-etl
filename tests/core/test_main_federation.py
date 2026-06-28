@@ -1,6 +1,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from ipolitico.core.constants import DomainType
 from ipolitico.main import main
 

@@ -1,4 +1,5 @@
 import polars as pl
+
 from ipolitico.transformers.bulk_window import (
     BulkTemporalFilter,
     apply_bulk_temporal_filter,

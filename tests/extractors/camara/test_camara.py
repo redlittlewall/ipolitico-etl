@@ -2,6 +2,7 @@ from unittest.mock import AsyncMock
 
 import polars as pl
 import pytest
+
 from ipolitico.core.config import CAMARA_PAGE_SIZE
 from ipolitico.core.constants import ApiParams
 from ipolitico.extractors.camara.api.camara_base import CamaraBaseExtractor

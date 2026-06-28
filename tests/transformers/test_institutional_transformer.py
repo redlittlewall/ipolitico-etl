@@ -6,6 +6,7 @@ import logging
 
 import polars as pl
 import pytest
+
 from ipolitico.core.constants import DomainType
 from ipolitico.core.schemas import SILVER_SCHEMAS
 from ipolitico.transformers.camara.institutional_transformer import (
@@ -653,9 +654,9 @@ class TestApplyContractLogging:
 
         warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
         assert len(warnings) >= 1, "Deveria ter emitido ao menos um WARNING"
-        assert any(
-            "id" in w.message for w in warnings
-        ), "WARNING deveria citar a coluna 'id' com perda de dados"
+        assert any("id" in w.message for w in warnings), (
+            "WARNING deveria citar a coluna 'id' com perda de dados"
+        )
 
     def test_clean_cast_emits_no_warning(self, caplog):
         """Cast bem-sucedido de todas as colunas não gera WARNING."""

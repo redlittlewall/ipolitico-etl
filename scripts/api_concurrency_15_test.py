@@ -64,7 +64,7 @@ print("=" * 80)
 print("TESTE 1: CONCORRÊNCIA 15 vs 18 vs 20 (endpoint leve /deputados)")
 print("=" * 80)
 
-leves = [f"{BASE}/deputados?itens=10&pagina={i%5+1}" for i in range(50)]
+leves = [f"{BASE}/deputados?itens=10&pagina={i % 5 + 1}" for i in range(50)]
 for conc in [15, 18, 20]:
     test_concurrency(conc, leves, "/deputados", runs=2)
     time.sleep(5)

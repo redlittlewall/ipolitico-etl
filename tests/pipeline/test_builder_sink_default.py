@@ -1,6 +1,7 @@
 """PipelineBuilder: fallback de sink quando sinks não está no YAML."""
 
 import pytest
+
 from ipolitico.core.client import CamaraClient
 from ipolitico.core.constants import SinkType
 from ipolitico.pipeline.builder import PipelineBuilder

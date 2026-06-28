@@ -2,6 +2,7 @@
 
 import polars as pl
 import pytest
+
 from ipolitico.core.constants import DomainType
 from ipolitico.transformers.camara.detalhe_transformer import CamaraDetalheTransformer
 

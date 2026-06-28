@@ -3,6 +3,7 @@ Testes estruturais do BULK_REGISTRY e seus schema_overrides.
 """
 
 import polars as pl
+
 from ipolitico.extractors.camara.bulk.registry import BULK_REGISTRY
 
 # 4 legados + 13 institucionais + 3 funcionarios/tecad + 5 licitacoes + 4 eventos = 29
@@ -111,9 +112,9 @@ def test_all_bulk_domains_have_schema_overrides():
     for domain in REQUIRED_SCHEMA_OVERRIDE_DOMAINS:
         entry = BULK_REGISTRY[domain]
         assert "schema_overrides" in entry, f"{domain} falta schema_overrides"
-        assert isinstance(
-            entry["schema_overrides"], dict
-        ), f"{domain}.schema_overrides deve ser um dict"
+        assert isinstance(entry["schema_overrides"], dict), (
+            f"{domain}.schema_overrides deve ser um dict"
+        )
 
 
 def test_all_bulk_domains_have_required_keys():
@@ -157,9 +158,9 @@ def test_snapshot_domains_no_filter_date_column():
     """
     for domain in SNAPSHOT_DOMAINS:
         entry = BULK_REGISTRY[domain]
-        assert (
-            entry["bulk_filter_date_column"] is None
-        ), f"{domain} não deveria ter bulk_filter_date_column"
+        assert entry["bulk_filter_date_column"] is None, (
+            f"{domain} não deveria ter bulk_filter_date_column"
+        )
 
 
 def test_yearly_domains_have_filter_date_column():
@@ -171,9 +172,9 @@ def test_yearly_domains_have_filter_date_column():
         if domain in YEARLY_DOMAINS_NO_FILTER:
             continue
         entry = BULK_REGISTRY[domain]
-        assert (
-            entry["bulk_filter_date_column"] is not None
-        ), f"{domain} deveria ter bulk_filter_date_column"
+        assert entry["bulk_filter_date_column"] is not None, (
+            f"{domain} deveria ter bulk_filter_date_column"
+        )
 
 
 def test_eventos_filter_date_column():

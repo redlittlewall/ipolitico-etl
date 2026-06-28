@@ -2,6 +2,7 @@ from pathlib import Path
 
 import polars as pl
 import pytest
+
 from ipolitico.storage.datalake_repository import DataLakeRepository
 
 

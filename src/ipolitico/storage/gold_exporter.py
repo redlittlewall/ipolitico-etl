@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List
 
 import duckdb
+
 from ipolitico.core.constants import DomainType
 from ipolitico.core.domain_spec import spec_for
 

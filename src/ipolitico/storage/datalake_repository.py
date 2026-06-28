@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 import duckdb
+
 from ipolitico.core.constants import DomainType
 from ipolitico.storage.state_store import StateStore
 

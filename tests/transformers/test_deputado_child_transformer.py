@@ -1,6 +1,7 @@
 """Testes para o CamaraDeputadoChildTransformer (profissoes, ocupacoes, mandatos_externos, etc.)."""
 
 import polars as pl
+
 from ipolitico.transformers.camara.deputado_child_transformer import CamaraDeputadoChildTransformer
 
 

@@ -1,6 +1,7 @@
 """Tests for DomainType, EARLIEST_DATE_MAP, DomainSpec, and SILVER_SCHEMA entries."""
 
 import polars as pl
+
 from ipolitico.core.constants import EARLIEST_DATE_MAP, DomainType, EarliestDates
 from ipolitico.core.domain_spec import spec_for
 from ipolitico.core.schemas import SILVER_SCHEMAS

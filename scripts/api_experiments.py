@@ -67,9 +67,9 @@ COLD_WARM_ROUTES = [
 
 def experimento_cold_warm():
     """Mesma rota, 2 chamadas consecutivas. Mede latência de cada."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f" EXPERIMENTO 1: COLD vs WARM  ({now()})")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"{'Rota':<50} {'#1 (ms)':<10} {'#2 (ms)':<10} {'#1 status':<10} {'#2 status':<10}")
     print("-" * 90)
 
@@ -82,10 +82,10 @@ def experimento_cold_warm():
         if s1 == 504:
             # Se deu 504 na primeira, tenta de novo com backoff
             for attempt in range(3):
-                print(f"   ↳ Retry {attempt+1} após {2**(attempt+1)}s...")
+                print(f"   ↳ Retry {attempt + 1} após {2 ** (attempt + 1)}s...")
                 time.sleep(2 ** (attempt + 1))
                 s_retry, ms_retry, b_retry = get(url)
-                print(f"   ↳ Tentativa {attempt+2}: status={s_retry}, {ms_retry:.0f}ms")
+                print(f"   ↳ Tentativa {attempt + 2}: status={s_retry}, {ms_retry:.0f}ms")
                 if s_retry != 504:
                     break
 
@@ -95,9 +95,9 @@ def experimento_cold_warm():
 
 def experimento_concorrencia():
     """Mesma rota simples, N chamadas simultâneas. Mede quantas dão 504."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f" EXPERIMENTO 2: CONCORRÊNCIA  ({now()})")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Rota barata (nunca dá 504 sozinha)
     route = "/deputados?itens=10&pagina="
@@ -132,9 +132,9 @@ def experimento_concorrencia():
 
 def experimento_bulk_disponivel():
     """Verifica se CSVs bulk existem para eventos_pauta e deputados_historico."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f" EXPERIMENTO 3: BULK DISPONÍVEL  ({now()})")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # URLs do dump bulk da Câmara
     bulk_urls = [
@@ -175,9 +175,9 @@ def experimento_sequencia():
     Simula o padrão real da pipeline: busca lista de eventos, depois
     para cada evento busca pauta. Mede quantos 504s aparecem.
     """
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f" EXPERIMENTO 4: SEQUÊNCIA (simula pipeline)  ({now()})")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Busca lista de eventos (primeira página)
     url_lista = f"{BASE}/eventos?situacao=Aprovado&ordem=ASC&ordenarPor=dataHoraInicio&itens=100"
@@ -215,13 +215,13 @@ def experimento_sequencia():
     print("\n  Resultados (primeira chamada = cold):")
     print(
         f"    Cold:  {len(cold_ok)}/{len(eventos_ids)} OK, "
-        f"média={sum(cold_ok)/len(cold_ok):.0f}ms"
+        f"média={sum(cold_ok) / len(cold_ok):.0f}ms"
         if cold_ok
         else "    Cold:  0 OK"
     )
     print(
         f"    Warm:  {len(warm_ok)}/{len(eventos_ids)} OK, "
-        f"média={sum(warm_ok)/len(warm_ok):.0f}ms"
+        f"média={sum(warm_ok) / len(warm_ok):.0f}ms"
         if warm_ok
         else "    Warm:  0 OK"
     )
@@ -247,9 +247,9 @@ def main():
     experimento_sequencia()
     experimento_bulk_disponivel()
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f" ✅ Experimentos concluídos — {now()}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
 
 if __name__ == "__main__":

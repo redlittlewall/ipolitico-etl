@@ -3,6 +3,7 @@ from pathlib import Path
 
 import polars as pl
 import pytest
+
 from ipolitico.core.constants import MedallionLayer
 from ipolitico.sinks.datalake_sink import DataLakeSink
 

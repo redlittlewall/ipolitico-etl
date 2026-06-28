@@ -1,6 +1,7 @@
 """Deputados Bulk: normalização ocorre no CamaraDeputadosTransformer."""
 
 import polars as pl
+
 from ipolitico.transformers.camara.deputados_transformer import CamaraDeputadosTransformer
 
 

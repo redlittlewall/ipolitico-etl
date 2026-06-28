@@ -5,6 +5,7 @@ from pathlib import Path
 
 import duckdb
 import polars as pl
+
 from ipolitico.storage.gold_exporter import ExportFormat, GoldExporter
 
 # ── Core export tests ────────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 import polars as pl
 import pytest
+
 from ipolitico.extractors.base import BaseExtractor
 
 

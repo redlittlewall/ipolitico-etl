@@ -1,5 +1,6 @@
 import pytest
 import respx
+
 from ipolitico.core.client import CamaraClient
 from ipolitico.core.constants import DomainType
 from ipolitico.core.warmup import WARMUP_CONFIG, WarmupSpec, build_warmup_urls

@@ -1,6 +1,7 @@
 """Blindagem de schema para votações/votos via CamaraVotacoesTransformer (Bulk/API)."""
 
 import polars as pl
+
 from ipolitico.core.constants import DomainType
 from ipolitico.transformers.camara.votacoes_transformer import CamaraVotacoesTransformer
 

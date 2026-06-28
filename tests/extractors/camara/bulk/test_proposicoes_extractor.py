@@ -1,6 +1,7 @@
 """Proposições Bulk: datas e contrato no CamaraProposicoesTransformer."""
 
 import polars as pl
+
 from ipolitico.transformers.camara.proposicoes_transformer import CamaraProposicoesTransformer
 
 

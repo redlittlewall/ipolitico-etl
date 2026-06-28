@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
 from ipolitico.core.constants import DomainType, LoadStrategy, SinkType
 from ipolitico.pipeline.manager import PipelineManager
 

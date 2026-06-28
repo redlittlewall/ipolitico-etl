@@ -1,6 +1,7 @@
 from unittest.mock import AsyncMock
 
 import pytest
+
 from ipolitico.core.constants import ApiParams
 from ipolitico.services.metadata import CamaraMetadataService
 

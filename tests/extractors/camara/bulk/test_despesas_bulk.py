@@ -1,6 +1,7 @@
 """Despesas Bulk: aliases CEAP → contrato Silver no CamaraDespesasTransformer."""
 
 import polars as pl
+
 from ipolitico.transformers.bulk_window import BulkTemporalFilter
 from ipolitico.transformers.camara.despesas_transformer import CamaraDespesasTransformer
 

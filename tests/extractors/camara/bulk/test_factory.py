@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 
 import pytest
+
 from ipolitico.core.constants import DomainType, SourceType
 
 # API Extractors

@@ -1,4 +1,5 @@
 import polars as pl
+
 from ipolitico.core.constants import DomainType, LoadStrategy, SourceType
 from ipolitico.pipeline.source_router import SourceRouter
 

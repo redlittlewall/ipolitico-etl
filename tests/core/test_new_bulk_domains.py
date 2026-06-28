@@ -1,6 +1,7 @@
 """Testes para os novos domínios bulk-only (funcionarios, tecadCategorias, tecadTermos)."""
 
 import polars as pl
+
 from ipolitico.core.constants import DomainType, LoadStrategy
 from ipolitico.core.domain_spec import DOMAIN_SPECS
 from ipolitico.core.schemas import SILVER_SCHEMAS

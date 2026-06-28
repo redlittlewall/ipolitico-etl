@@ -3,6 +3,7 @@ Testes do helper de locale BR para conversão de moeda (1.234,56 → Float64).
 """
 
 import polars as pl
+
 from ipolitico.transformers.br_locale import convert_br_currency_columns
 
 

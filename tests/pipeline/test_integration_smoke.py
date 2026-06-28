@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import polars as pl
 import pytest
+
 from ipolitico.core.constants import DomainType, LoadStrategy, MedallionLayer, SinkType
 from ipolitico.pipeline.builder import PipelineBuilder, PipelineComponents
 from ipolitico.pipeline.manager import PipelineManager

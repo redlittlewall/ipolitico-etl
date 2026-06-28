@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 
 import polars as pl
 import pytest
+
 from ipolitico.extractors.camara.api.deputado_child import MandatosExternosExtractor
 
 

@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import polars as pl
+
 from ipolitico.storage.datalake_repository import DataLakeRepository
 from ipolitico.storage.state_store import StateStore
 

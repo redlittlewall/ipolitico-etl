@@ -1,6 +1,7 @@
 """PipelineBuilder: fallback extractor_bulk quando não configurado no YAML."""
 
 import pytest
+
 from ipolitico.core.client import CamaraClient
 from ipolitico.core.constants import SinkType, SourceType
 from ipolitico.pipeline.builder import PipelineBuilder

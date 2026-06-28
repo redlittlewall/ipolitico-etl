@@ -6,6 +6,7 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import polars as pl
 import pytest
+
 from ipolitico.extractors.camara.bulk.base_bulk import BaseBulkExtractor
 
 

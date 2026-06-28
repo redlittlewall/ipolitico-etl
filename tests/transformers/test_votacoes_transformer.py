@@ -1,6 +1,7 @@
 """Transformer de votações: Struct da API e contrato Silver."""
 
 import polars as pl
+
 from ipolitico.core.constants import DomainType
 from ipolitico.transformers.camara.votacoes_transformer import CamaraVotacoesTransformer
 

@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock
 
 import pytest
+
 from ipolitico.extractors.camara.api.proposicoes import ProposicoesExtractor
 
 

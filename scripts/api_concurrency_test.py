@@ -172,7 +172,7 @@ def test1_lightweight() -> None:
         results = []
         for run in range(RUNS):
             urls = [url for _ in range(level)]
-            r = _run_level(urls, min(level, 50), f"run{run+1}")
+            r = _run_level(urls, min(level, 50), f"run{run + 1}")
             results.append(r)
             time.sleep(COOLDOWN)
         # Pick the median result by pct_ok
@@ -205,7 +205,7 @@ def test2_heavy() -> None:
         for run in range(RUNS):
             sample = random.sample(DEPUTADO_IDS, level)
             urls = [f"{BASE}/deputados/{did}/historico" for did in sample]
-            r = _run_level(urls, min(level, 50), f"run{run+1}")
+            r = _run_level(urls, min(level, 50), f"run{run + 1}")
             results.append(r)
             time.sleep(COOLDOWN)
         results.sort(key=lambda x: x["pct_ok"])
@@ -246,7 +246,7 @@ def test3_mixed() -> None:
             urls += [light_url for _ in range(light_count)]
 
             start = time.monotonic()
-            r = _run_level(urls, min(level, 50), f"run{run+1}")
+            r = _run_level(urls, min(level, 50), f"run{run + 1}")
             r["wall_time"] = time.monotonic() - start
             results.append(r)
             time.sleep(COOLDOWN)
@@ -281,7 +281,7 @@ def test4_saturation() -> None:
     probe_interval = 1  # seconds between probes
 
     for run in range(RUNS):
-        print(f"\n  Run {run+1}/{RUNS}")
+        print(f"\n  Run {run + 1}/{RUNS}")
         sample = random.sample(DEPUTADO_IDS, heavy_count)
         heavy_urls = [f"{BASE}/deputados/{did}/historico" for did in sample]
         probe_results: list[dict] = []
@@ -320,14 +320,14 @@ def test4_saturation() -> None:
         probe_total = len(probe_results)
 
         print(
-            f"    Heavy:  OK={heavy_ok:>2}/{heavy_total:<2} " f"({100.0*heavy_ok/heavy_total:.0f}%)"
+            f"    Heavy:  OK={heavy_ok:>2}/{heavy_total:<2} ({100.0 * heavy_ok / heavy_total:.0f}%)"
         )
         print(
-            f"    Probe:  OK={probe_ok:>2}/{probe_total:<2} " f"({100.0*probe_ok/probe_total:.0f}%)"
+            f"    Probe:  OK={probe_ok:>2}/{probe_total:<2} ({100.0 * probe_ok / probe_total:.0f}%)"
         )
         if probe_total > 0:
             statuses_flat = ", ".join(
-                f"{s}:{sum(1 for r in probe_results if r['status']==s)}"
+                f"{s}:{sum(1 for r in probe_results if r['status'] == s)}"
                 for s in sorted({r["status"] for r in probe_results})
             )
             print(f"    Probe statuses: {statuses_flat}")

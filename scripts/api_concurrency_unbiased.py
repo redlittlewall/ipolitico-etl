@@ -23,14 +23,14 @@ def fetch_retry(url: str, retries: int = 3) -> tuple[int, float, str]:
         t0 = time.perf_counter()
         try:
             with urllib.request.urlopen(url, timeout=TIMEOUT) as r:
-                return r.status, (time.perf_counter() - t0) * 1000, f"ok attempt={attempt+1}"
+                return r.status, (time.perf_counter() - t0) * 1000, f"ok attempt={attempt + 1}"
         except urllib.error.HTTPError as e:
             elapsed = (time.perf_counter() - t0) * 1000
             if e.code in (504, 429) and attempt < retries - 1:
                 wait = 2 ** (attempt + 1)
                 time.sleep(wait)
                 continue
-            return e.code, elapsed, f"attempt={attempt+1} retries exhausted"
+            return e.code, elapsed, f"attempt={attempt + 1} retries exhausted"
         except Exception as e:
             return 0, (time.perf_counter() - t0) * 1000, str(e)[:100]
     return 0, 0, "max retries"
