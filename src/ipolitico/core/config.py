@@ -28,6 +28,7 @@ MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", 10))
 CAMARA_HTTP_CONCURRENCY = int(os.getenv("CAMARA_HTTP_CONCURRENCY", str(MAX_CONCURRENT_REQUESTS)))
 
 # Configuração de Logging
+LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
