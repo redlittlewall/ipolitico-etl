@@ -1,16 +1,53 @@
 [project]
 name = "ipolitico-etl"
-version = "0.1.0"
+version = "0.2.0"
 description = "ETL Open Source, neutro e determinístico para dados da política brasileira."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
+authors = [
+    { name = "iPolitico Contributors" },
+]
+keywords = ["etl", "camara-dos-deputados", "dados-abertos", "politica-brasileira", "transparencia", "data-lake"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: Portuguese (Brazilian)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Database :: Database Engines/Servers",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Sociology :: Politics",
+]
 dependencies = [
     "httpx",
     "polars",
     "pydantic",
     "respx",
+    "duckdb",
+    "python-dotenv",
+    "tenacity",
+    "PyYAML",
 ]
+
+[project.urls]
+Homepage = "https://github.com/redlittlewall/ipolitico-etl"
+Repository = "https://github.com/redlittlewall/ipolitico-etl"
+Documentation = "https://github.com/redlittlewall/ipolitico-etl#readme"
+Changelog = "https://github.com/redlittlewall/ipolitico-etl/releases"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+ipolitico = "ipolitico.main:main_cli"
 
 [tool.ruff]
 line-length = 100

@@ -1,0 +1,91 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Test Swagger",
+    "version": "v1.0"
+  },
+  "paths": {
+    "/deputados": {
+      "get": {
+        "summary": "Lista de deputados",
+        "tags": ["Deputados"],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Deputado" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deputados/{id}": {
+      "get": {
+        "summary": "Detalhe do deputado",
+        "tags": ["Deputados"]
+      }
+    },
+    "/deputados/{id}/eventos": {
+      "get": {
+        "summary": "Eventos do deputado",
+        "tags": ["Deputados"]
+      }
+    },
+    "/blocos": {
+      "get": {
+        "summary": "Lista de blocos",
+        "tags": ["Blocos"],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Bloco" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/recurso_novo": {
+      "get": {
+        "summary": "Lista de recurso novo",
+        "tags": ["Novos"]
+      }
+    },
+    "/recurso_novo/{id}/detalhe_filho": {
+      "get": {
+        "summary": "Detalhe filho",
+        "tags": ["Novos"]
+      }
+    },
+    "/referencias/uf": {
+      "get": {
+        "summary": "Lista de UF",
+        "tags": ["Referências"]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Deputado": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "nome": { "type": "string" },
+          "siglaPartido": { "type": "string" }
+        }
+      },
+      "Bloco": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "nome": { "type": "string" }
+        }
+      }
+    }
+  }
+}

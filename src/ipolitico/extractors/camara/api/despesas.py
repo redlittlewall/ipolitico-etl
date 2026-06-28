@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from typing import Any, Optional
 
 import polars as pl
 
@@ -11,94 +11,48 @@ logger = logging.getLogger(__name__)
 
 class DespesasExtractor(CamaraBaseExtractor):
     """
-    Extrator responsável pelo domínio de Despesas (Cota Parlamentar).
+    Extrator responsável por buscar Cotas Parlamentares (Despesas) na API.
 
-    A API da Câmara possui um limite rígido de itens por requisição. Este extrator
-    implementa um modelo Producer-Consumer que fatiia as buscas (chunking) e realiza
-    o streaming dos dados diretamente para o sink, evitando acúmulo na RAM.
+    A delegação do fatiamento (chunking) e orquestração assíncrona pertence
+    agora ao PipelineRunner. Esta classe lida exclusivamente com o fetch
+    direto à API de acordo com os parâmetros enviados.
     """
 
     async def extract(
-        self,
-        sink_func,
-        deputados_ids: list[int] = None,
-        start_date: str = None,
-        end_date: str = None,
-    ) -> None:
+        self, deputado_id: int, year: int, month: Optional[int] = None, **kwargs: Any
+    ) -> pl.DataFrame:
         """
-            Orquestra a extração de despesas executando jobs mensais/anuais em paralelo.
-
-        Utiliza o motor execute_pipeline para garantir que cada lote de despesa processado
-        seja salvo imediatamente via sink_func.
+        Busca todas as despesas de um deputado em um ano/mês específico.
 
         Args:
-            sink_func (callable): Função assíncrona de persistência (ex: SQLiteSink.save).
-            deputados_ids (list[int]): Lista de IDs dos deputados. Obrigatório.
-            start_date (str): Data inicial no formato YYYY-MM-DD. Obrigatório.
-            end_date (str): Data final no formato YYYY-MM-DD. Obrigatório.
+            deputado_id (int): O ID único do parlamentar.
+            year (int): O ano de referência.
+            month (int, optional): O mês de referência.
+            **kwargs: Parâmetros adicionais (ignorado neste escopo básico).
 
         Returns:
-            None: Os dados são enviados diretamente para a fila do consumidor (sink_func).
-
-        Raises:
-            ValueError: Caso os limites temporais ou IDs não sejam fornecidos.
+            pl.DataFrame: DataFrame contendo as despesas estritamente brutos.
         """
-        if not start_date or not end_date or not deputados_ids:
-            raise ValueError(
-                "Extrator de Despesas exige start_date, end_date e deputados_ids explícitos."
-            )
+        endpoint = f"{ApiRoutes.DEPUTADOS.value}/{deputado_id}/despesas"
 
-        start_dt = datetime.strptime(start_date.split("T")[0], "%Y-%m-%d")
-        end_dt = datetime.strptime(end_date.split("T")[0], "%Y-%m-%d")
+        raw_params = {
+            ApiParams.ANO: year,
+            ApiParams.ORDEM: ApiParams.ORDEM_ASC.value,
+            ApiParams.ORDENAR_POR: ApiParams.DATA_DOCUMENTO.value,
+        }
 
-        start_year, start_month = start_dt.year, start_dt.month
-        end_year, end_month = end_dt.year, end_dt.month
-        logger.debug(f"Sincronizando despesas do período: {start_date} a {end_date}")
+        if month:
+            raw_params[ApiParams.MES] = month
 
-        # Construção da matriz de processamento (Jobs Temporais)
-        jobs = []
-        for year in range(start_year, end_year + 1):
-            months = (
-                range(start_month, end_month + 1)
-                if start_year == end_year
-                else range(start_month, 13)
-                if year == start_year
-                else range(1, end_month + 1)
-                if year == end_year
-                else range(1, 13)
-            )
+        logger.debug(f"Fetching despesas for dep {deputado_id} ({year}/{month})")
+        data = await self.fetch_paginated(endpoint, self.build_params(raw_params))
 
-            for d_id in deputados_ids:
-                for month in months:
-                    jobs.append({"id": d_id, "year": year, "month": month})
+        if not data:
+            return pl.DataFrame()
 
-        # Definição da rotina operária estrita
-        async def fetch_despesa_deputado(job: dict) -> pl.DataFrame:
-            endpoint = f"{ApiRoutes.DEPUTADOS.value}/{job['id']}/despesas"
+        df = pl.DataFrame(data, infer_schema_length=None)
 
-            raw_params = {
-                ApiParams.ANO: job["year"],  # Correção Crítica: Sem colchetes
-                ApiParams.MES: job["month"],
-                ApiParams.ORDEM: ApiParams.ORDEM_ASC.value,
-                ApiParams.ORDENAR_POR: "dataDocumento",
-            }
-            dados = await self.fetch_paginated(endpoint, self.build_params(raw_params))
+        if not df.is_empty():
+            df = df.with_columns(pl.lit(deputado_id).alias(ApiParams.DEPUTADO_ID.value))
 
-            if not dados:
-                return pl.DataFrame()
-
-            # Injeção da Chave Estrangeira
-            df = pl.DataFrame(dados).with_columns(pl.lit(job["id"]).alias("id_deputado"))
-
-            return df.filter(
-                (pl.col("dataDocumento").str.slice(0, 10) >= start_date)
-                & (pl.col("dataDocumento").str.slice(0, 10) <= end_date)
-            )
-
-        await self.execute_pipeline(
-            items=jobs,
-            fetch_func=fetch_despesa_deputado,
-            sink_func=sink_func,
-            table_name="despesas",
-            unique_keys=["id_deputado", "numDocumento", "codDocumento"],
-        )
+        return df

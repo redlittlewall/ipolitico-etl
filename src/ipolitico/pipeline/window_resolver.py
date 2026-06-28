@@ -1,0 +1,169 @@
+from __future__ import annotations
+
+import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Optional, Tuple
+
+from ipolitico.core.constants import DomainType, LoadStrategy, MedallionLayer
+from ipolitico.core.domain_spec import spec_for
+from ipolitico.storage.state_store import StateStore
+
+logger = logging.getLogger(__name__)
+
+
+def resolve_calendar_years(span_start: str, span_end: str) -> tuple[int, int]:
+    """Retorna anos civis inicial e final a partir de ISO YYYY-MM-DD."""
+    y0 = int(span_start.split("-")[0])
+    y1 = int(span_end.split("-")[0])
+    if y0 > y1:
+        return y1, y0
+    return y0, y1
+
+
+def resolve_effective_iso_window(
+    domain: DomainType,
+    *,
+    orchestration_start: str,
+    orchestration_end: str,
+    earliest_possible: str,
+    strategy: LoadStrategy,
+    state_store: StateStore | None,
+    watermark_column: str | None,
+) -> tuple[str, str]:
+    """
+    Aplica piso dominial + teto=hoje.
+
+    Incremental já foi materializado em *orchestration_start* via watermark;
+    esta função reforça piso dominial.
+
+    Args:
+        domain: Tipo do domínio (usado para extensões futuras).
+        orchestration_start: Início da janela orquestrada (ISO).
+        orchestration_end: Fim da janela orquestrada (ISO).
+        earliest_possible: Data mais antiga do domínio (piso).
+        strategy: Estratégia de carga (reservado para extensões futuras).
+        state_store: StateStore (reservado para extensões futuras).
+        watermark_column: Coluna watermark (reservado para extensões futuras).
+
+    Returns:
+        Tupla (start, end) com piso e teto aplicados.
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    start = max(orchestration_start, earliest_possible)
+    end = min(orchestration_end, today)
+
+    # Parâmetros reservados para extensões futuras (P1)
+    _ = strategy, state_store, watermark_column, domain
+
+    if start > end:
+        end = today
+    return start, end
+
+
+class WindowResolver:
+    """Resolve janela orquestrada (incremental / full) a partir do estado persistido."""
+
+    def __init__(self, state_store: StateStore) -> None:
+        self._store = state_store
+        # Tenta extrair base_dir do state_store (DataLakeSink/DataLakeRepository)
+        self._base_dir: Path | None = None
+        if hasattr(state_store, "base_dir") and state_store.base_dir:
+            self._base_dir = Path(state_store.base_dir)
+
+    def should_skip_stable(self, domain: DomainType) -> bool:
+        """
+        Verifica se um domínio estável (stable=True) já tem dados Silver.
+
+        Domínios estáveis como REFERENCIAS, FUNCIONARIOS, TECAD_*, LICITACOES*
+        e outros bulk-only NUNCA mudam entre execuções. Se já foram extraídos
+        uma vez, pular completamente.
+
+        Args:
+            domain: Tipo do domínio a verificar.
+
+        Returns:
+            True se o domínio é estável E já existe Silver, False caso contrário.
+        """
+        spec = spec_for(domain)
+        if not spec or not spec.stable:
+            return False
+
+        if self._base_dir is None:
+            return False
+
+        silver_dir = self._base_dir / MedallionLayer.SILVER.value / domain.value
+        if not silver_dir.exists():
+            return False
+
+        parquet_files = list(silver_dir.glob("*.parquet"))
+        if not parquet_files:
+            return False
+
+        logger.info(
+            "[%s] Domínio estável com dados Silver existentes. "
+            "Saltando extração (não há dados novos desde a última carga).",
+            domain.value.upper(),
+        )
+        return True
+
+    @staticmethod
+    def watermark_column(domain: DomainType) -> Optional[str]:
+        spec = spec_for(domain)
+        if spec and spec.watermark_column:
+            return spec.watermark_column
+        return None
+
+    def resolve(
+        self,
+        domain: DomainType,
+        strategy: LoadStrategy,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> Tuple[str, str]:
+        actual_end = end_date or datetime.now().strftime("%Y-%m-%d")
+        spec = spec_for(domain)
+        earliest_possible = spec.earliest_iso if spec else "1826-04-29"
+
+        if start_date:
+            actual_start = max(start_date, earliest_possible)
+            if start_date != actual_start:
+                logger.warning(
+                    f"[{domain.value.upper()}] A data {start_date} é anterior à existência "
+                    f"destes dados. Ajustando limite inicial para {actual_start}."
+                )
+            return actual_start, actual_end
+
+        if strategy == LoadStrategy.FULL_LOAD:
+            actual_start = earliest_possible
+            logger.info(
+                f"[{domain.value.upper()}] Estratégia FULL LOAD."
+                f" Iniciando extração desde a origem segura: {actual_start}."
+            )
+            return actual_start, actual_end
+
+        watermark_col = self.watermark_column(domain)
+        if not watermark_col:
+            logger.info(
+                f"[{domain.value.upper()}] Entidade dimensional detectada."
+                " Assumindo janela completa para atualização (UPSERT)."
+            )
+            return earliest_possible, actual_end
+
+        watermark = self._store.get_watermark(domain.value, watermark_col)
+
+        if watermark:
+            raw_watermark = str(watermark).split("T")[0]
+            actual_start = max(raw_watermark, earliest_possible)
+            logger.info(
+                f"[{domain.value.upper()}] Estratégia INCREMENTAL."
+                f" Retomando da marca d'água: {actual_start}."
+            )
+        else:
+            actual_start = earliest_possible
+            logger.info(
+                f"[{domain.value.upper()}] Tabela sem histórico."
+                f" Iniciando carga a partir de {actual_start}."
+            )
+
+        return actual_start, actual_end

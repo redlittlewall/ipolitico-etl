@@ -1,0 +1,48 @@
+name: 🐛 Bug Report
+description: Reporte um problema para nos ajudar a melhorar
+labels: ["bug", "needs-triage"]
+
+body:
+  - type: markdown
+    attributes:
+      value: "Obrigado por reportar! Preencha os campos abaixo."
+
+  - type: input
+    id: domain
+    attributes:
+      label: Domínio afetado
+      description: Qual domínio/extrator apresentou problema? (ex: discursos, despesas)
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Descrição
+      description: O que aconteceu? Qual o comportamento esperado?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Passos para reproduzir
+      description: Comando executado, logs de erro, etc.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs relevantes
+      description: Cole trechos do log com erro (stack trace, HTTP errors)
+      render: text
+
+  - type: input
+    id: environment
+    attributes:
+      label: Ambiente
+      description: Versão do Python, SO, pip list (opcional)
+    validations:
+      required: false

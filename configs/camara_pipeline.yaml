@@ -1,0 +1,220 @@
+# Mapeamento dinâmico de dependências (Inversion of Control)
+domain_configs:
+  deputados:
+    extractor: "ipolitico.extractors.camara.api.deputados.DeputadosExtractor"
+    transformer: "ipolitico.transformers.camara.deputados_transformer.CamaraDeputadosTransformer"
+  despesas:
+    extractor: "ipolitico.extractors.camara.api.despesas.DespesasExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.despesas_transformer.CamaraDespesasTransformer"
+  proposicoes:
+    extractor: "ipolitico.extractors.camara.api.proposicoes.ProposicoesExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.proposicoes_transformer.CamaraProposicoesTransformer"
+  votacoes:
+    extractor: "ipolitico.extractors.camara.api.votacoes.VotacoesExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.votacoes_transformer.CamaraVotacoesTransformer"
+  votos:
+    extractor: "ipolitico.extractors.camara.api.votos.VotosExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.votacoes_transformer.CamaraVotacoesTransformer"
+  profissoes:
+    # NOTA: Sem extractor_bulk. O CSV bulk (deputadosProfissoes.csv) é um
+    # catálogo de tipos de profissão sem coluna id_deputado, não dados
+    # por-deputado. O extrator API (/deputados/{id}/profissoes) é a fonte
+    # correta com id_deputado por deputado.
+    extractor: "ipolitico.extractors.camara.api.deputado_child.ProfissoesExtractor"
+    transformer: "ipolitico.transformers.camara.deputado_child_transformer.CamaraDeputadoChildTransformer"
+  ocupacoes:
+    # NOTA: Sem extractor_bulk. O CSV bulk (deputadosOcupacoes.csv) é um
+    # catálogo de ocupações sem coluna id_deputado. O extrator API
+    # (/deputados/{id}/ocupacoes) é a fonte correta.
+    extractor: "ipolitico.extractors.camara.api.deputado_child.OcupacoesExtractor"
+    transformer: "ipolitico.transformers.camara.deputado_child_transformer.CamaraDeputadoChildTransformer"
+  orgaos:
+    extractor: "ipolitico.extractors.camara.api.orgaos.OrgaosExtractor"
+    transformer: "ipolitico.transformers.camara.orgaos_transformer.CamaraOrgaosTransformer"
+    # NOTA: Sem extractor_bulk. O CSV bulk de orgaos não tem coluna id
+    # numérica e o campo uri contém dados corrompidos (texto legislativo
+    # em vez de URI). Usar sempre rota API para orgaos.
+  partidos:
+    extractor: "ipolitico.extractors.camara.api.partidos.PartidosExtractor"
+    transformer: "ipolitico.transformers.camara.partidos_transformer.CamaraPartidosTransformer"
+  eventos:
+    extractor: "ipolitico.extractors.camara.api.eventos.EventosExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.eventos_transformer.CamaraEventosTransformer"
+  blocos:
+    extractor: "ipolitico.extractors.camara.api.blocos.BlocosExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraBlocosTransformer"
+  frentes:
+    extractor: "ipolitico.extractors.camara.api.frentes.FrentesExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraFrentesTransformer"
+  grupos:
+    extractor: "ipolitico.extractors.camara.api.grupos.GruposExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraGruposTransformer"
+  legislaturas:
+    extractor: "ipolitico.extractors.camara.api.legislaturas.LegislaturasExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraLegislaturasTransformer"
+  discursos:
+    extractor: "ipolitico.extractors.camara.api.deputado_child.DiscursosExtractor"
+    transformer: "ipolitico.transformers.camara.discursos_transformer.CamaraDiscursosTransformer"
+  tramitacoes:
+    extractor: "ipolitico.extractors.camara.api.proposicao_child.TramitacoesExtractor"
+    transformer: "ipolitico.transformers.camara.proposicao_child_transformer.CamaraProposicaoChildTransformer"
+  autores:
+    extractor: "ipolitico.extractors.camara.api.proposicao_child.AutoresExtractor"
+    transformer: "ipolitico.transformers.camara.proposicao_child_transformer.CamaraProposicaoChildTransformer"
+  orientacoes:
+    extractor: "ipolitico.extractors.camara.api.votacao_child.OrientacoesExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.votacao_child_transformer.CamaraOrientacoesTransformer"
+  orgaos_membros:
+    extractor: "ipolitico.extractors.camara.api.orgao_child.OrgaoMembrosExtractor"
+    transformer: "ipolitico.transformers.camara.membros_transformer.CamaraMembrosTransformer"
+  frentes_membros:
+    extractor: "ipolitico.extractors.camara.api.frente_child.FrenteMembrosExtractor"
+    transformer: "ipolitico.transformers.camara.membros_transformer.CamaraMembrosTransformer"
+  relacionadas:
+    extractor: "ipolitico.extractors.camara.api.proposicao_child.RelacionadasExtractor"
+    transformer: "ipolitico.transformers.camara.proposicao_child_transformer.CamaraProposicaoChildTransformer"
+  temas:
+    extractor: "ipolitico.extractors.camara.api.proposicao_child.TemasExtractor"
+    transformer: "ipolitico.transformers.camara.proposicao_child_transformer.CamaraProposicaoChildTransformer"
+  deputados_frentes:
+    extractor: "ipolitico.extractors.camara.api.deputado_child.FrentesDeputadoExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.deputado_child_transformer.CamaraDeputadoChildTransformer"
+  deputados_orgaos:
+    extractor: "ipolitico.extractors.camara.api.deputado_child.OrgaosDeputadoExtractor"
+    transformer: "ipolitico.transformers.camara.deputado_child_transformer.CamaraDeputadoChildTransformer"
+  deputados_eventos:
+    extractor: "ipolitico.extractors.camara.api.deputado_child.EventosDeputadoExtractor"
+    transformer: "ipolitico.transformers.camara.deputado_child_transformer.CamaraDeputadoChildTransformer"
+  deputados_historico:
+    extractor: "ipolitico.extractors.camara.api.deputado_child.HistoricoDeputadoExtractor"
+    transformer: "ipolitico.transformers.camara.deputado_child_transformer.CamaraDeputadoChildTransformer"
+  mandatos_externos:
+    extractor: "ipolitico.extractors.camara.api.deputado_child.MandatosExternosExtractor"
+    transformer: "ipolitico.transformers.camara.deputado_child_transformer.CamaraDeputadoChildTransformer"
+  eventos_deputados:
+    extractor: "ipolitico.extractors.camara.api.evento_child.EventoDeputadosExtractor"
+    transformer: "ipolitico.transformers.camara.evento_child_transformer.CamaraEventoChildTransformer"
+  eventos_votacoes:
+    extractor: "ipolitico.extractors.camara.api.evento_child.EventoVotacoesExtractor"
+    transformer: "ipolitico.transformers.camara.evento_child_transformer.CamaraEventoChildTransformer"
+  eventos_pauta:
+    extractor: "ipolitico.extractors.camara.api.evento_child.EventoPautaExtractor"
+    transformer: "ipolitico.transformers.camara.evento_child_transformer.CamaraEventoChildTransformer"
+  eventos_orgaos:
+    extractor: "ipolitico.extractors.camara.api.evento_child.EventoOrgaosExtractor"
+    transformer: "ipolitico.transformers.camara.evento_child_transformer.CamaraEventoChildTransformer"
+  partidos_membros:
+    extractor: "ipolitico.extractors.camara.api.partido_child.PartidoMembrosExtractor"
+    transformer: "ipolitico.transformers.camara.membros_transformer.CamaraMembrosTransformer"
+  partidos_lideres:
+    extractor: "ipolitico.extractors.camara.api.partido_child.PartidoLideresExtractor"
+    transformer: "ipolitico.transformers.camara.membros_transformer.CamaraMembrosTransformer"
+  proposicoes_votacoes:
+    extractor: "ipolitico.extractors.camara.api.proposicao_child.ProposicoesVotacoesExtractor"
+    transformer: "ipolitico.transformers.camara.proposicao_child_transformer.CamaraProposicaoChildTransformer"
+  blocos_partidos:
+    extractor: "ipolitico.extractors.camara.api.bloco_child.BlocoPartidosExtractor"
+    transformer: "ipolitico.transformers.camara.membros_transformer.CamaraMembrosTransformer"
+  referencias:
+    extractor: "ipolitico.extractors.camara.api.referencias.ReferenciasExtractor"
+    transformer: "ipolitico.transformers.camara.referencias_transformer.CamaraReferenciasTransformer"
+  deputados_detalhe:
+    extractor: "ipolitico.extractors.camara.api.detail_child.DeputadosDetalheExtractor"
+    transformer: "ipolitico.transformers.camara.detalhe_transformer.CamaraDetalheTransformer"
+  orgaos_detalhe:
+    extractor: "ipolitico.extractors.camara.api.detail_child.OrgaosDetalheExtractor"
+    transformer: "ipolitico.transformers.camara.detalhe_transformer.CamaraDetalheTransformer"
+  eventos_detalhe:
+    extractor: "ipolitico.extractors.camara.api.detail_child.EventosDetalheExtractor"
+    transformer: "ipolitico.transformers.camara.detalhe_transformer.CamaraDetalheTransformer"
+  votacoes_detalhe:
+    extractor: "ipolitico.extractors.camara.api.detail_child.VotacoesDetalheExtractor"
+    transformer: "ipolitico.transformers.camara.detalhe_transformer.CamaraDetalheTransformer"
+  frentes_detalhe:
+    extractor: "ipolitico.extractors.camara.api.detail_child.FrentesDetalheExtractor"
+    transformer: "ipolitico.transformers.camara.detalhe_transformer.CamaraDetalheTransformer"
+  partidos_detalhe:
+    extractor: "ipolitico.extractors.camara.api.detail_child.PartidosDetalheExtractor"
+    transformer: "ipolitico.transformers.camara.detalhe_transformer.CamaraDetalheTransformer"
+  grupos_detalhe:
+    extractor: "ipolitico.extractors.camara.api.detail_child.GruposDetalheExtractor"
+    transformer: "ipolitico.transformers.camara.detalhe_transformer.CamaraDetalheTransformer"
+  legislaturas_detalhe:
+    extractor: "ipolitico.extractors.camara.api.detail_child.LegislaturasDetalheExtractor"
+    transformer: "ipolitico.transformers.camara.detalhe_transformer.CamaraDetalheTransformer"
+  blocos_detalhe:
+    extractor: "ipolitico.extractors.camara.api.detail_child.BlocosDetalheExtractor"
+    transformer: "ipolitico.transformers.camara.detalhe_transformer.CamaraDetalheTransformer"
+  proposicoes_detalhe:
+    extractor: "ipolitico.extractors.camara.api.detail_child.ProposicoesDetalheExtractor"
+    transformer: "ipolitico.transformers.camara.detalhe_transformer.CamaraDetalheTransformer"
+  orgaos_eventos:
+    extractor: "ipolitico.extractors.camara.api.orgao_child.OrgaoEventosExtractor"
+    transformer: "ipolitico.transformers.camara.evento_child_transformer.CamaraEventoChildTransformer"
+  orgaos_votacoes:
+    extractor: "ipolitico.extractors.camara.api.orgao_child.OrgaoVotacoesExtractor"
+    transformer: "ipolitico.transformers.camara.evento_child_transformer.CamaraEventoChildTransformer"
+  grupos_membros:
+    extractor: "ipolitico.extractors.camara.api.grupo_child.GrupoMembrosExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.membros_transformer.CamaraMembrosTransformer"
+  grupos_historico:
+    extractor: "ipolitico.extractors.camara.api.grupo_child.GrupoHistoricoExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.membros_transformer.CamaraMembrosTransformer"
+  funcionarios:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraFuncionariosTransformer"
+  tecad_categorias:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraTecadCategoriasTransformer"
+  tecad_termos:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraTecadTermosTransformer"
+  # ── Domínios bulk-only de licitações (Fase 3) ─────────────────────────
+  licitacoes:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraLicitacoesTransformer"
+  licitacoes_contratos:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraLicitacoesContratosTransformer"
+  licitacoes_itens:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraLicitacoesItensTransformer"
+  licitacoes_pedidos:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraLicitacoesPedidosTransformer"
+  licitacoes_propostas:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraLicitacoesPropostasTransformer"
+  # ── Domínios bulk-only de eventos/votações ──────────────────────────────
+  eventos_presenca_deputados:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraEventosPresencaDeputadosTransformer"
+  eventos_requerimentos:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraEventosRequerimentosTransformer"
+  votacoes_objetos:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraVotacoesObjetosTransformer"
+  votacoes_proposicoes:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraVotacoesProposicoesTransformer"
+  legislaturas_lideres:
+    extractor: "ipolitico.extractors.camara.api.legislatura_child.LegislaturaLideresExtractor"
+    transformer: "ipolitico.transformers.camara.membros_transformer.CamaraMembrosTransformer"
+  legislaturas_mesa:
+    extractor: "ipolitico.extractors.camara.api.legislatura_child.LegislaturaMesaExtractor"
+    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.membros_transformer.CamaraMembrosTransformer"

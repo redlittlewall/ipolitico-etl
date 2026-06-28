@@ -1,9 +1,12 @@
-from typing import Any
+import logging
+from typing import Any, Dict, List
 
 from ipolitico.core.client import CamaraClient
 from ipolitico.core.config import CAMARA_PAGE_SIZE
 from ipolitico.core.constants import ApiParams
-from ipolitico.extractors.base import BaseExtractor, IStateStore
+from ipolitico.extractors.base import BaseExtractor
+
+logger = logging.getLogger(__name__)
 
 
 class CamaraBaseExtractor(BaseExtractor):
@@ -11,23 +14,29 @@ class CamaraBaseExtractor(BaseExtractor):
     Extrator Base específico para a API de Dados Abertos da Câmara.
 
     Atua como uma ponte (Adapter) entre o motor assíncrono genérico e as
-    regras de negócio estatais, gerenciando a injeção automática de parâmetros
-    de paginação e a normalização de Enumerações.
+    particularidades da API da Câmara, gerenciando a injeção automática de
+    parâmetros de paginação e a normalização de Enumerações, sem deter
+    estado ou regras de negócio.
     """
 
-    def __init__(self, client: CamaraClient, state_store: IStateStore):
-        super().__init__(state_store)
+    def __init__(self, client: CamaraClient):
+        """
+        Inicializa o extrator base da API.
+
+        Args:
+            client (CamaraClient): Cliente HTTP configurado para requisições na Câmara.
+        """
         self.client = client
 
-    def build_params(self, raw_params: dict[Any, Any]) -> dict[str, Any]:
+    def build_params(self, raw_params: Dict[Any, Any]) -> Dict[str, Any]:
         """
         Limpa parâmetros nulos e resolve Enums para strings compreensíveis pela API.
 
         Args:
-            raw_params (dict): Dicionário de parâmetros de requisição cru.
+            raw_params (Dict[Any, Any]): Dicionário de parâmetros de requisição cru.
 
         Returns:
-            dict: Dicionário purificado e pronto para serialização na URL.
+            Dict[str, Any]: Dicionário purificado e pronto para serialização na URL.
         """
         cleaned_params = {}
         for key, value in raw_params.items():
@@ -36,36 +45,78 @@ class CamaraBaseExtractor(BaseExtractor):
                 cleaned_params[param_key] = value
         return cleaned_params
 
-    async def fetch_paginated(self, endpoint: str, params: dict[str, Any]) -> list[dict[str, Any]]:
+    async def fetch_paginated(self, endpoint: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
-        Lida com a paginação infinita da Câmara (baseada em 'pagina' e 'itens').
+        Lida com a paginação infinita da API da Câmara.
 
         Percorre as páginas da API automaticamente até que uma lista vazia
-        ou uma página com menos itens que o limite máximo (CAMARA_PAGE_SIZE) seja retornada.
+        ou uma página com menos itens que o limite máximo seja retornada.
 
         Args:
             endpoint (str): Caminho relativo do recurso (ex: 'deputados/1/despesas').
-            params (dict): Parâmetros de filtro e ordenação já limpos.
+            params (Dict[str, Any]): Parâmetros de filtro e ordenação já limpos.
 
         Returns:
-            list: Todos os registros acumulados das múltiplas páginas.
+            List[Dict[str, Any]]: Todos os registros acumulados das múltiplas páginas.
         """
+        page_limit_key = ApiParams.ITENS.value
+        if params.get(page_limit_key) is None:
+            params[page_limit_key] = CAMARA_PAGE_SIZE
+        page_limit = int(params[page_limit_key])
+
         all_data = []
-        pagina = 1
+        page = 1
 
         while True:
-            params[ApiParams.PAGINA.value] = pagina
+            params[ApiParams.PAGINA.value] = page
 
-            dados = await self.client.fetch(endpoint, params=params)
+            data = await self.client.fetch(endpoint, params=params)
 
-            if not dados:
+            if not data:
                 break
 
-            all_data.extend(dados)
+            all_data.extend(data)
 
-            if len(dados) < CAMARA_PAGE_SIZE:
+            if len(data) < page_limit:
                 break
 
-            pagina += 1
+            page += 1
 
         return all_data
+
+    async def fetch_unpaginated(
+        self, endpoint: str, params: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """
+        Obtém dados de um endpoint que NÃO suporta paginação (itens/pagina).
+
+        Alguns endpoints da API Câmara (ex: /proposicoes/{id}/tramitacoes,
+        /eventos/{id}/deputados) rejeitam os parâmetros 'itens' e 'pagina'
+        com erro 400/405. Para estes, use este método em vez de fetch_paginated.
+
+        Args:
+            endpoint (str): Caminho relativo do recurso.
+            params (Dict[str, Any]): Parâmetros de filtro (ex: dataInicio, dataFim).
+
+        Returns:
+            List[Dict[str, Any]]: Registros retornados pela API.
+        """
+        return await self.client.fetch(endpoint, params=params)
+
+    async def probe_endpoint(self, endpoint: str) -> int:
+        """
+        Sonda o endpoint pedindo apenas 1 item para validar a existência de dados.
+        Evita chamadas em massa desnecessárias para recursos vazios.
+
+        Args:
+            endpoint (str): Caminho relativo do recurso.
+
+        Returns:
+            int: Quantidade de itens retornados (0 se vazio).
+        """
+        try:
+            data = await self.client.fetch(endpoint, params={"itens": 1})
+            return len(data) if data else 0
+        except Exception as e:
+            logger.error(f"Erro ao sondar o endpoint {endpoint}: {e}")
+            return 0

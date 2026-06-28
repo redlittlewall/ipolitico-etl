@@ -1,57 +1,85 @@
+"""Blindagem de schema para votações/votos via CamaraVotacoesTransformer (Bulk/API)."""
+
 import polars as pl
-from ipolitico.extractors.camara.bulk.votacoes_bulk import VotacoesBulkExtractor, VotosBulkExtractor
 
-# ==========================================
-# TESTES: VOTAÇÕES BULK (Schema Drift)
-# ==========================================
+from ipolitico.core.constants import DomainType
+from ipolitico.transformers.camara.votacoes_transformer import CamaraVotacoesTransformer
 
 
-def test_votacoes_bulk_schema_standardization():
-    """[BLINDAGEM] Garante que as colunas de data são convertidas para Datetime."""
-    ext = VotacoesBulkExtractor(None)
+def test_votacoes_transformer_datetime_from_bulk_strings():
+    tr = CamaraVotacoesTransformer()
     df_sujo = pl.DataFrame(
-        {"data": ["2026-05-10T14:00:00"], "dataHoraRegistro": ["2026-05-10T14:30:00"]}
+        {
+            "id": ["v1"],
+            "uri": ["u"],
+            "data": ["2026-05-10T14:00:00"],
+            "dataHoraRegistro": ["2026-05-10T14:30:00"],
+            "siglaOrgao": ["CCJC"],
+            "uriOrgao": [""],
+            "uriEvento": [""],
+            "proposicaoObjeto": [""],
+            "descricao": [""],
+            "aprovacao": [1],
+        }
     )
 
-    df_limpo = ext._standardize_schema(df_sujo)
+    df_limpo = tr.transform(df_sujo, sub_domain=DomainType.VOTACOES.value)
 
     assert df_limpo["data"].dtype == pl.Datetime
     assert df_limpo["dataHoraRegistro"].dtype == pl.Datetime
 
 
-def test_votacoes_bulk_missing_date_columns():
-    """[BLINDAGEM] O governo mandou o CSV sem datas. Não pode estourar com with_columns([])."""
-    ext = VotacoesBulkExtractor(None)
-    df_sujo = pl.DataFrame({"outra_coluna": ["VOT-123"]})
+def test_votacoes_transformer_missing_mandatory_columns_returns_empty():
+    tr = CamaraVotacoesTransformer()
+    df_sujo = pl.DataFrame(
+        {
+            "id": ["VOT-123"],
+            "uri": ["u"],
+            "siglaOrgao": ["CCJC"],
+            "uriOrgao": [""],
+            "proposicaoObjeto": [""],
+            "descricao": [""],
+        }
+    )
 
-    df_limpo = ext._standardize_schema(df_sujo)
-    assert "outra_coluna" in df_limpo.columns
-    assert "data" not in df_limpo.columns
+    df_limpo = tr.transform(df_sujo, sub_domain=DomainType.VOTACOES.value)
+
+    assert df_limpo.is_empty()
 
 
-# ==========================================
-# TESTES: VOTOS BULK (Schema Drift)
-# ==========================================
+def test_votos_transformer_bulk_id_deputado_rename():
+    tr = CamaraVotacoesTransformer()
+    df_sujo = pl.DataFrame(
+        {
+            "tipoVoto": ["Sim"],
+            "dataRegistroVoto": ["2026-01-01"],
+            "idDeputado": ["999"],
+            "partido": ["X"],
+            "uf": ["SP"],
+            "votacao_id": ["v1"],
+        }
+    )
 
+    df_limpo = tr.transform(df_sujo, sub_domain=DomainType.VOTOS.value)
 
-def test_votos_bulk_schema_standardization():
-    """[BLINDAGEM] Traduz o idDeputado legado e tipa como Int64 forte."""
-    ext = VotosBulkExtractor(None)
-    df_sujo = pl.DataFrame({"idDeputado": ["999"], "voto": ["Sim"]})
-
-    df_limpo = ext._standardize_schema(df_sujo)
-
-    assert "deputado_id" in df_limpo.columns
     assert "idDeputado" not in df_limpo.columns
-    assert df_limpo["deputado_id"][0] == 999
-    assert df_limpo["deputado_id"].dtype == pl.Int64
+    assert "id_deputado" in df_limpo.columns
+    assert df_limpo["id_deputado"][0] == 999
+    assert df_limpo["id_deputado"].dtype == pl.Int64
 
 
-def test_votos_bulk_missing_id_column():
-    """[BLINDAGEM] O governo mandou o CSV sem idDeputado. Não pode estourar ColumnNotFoundError."""
-    ext = VotosBulkExtractor(None)
-    df_sujo = pl.DataFrame({"voto": ["Sim"]})
+def test_votos_transformer_missing_id_deputado_fails_contract():
+    tr = CamaraVotacoesTransformer()
+    df_sujo = pl.DataFrame(
+        {
+            "tipoVoto": ["Sim"],
+            "dataRegistroVoto": ["2026-01-01"],
+            "partido": ["X"],
+            "uf": ["SP"],
+            "votacao_id": ["v1"],
+        }
+    )
 
-    df_limpo = ext._standardize_schema(df_sujo)
-    assert "voto" in df_limpo.columns
-    assert "deputado_id" not in df_limpo.columns
+    df_limpo = tr.transform(df_sujo, sub_domain=DomainType.VOTOS.value)
+
+    assert df_limpo.is_empty()

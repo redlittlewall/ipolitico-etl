@@ -1,166 +1,60 @@
-"""
-Testes Unitários do Extrator de Deputados (API).
-Valida a geração de matriz de legislaturas (Full Load vs Atual)
-e a normalização estrita de JSONs complexos nos detalhes cadastrais.
-"""
+"""Testes do DeputadosExtractor (API) — extrator retorna DataFrame bruto."""
 
-import json
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
+
 from ipolitico.extractors.camara.api.deputados import DeputadosExtractor
 
 
 @pytest.fixture
-def mock_deps_dependencies():
-    """Fornece mocks isolados de rede e banco de dados."""
+def extractor() -> DeputadosExtractor:
     client = AsyncMock()
-    state_store = MagicMock()
-    # Simulamos que o banco está vazio inicialmente
-    state_store.get_existing_ids.return_value = []
-    return client, state_store
-
-
-@pytest.fixture
-def extractor(mock_deps_dependencies):
-    """Instancia o extrator de Deputados com injeção de dependências mockadas."""
-    client, state_store = mock_deps_dependencies
-    ext = DeputadosExtractor(client, state_store)
-
-    # Mock do serviço de metadados interno (fingimos estar na Legislatura 2)
-    ext.metadata.get_current_legislature_id = AsyncMock(return_value=2)
-
-    # Mock da paginação
+    ext = DeputadosExtractor(client)
     ext.fetch_paginated = AsyncMock()
     return ext
 
 
-@pytest.fixture
-def mock_sink():
-    """Mock da função sink_func (ex: SQLiteSink.save) para interceptar os DataFrames."""
-    return AsyncMock()
-
-
 @pytest.mark.asyncio
-async def test_extract_with_dates(extractor, mock_sink):
-    """
-    Garante que os filtros de data são passados corretamente para a API
-    e enviados diretamente para o Sink sem passar pelo pipeline de legislaturas.
-    """
+async def test_extract_passes_date_filters_to_api(extractor: DeputadosExtractor):
     extractor.fetch_paginated.return_value = [{"id": 1, "nome": "João Político"}]
 
-    await extractor.extract(sink_func=mock_sink, start_date="2026-01-01", end_date="2026-01-31")
+    df = await extractor.extract(start_date="2026-01-01", end_date="2026-01-31")
 
-    # Verifica se a API foi chamada com os parâmetros corretos
-    args, kwargs = extractor.fetch_paginated.call_args
-    params = args[1]
+    assert df.height == 1
+    _endpoint, params = extractor.fetch_paginated.call_args[0]
     assert params["dataInicio"] == "2026-01-01"
     assert params["dataFim"] == "2026-01-31"
 
-    # Verifica se o Sink recebeu o DataFrame com o contrato correto
-    mock_sink.assert_called_once()
-    df_salvo, table_name, unique_keys = mock_sink.call_args[0]
-    assert df_salvo.height == 1
-    assert table_name == "deputados"
-    assert unique_keys == "id"
+
+@pytest.mark.asyncio
+async def test_extract_empty_api_returns_empty_frame(extractor: DeputadosExtractor):
+    extractor.fetch_paginated.return_value = []
+
+    df = await extractor.extract(start_date="2026-01-01", end_date="2026-01-31")
+
+    assert df.is_empty()
 
 
 @pytest.mark.asyncio
-async def test_extract_full_load_matrix(extractor, mock_sink):
-    """
-    Testa se o full_load gera os jobs corretamente varrendo todas as legislaturas
-    desde o Império até a legislatura mockada atual (1 até 2).
-    """
-    # Mockamos a função base execute_pipeline para não disparar a concorrência real
-    extractor.execute_pipeline = AsyncMock()
-
-    await extractor.extract(sink_func=mock_sink, full_load=True)
-
-    extractor.execute_pipeline.assert_called_once()
-
-    # Valida se a matriz de tarefas (items) mandou processar as legislaturas [1, 2]
-    kwargs = extractor.execute_pipeline.call_args[1]
-    assert kwargs["items"] == [1, 2]
-    assert kwargs["table_name"] == "deputados"
-
-
-@pytest.mark.asyncio
-async def test_extract_detalhes_normalization(extractor, mock_sink):
-    """
-    CRÍTICO (Blindagem de Schema): Garante que objetos complexos (dict/list) no
-    JSON da API sejam serializados para string antes de entrarem no Sink,
-    evitando falhas de tipagem no SQLite ou Parquet.
-    """
+async def test_extract_detalhes_builds_row_dataframe(extractor: DeputadosExtractor):
     complex_response = {
         "id": 999,
         "nome": "Maria Política",
-        "ultimoStatus": {"gabinete": "302", "situacao": "Exercício"},  # Isto é um Dict
-        "redeSocial": ["twitter.com/deputada", "instagram.com/deputada"],  # Isto é uma List
+        "ultimoStatus": {"gabinete": "302", "situacao": "Exercício"},
     }
     extractor.client.fetch = AsyncMock(return_value=complex_response)
 
-    # Dispara a extração de detalhes
-    await extractor.extract_detalhes(sink_func=mock_sink, deputados_ids=[999])
+    df = await extractor.extract_detalhes(999)
 
-    # Interceta o DataFrame que o extrator tentou gravar
-    mock_sink.assert_called_once()
-    df_salvo = mock_sink.call_args[0][0]
-
-    # O Polars deve ter recebido strings JSON, não objetos Python puros
-    assert isinstance(df_salvo["ultimoStatus"][0], str)
-    assert isinstance(df_salvo["redeSocial"][0], str)
-
-    # Verifica se os dados internos são recuperáveis a partir da string
-    data_status = json.loads(df_salvo["ultimoStatus"][0])
-    assert data_status["gabinete"] == "302"
-    assert data_status["situacao"] == "Exercício"
+    assert df.height == 1
+    assert df["id"][0] == 999
 
 
 @pytest.mark.asyncio
-async def test_extract_with_filters_empty_result(extractor):
-    """
-    [Cobre Linhas 78-80]
-    Testa o 'early return' quando filtramos dados e a API da Câmara não devolve nada.
-    O sink_func NUNCA deve ser chamado com DataFrame vazio.
-    """
-    extractor.fetch_paginated.return_value = []
-    mock_sink = AsyncMock()
+async def test_extract_detalhes_empty_response(extractor: DeputadosExtractor):
+    extractor.client.fetch = AsyncMock(return_value={})
 
-    await extractor.extract(sink_func=mock_sink, start_date="2026-01-01", end_date="2026-01-31")
+    df = await extractor.extract_detalhes(99)
 
-    # Garante que não chamamos a gravação no banco atoa
-    mock_sink.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_extract_detalhes_empty_ids(extractor):
-    """
-    [Cobre Linha 106]
-    Garante que a extração de detalhes aborte imediatamente (sem disparar concorrência)
-    se não mandarmos nenhum ID de deputado.
-    """
-    mock_sink = AsyncMock()
-    extractor.execute_pipeline = AsyncMock()
-
-    await extractor.extract_detalhes(sink_func=mock_sink, deputados_ids=[])
-
-    # O pipeline não pode ter sido ativado
-    extractor.execute_pipeline.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_fetch_detalhe_empty_response(extractor):
-    """
-    [Cobre Linha 116]
-    Simula uma anomalia na API onde o detalhe do deputado retorna vazio (ou é um falso ID).
-    """
-    mock_sink = AsyncMock()
-    # A API não encontrou os detalhes daquele deputado
-    extractor.client.fetch.return_value = {}
-
-    # Rodamos o extrator para um deputado (ID 99)
-    await extractor.extract_detalhes(sink_func=mock_sink, deputados_ids=[99])
-
-    # Como a API retornou vazio, o worker interno descarta,
-    # e o banco de dados (sink_func) não deve receber nada.
-    mock_sink.assert_not_called()
+    assert df.is_empty()

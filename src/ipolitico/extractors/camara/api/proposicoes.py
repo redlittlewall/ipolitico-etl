@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from typing import Any, Optional
 
 import polars as pl
 
@@ -11,53 +11,42 @@ logger = logging.getLogger(__name__)
 
 class ProposicoesExtractor(CamaraBaseExtractor):
     """
-    Extrator responsável pelo domínio de Proposições Legislativas.
+    Extrator responsável pelo domínio de Proposições Legislativas na API.
 
-    Busca Projetos de Lei, PECs, Requerimentos e outras matérias. Devido ao volume massivo,
-    a extração é obrigatoriamente particionada por ano para evitar timeouts da infraestrutura
-    governamental.
+    Busca Projetos de Lei, PECs e Requerimentos de forma crua.
+    A orquestração de chamadas particionadas por ano fica a cargo do PipelineRunner.
     """
 
-    async def extract(self, sink_func, start_date: str, end_date: str) -> pl.DataFrame:
+    async def extract(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        year: Optional[int] = None,
+        **kwargs: Any,
+    ) -> pl.DataFrame:
         """
-        Executa a extração de proposições numa janela de tempo estrita.
+        Executa a extração bruta de proposições da Câmara.
 
         Args:
-            sink_func (callable): Função assíncrona de persistência.
-            start_date (str): Data de início (YYYY-MM-DD).
-            end_date (str): Data de fim (YYYY-MM-DD).
+            start_date (str, optional): Data de início (YYYY-MM-DD).
+            end_date (str, optional): Data de fim (YYYY-MM-DD).
+            year (int, optional): Ano específico da proposição.
+            **kwargs: Parâmetros extras.
+
+        Returns:
+            pl.DataFrame: DataFrame contendo os dados brutos de proposições.
         """
-        if not start_date or not end_date:
-            raise ValueError("O Extrator de Proposições exige limites temporais explícitos.")
+        raw_params = {
+            ApiParams.ANO: year,
+            ApiParams.DATA_INICIO.value: start_date,
+            ApiParams.DATA_FIM.value: end_date,
+            ApiParams.ORDEM: ApiParams.ORDEM_ASC.value,
+            ApiParams.ORDENAR_POR: ApiParams.ID.value,
+        }
 
-        dt_ini = datetime.strptime(start_date.split("T")[0], "%Y-%m-%d")
-        dt_fim = datetime.strptime(end_date.split("T")[0], "%Y-%m-%d")
-
-        logger.debug(f"Sincronizando Proposições: {start_date} a {end_date}")
-
-        anos = list(range(dt_ini.year, dt_fim.year + 1))
-
-        async def fetch_proposicoes_ano(ano: int) -> pl.DataFrame:
-            raw_params = {
-                ApiParams.ANO: ano,
-                ApiParams.ORDEM: ApiParams.ORDEM_ASC.value,
-                ApiParams.ORDENAR_POR: "id",
-            }
-            dados = await self.fetch_paginated(
-                ApiRoutes.PROPOSICOES.value, self.build_params(raw_params)
-            )
-            df = pl.DataFrame(dados) if dados else pl.DataFrame()
-            if not df.is_empty():
-                df = df.filter(
-                    (pl.col("dataApresentacao").str.slice(0, 10) >= start_date)
-                    & (pl.col("dataApresentacao").str.slice(0, 10) <= end_date)
-                )
-            return df
-
-        await self.execute_pipeline(
-            items=anos,
-            fetch_func=fetch_proposicoes_ano,
-            sink_func=sink_func,
-            table_name="proposicoes",
-            unique_keys="id",
+        logger.debug(f"Fetching proposicoes with params: {raw_params}")
+        data = await self.fetch_paginated(
+            ApiRoutes.PROPOSICOES.value, self.build_params(raw_params)
         )
+
+        return pl.DataFrame(data) if data else pl.DataFrame()

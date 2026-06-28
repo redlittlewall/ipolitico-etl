@@ -1,0 +1,42 @@
+name: ✨ Feature Request
+description: Sugira uma ideia para o projeto
+labels: ["enhancement", "needs-triage"]
+
+body:
+  - type: markdown
+    attributes:
+      value: "Sugestões são bem-vindas! Conte-nos sua ideia."
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema
+      description: Que limitação ou necessidade você identificou?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solução proposta
+      description: Como você imagina que isso poderia funcionar?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas consideradas
+      description: Outras abordagens que você pensou
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Escopo
+      options:
+        - Nova fonte de dados (API)
+        - Nova funcionalidade no ETL
+        - Melhoria de performance
+        - Documentação
+        - Infraestrutura (CI, deploy)
+        - Outro

@@ -1,7 +1,10 @@
+import asyncio
 import logging
+import time
+import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import List, Union
+from typing import Dict, List, Optional, Union
 
 import polars as pl
 
@@ -11,84 +14,165 @@ logger = logging.getLogger(__name__)
 class DataLakeSink:
     """
     Destino de dados orientado a Analytics (OLAP).
-    Armazena os dados em formato colunar Parquet, ideal para consultas pesadas
-    com DuckDB ou leitura massiva via APIs.
+
+    Opera com buffer + flush consolidado para reduzir o número de micro-arquivos
+    Parquet. O buffer acumula DataFrames por tabela até atingir threshold de
+    tamanho (flush_size_mb) ou tempo (flush_interval_s), ou até flush explícito
+    via método flush().
+
+    Args:
+        base_dir: Diretório raiz do DataLake.
+        flush_size_mb: Tamanho máximo do buffer em MB antes de flush automático.
+                       0 desabilita threshold por tamanho.
+        flush_interval_s: Intervalo máximo em segundos antes de flush automático.
+                          0 desabilita threshold por tempo.
     """
 
-    def __init__(self, base_dir: str = "datalake"):
+    def __init__(
+        self,
+        base_dir: str = "data/datalake",
+        flush_size_mb: int = 50,
+        flush_interval_s: int = 300,
+    ):
         self.base_dir = Path(base_dir)
-        self.base_dir.mkdir(parents=True, exist_ok=True)
+        self.flush_size_mb = flush_size_mb
+        self.flush_interval_s = flush_interval_s
 
-    def _get_file_path(self, table_name: str) -> Path:
-        return self.base_dir / f"{table_name}.parquet"
+        # Buffer interno: key = f"{layer}/{table_name}"
+        self._buffers: Dict[str, pl.DataFrame] = {}
+        self._lock = asyncio.Lock()
+        self._last_flush_time: Dict[str, float] = {}
+
+    # ------------------------------------------------------------------
+    #  API Pública
+    # ------------------------------------------------------------------
 
     async def save(
-        self, df: pl.DataFrame, table_name: str, unique_keys: Union[str, List[str]] = None
+        self,
+        df: pl.DataFrame,
+        table_name: str,
+        layer: str,
+        unique_keys: Optional[Union[str, List[str]]] = None,
     ) -> None:
         """
-        Salva o DataFrame em Parquet. Se o arquivo já existir, faz a fusão (UPSERT em memória).
+        Acumula o DataFrame no buffer interno. O flush (escrita em Parquet)
+        ocorre automaticamente por tamanho/tempo ou via flush() explícito.
+
+        Args:
+            df: Dados a serem salvos.
+            table_name: Nome da tabela/entidade destino.
+            layer: Camada Medallion (bronze, silver, gold).
+            unique_keys: Ignorado na ingestão (append-only).
         """
         if df.is_empty():
             return
 
+        # Injeção de auditoria por chunk (antes do buffer)
         df = df.with_columns(pl.lit(datetime.now().isoformat()).alias("captured_at"))
-        file_path = self._get_file_path(table_name)
 
-        if not file_path.exists():
-            # First Load
-            df.write_parquet(file_path)
-            logger.debug(
-                f"[{table_name}] CREATE: DataLake Parquet criado com {df.height} registros."
-            )
-            return
+        key = self._buffer_key(table_name, layer)
 
-        # Incremental Load (UPSERT em Memória com Polars)
-        existing_df = pl.read_parquet(file_path)
-        combined_df = pl.concat([existing_df, df], how="diagonal_relaxed")
+        async with self._lock:
+            if key in self._buffers and self._buffers[key] is not None:
+                self._buffers[key] = pl.concat([self._buffers[key], df])
+            else:
+                self._buffers[key] = df
 
-        if unique_keys:
-            keys = [unique_keys] if isinstance(unique_keys, str) else unique_keys
-            # Mantém o registro mais recente (o que acabou de chegar) em caso de chaves iguais
-            combined_df = combined_df.unique(subset=keys, keep="last")
+            await self._maybe_flush(key, table_name, layer)
 
-        combined_df.write_parquet(file_path)
+    async def flush(self, table_name: str, layer: str) -> None:
+        """
+        Flush explícito: escreve o buffer pendente em Parquet e limpa o buffer.
+
+        Args:
+            table_name: Nome da tabela/entidade.
+            layer: Camada Medallion.
+        """
+        key = self._buffer_key(table_name, layer)
+        async with self._lock:
+            await self._do_flush(key, table_name, layer)
+
+    async def flush_all(self) -> None:
+        """
+        Flush de todos os buffers pendentes (útil no shutdown do pipeline).
+        """
+        keys = list(self._buffers.keys())
+        for key in keys:
+            layer, table_name = key.split("/", 1)
+            async with self._lock:
+                await self._do_flush(key, table_name, layer)
+
+    # ------------------------------------------------------------------
+    #  Métodos de apoio
+
+    # ------------------------------------------------------------------
+    #  Métodos internos
+    # ------------------------------------------------------------------
+
+    def _buffer_key(self, table_name: str, layer: str) -> str:
+        """Gera chave única para o buffer por tabela + camada."""
+        return f"{layer}/{table_name}"
+
+    def _get_file_path(self, table_name: str, layer: str) -> Path:
+        """
+        Gera um caminho único de arquivo Parquet por flush.
+        Evita colisões de concorrência assíncrona.
+        """
+        layer_dir = self.base_dir / layer / table_name
+        layer_dir.mkdir(parents=True, exist_ok=True)
+
+        batch_id = uuid.uuid4().hex[:8]
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+
+        return layer_dir / f"lote_{timestamp}_{batch_id}.parquet"
+
+    def _write_parquet(self, df: pl.DataFrame, table_name: str, layer: str) -> None:
+        """Escreve 1 arquivo Parquet consolidado a partir do buffer."""
+        file_path = self._get_file_path(table_name, layer)
+        df.write_parquet(file_path)
+
         logger.debug(
-            f"[{table_name}] UPSERT Parquet: Arquivo atualizado. "
-            f"Total de registros agora: {combined_df.height}."
+            f"[{table_name} | {layer.upper()}] FLUSH: {df.height} registros em {file_path.name}."
         )
 
-    async def delete_period(self, table: str, start_date: str, end_date: str, date_column: str):
+    async def _maybe_flush(self, key: str, table_name: str, layer: str) -> None:
         """
-        Remove registros de um período específico recriando o arquivo Parquet sem eles.
+        Verifica thresholds de tamanho e tempo e faz flush automático se
+        necessário. Chamado dentro do lock do save().
         """
-        file_path = self._get_file_path(table)
-        if not file_path.exists():
+        buf = self._buffers.get(key)
+        if buf is None:
             return
 
-        df = pl.read_parquet(file_path)
+        # Threshold por tamanho
+        if self.flush_size_mb:
+            estimated_bytes = buf.estimated_size()
+            if estimated_bytes >= self.flush_size_mb * 1024 * 1024:
+                logger.debug(
+                    f"[{table_name}] Flush automático por tamanho "
+                    f"({estimated_bytes / 1024 / 1024:.1f} MB >= {self.flush_size_mb} MB)"
+                )
+                await self._do_flush(key, table_name, layer)
+                return
 
-        df_filtered = df.filter(
-            (pl.col(date_column).cast(pl.String).str.slice(0, 10) < start_date)
-            | (pl.col(date_column).cast(pl.String).str.slice(0, 10) > end_date)
-        )
+        # Threshold por tempo
+        if self.flush_interval_s:
+            last = self._last_flush_time.get(key) or 0.0
+            elapsed = time.monotonic() - last
+            if elapsed >= self.flush_interval_s:
+                buffer_rows = buf.height
+                logger.debug(
+                    f"[{table_name}] Flush automático por tempo "
+                    f"({elapsed:.0f}s >= {self.flush_interval_s}s, {buffer_rows} registros)"
+                )
+                await self._do_flush(key, table_name, layer)
 
-        deleted_rows = df.height - df_filtered.height
-        if deleted_rows > 0:
-            df_filtered.write_parquet(file_path)
-            logger.warning(
-                f"[{table}] FULL_LOAD (DataLake): {deleted_rows} registos "
-                f"eliminados no período {start_date} a {end_date}."
-            )
-
-    def get_existing_ids(self, table: str, column: str = "id") -> list[int]:
-        """Recupera lista de chaves já persistidas no Parquet."""
-        file_path = self._get_file_path(table)
-        if not file_path.exists():
-            return []
-        try:
-            # O Polars lê apenas a coluna necessária, ignorando as outras 99% do arquivo
-            df = pl.read_parquet(file_path, columns=[column])
-            return df[column].to_list() if not df.is_empty() else []
-        except Exception as e:
-            logger.error(f"Erro ao ler IDs do DataLake na tabela {table}: {e}")
-            return []
+    async def _do_flush(self, key: str, table_name: str, layer: str) -> None:
+        """
+        Executa a escrita do buffer em Parquet e limpa o buffer.
+        Chamado dentro do lock.
+        """
+        buf = self._buffers.pop(key, None)
+        if buf is not None and not buf.is_empty():
+            self._write_parquet(buf, table_name, layer)
+        self._last_flush_time[key] = time.monotonic()

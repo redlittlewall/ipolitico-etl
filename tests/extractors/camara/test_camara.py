@@ -1,7 +1,8 @@
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import polars as pl
 import pytest
+
 from ipolitico.core.config import CAMARA_PAGE_SIZE
 from ipolitico.core.constants import ApiParams
 from ipolitico.extractors.camara.api.camara_base import CamaraBaseExtractor
@@ -18,13 +19,8 @@ def mock_client():
 
 
 @pytest.fixture
-def mock_state_store():
-    return MagicMock()
-
-
-@pytest.fixture
-def extractor(mock_client, mock_state_store):
-    return DummyCamaraExtractor(client=mock_client, state_store=mock_state_store)
+def extractor(mock_client):
+    return DummyCamaraExtractor(client=mock_client)
 
 
 def test_build_params_limpa_nulos_e_extrai_enums(extractor):
@@ -46,6 +42,18 @@ def test_build_params_limpa_nulos_e_extrai_enums(extractor):
     # O Enum do valor deve ser resolvido ("ASC")
     assert cleaned["ordem"] == "ASC"
     assert cleaned["param_estranho"] == "valor"
+
+
+@pytest.mark.asyncio
+async def test_fetch_paginated_injetar_itens_quando_ausente(extractor):
+    """Garante itens=CAMARA_PAGE_SIZE na requisição quando o cliente não envia explicitamente."""
+    extractor.client.fetch.return_value = []
+
+    await extractor.fetch_paginated("deputados", {})
+
+    primeira_chamada = extractor.client.fetch.call_args
+    kwargs = primeira_chamada.kwargs
+    assert kwargs.get("params").get(ApiParams.ITENS.value) == CAMARA_PAGE_SIZE
 
 
 @pytest.mark.asyncio

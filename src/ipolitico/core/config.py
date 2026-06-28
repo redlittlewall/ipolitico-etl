@@ -1,8 +1,3 @@
-"""
-Configurações Globais do iPolitico ETL.
-Centraliza os limites arquiteturais, variáveis de ambiente e tunning de performance.
-"""
-
 import logging
 import os
 from pathlib import Path
@@ -11,20 +6,32 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Silencia logs verbosos de bibliotecas de infraestrutura
-logging.getLogger("httpx").setLevel(logging.WARNING)
-
-# --- Caminhos Base ---
+# --- Estrutura de Pastas (Baseado no Plano Diretor)[cite: 2] ---
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
-SQLITE_DB_PATH = os.getenv("IPOLITICO_DB_PATH", str(BASE_DIR / "ipolitico.db"))
+DATA_DIR = BASE_DIR / "data"
 
-# --- Configurações da API Governamental ---
-CAMARA_API_BASE_URL = "https://dadosabertos.camara.leg.br/api/v2"
-LEGISLATURA_ATUAL = 57
+# Caminhos para Bancos de Dados e Logs
+DB_PATH = DATA_DIR / "dbs" / os.getenv("DB_NAME", "ipolitico_state.db")
+TELEMETRY_PATH = DATA_DIR / "dbs" / "api_telemetry.db"
+LOG_PATH = DATA_DIR / "logs" / "ipolitico_etl.log"
+DATALAKE_DIR = DATA_DIR / "datalake"
 
-# --- Tunning de Concorrência e Extração ---
-# Limite de paginação da Câmara
-CAMARA_PAGE_SIZE = 100
+# --- Configurações da Câmara ---
+CAMARA_API_BASE_URL = os.getenv("CAMARA_API_BASE_URL", "https://dadosabertos.camara.leg.br/api/v2")
+CAMARA_PAGE_SIZE = int(os.getenv("CAMARA_PAGE_SIZE", 1000))
+LEGISLATURA_ATUAL = int(os.getenv("LEGISLATURA_ATUAL", 57))
 
-# Limite de Concorrência: Evita HTTP 429
+# --- Tuning de Performance ---
 MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", 10))
+# Limite de GETs simultâneos no CamaraClient (respeitar fair use da API).
+# 10 req/s comprovado 100% seguro.
+CAMARA_HTTP_CONCURRENCY = int(os.getenv("CAMARA_HTTP_CONCURRENCY", str(MAX_CONCURRENT_REQUESTS)))
+
+# Configuração de Logging
+LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.FileHandler(LOG_PATH), logging.StreamHandler()],
+)
+logging.getLogger("httpx").setLevel(logging.WARNING)

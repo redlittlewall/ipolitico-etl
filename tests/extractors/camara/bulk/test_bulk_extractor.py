@@ -1,75 +1,46 @@
 """
-Testes Unitários dos Extratores Bulk (Dumps Massivos).
-Focado em validar o fluxo Disk-to-Database (Streaming),
-limpeza nuclear de cabeçalhos e a lógica de descompactação de ZIPs governamentais.
+Testes unitários do fluxo BaseBulkExtractor (download → ZIP opcional → read_csv).
 """
 
 from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import polars as pl
 import pytest
+
 from ipolitico.extractors.camara.bulk.base_bulk import BaseBulkExtractor
-from ipolitico.extractors.camara.bulk.votacoes_bulk import VotosBulkExtractor
 
 
-# --- CLASSES DUMMY PARA TESTAR A HERANÇA E ERROS DE INTEGRAÇÃO ---
-class UnmappedBulk(BaseBulkExtractor):
-    domain_name = "dominio_fantasma"
-
-
-class MissingYearBulk(BaseBulkExtractor):
-    domain_name = "despesas"  # Sabemos que despesas exige ano no registry
-
-
-class EmptyDomainBulk(BaseBulkExtractor):
-    domain_name = ""
-
-
-class ValidZipBulk(BaseBulkExtractor):
-    domain_name = "despesas"
-
-
-class ValidCsvBulk(BaseBulkExtractor):
-    domain_name = "deputados"
-
-
-# Classe Falsa (Dummy) para testarmos a classe Base isoladamente
-class DummyBulkExtractor(BaseBulkExtractor):
-    domain_name = "dummy"
-
-    def _build_url(self, year=None):
-        # Simulamos uma URL que baixa um ZIP para testarmos a ramificação de extração
-        return "http://dadosabertos.camara.leg.br/arquivos/dummy/csv/dummy.csv.zip"
-
-    def _standardize_schema(self, df: pl.DataFrame) -> pl.DataFrame:
-        return df
+@pytest.fixture(autouse=True)
+def _clear_bulk_cache():
+    """Limpa cache compartilhado do BaseBulkExtractor antes de cada teste."""
+    BaseBulkExtractor.clear_cache()
 
 
 @pytest.fixture
 def mock_client():
-    """Mock do CamaraClient que sempre diz que o download foi um sucesso."""
     client = AsyncMock()
     client.download_file = AsyncMock(return_value=True)
     return client
 
 
-@pytest.fixture
-def mock_sink():
-    """Mock do consumidor (Sink) que vai receber os chunks de dados."""
-    return AsyncMock()
-
-
 @pytest.mark.asyncio
+@patch(
+    "ipolitico.extractors.camara.bulk.base_bulk.BULK_REGISTRY",
+    new={
+        "dummy": {
+            "requires_year": False,
+            "url_template": "http://dadosabertos.camara.leg.br/arquivos/dummy/csv/dummy.csv.zip",
+            "bulk_granularity": "snapshot",
+            "bulk_filter_date_column": None,
+        },
+    },
+)
 @patch("ipolitico.extractors.camara.bulk.base_bulk.pl.read_csv")
 @patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.ZipFile")
 @patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.is_zipfile")
-async def test_base_bulk_extraction_flow(
-    mock_is_zipfile, mock_zipfile, mock_read_csv, mock_client, mock_sink
+async def test_base_bulk_extraction_flow_zip(
+    mock_is_zipfile, mock_zipfile, mock_read_csv, mock_client
 ):
-    """
-    CRÍTICO: Testa o fluxo completo de um Dump ZIP.
-    Adequado para a versão Eager (pl.read_csv) com bypass na validação de arquivo quebrado.
-    """
     mock_is_zipfile.return_value = True
 
     mock_zip_instance = MagicMock()
@@ -84,145 +55,242 @@ async def test_base_bulk_extraction_flow(
     )
     mock_read_csv.return_value = df_sujo
 
-    ext = DummyBulkExtractor(mock_client)
-    await ext.extract(sink_func=mock_sink, unique_keys="id")
+    ext = BaseBulkExtractor(mock_client, domain_name="dummy")
+    result = await ext.extract()
 
     mock_client.download_file.assert_called_once()
     mock_zip_instance.extract.assert_called_once_with("dummy_extraido.csv", ANY)
 
-    mock_sink.assert_called_once()
-    df_limpo, table_name, unique_keys = mock_sink.call_args[0]
-
-    assert table_name == "dummy"
-    assert "id" in df_limpo.columns
-    assert 'ï»¿"id"' not in df_limpo.columns
-
-    assert "captured_at" in df_limpo.columns
-    assert "updated_at" in df_limpo.columns
+    assert "id" in result.columns
+    assert 'ï»¿"id"' not in result.columns
 
 
 @pytest.mark.asyncio
-async def test_votos_bulk_schema_standardization(mock_client):
+@patch(
+    "ipolitico.extractors.camara.bulk.base_bulk.BULK_REGISTRY",
+    new={
+        "dummy": {
+            "requires_year": False,
+            "url_template": "http://dadosabertos.camara.leg.br/arquivos/dummy/csv/dummy.csv.zip",
+            "bulk_granularity": "snapshot",
+            "bulk_filter_date_column": None,
+            "schema_overrides": {"id": pl.Int64, "ano": pl.Int32},
+        },
+    },
+)
+@patch("ipolitico.extractors.camara.bulk.base_bulk.pl.read_csv")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.ZipFile")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.is_zipfile")
+async def test_extract_passes_schema_overrides_to_read_csv(
+    mock_is_zipfile, mock_zipfile, mock_read_csv, mock_client
+):
     """
-    CRÍTICO: A Câmara muda os nomes das chaves estrangeiras entre a API e o Bulk.
-    Testa se o VotosBulkExtractor normaliza 'idDeputado' para 'deputado_id'
-    e o tipa como Int64, garantindo integridade referencial no banco.
+    [SCHEMA OVERRIDES] Verifica que o extract() encaminha o schema_overrides
+    do BULK_REGISTRY para o pl.read_csv(), eliminando a necessidade de
+    conversão posterior nos transformers.
     """
-    ext = VotosBulkExtractor(mock_client)
+    mock_is_zipfile.return_value = True
+    mock_zip_instance = MagicMock()
+    mock_zip_instance.namelist.return_value = ["dummy.csv"]
+    mock_zipfile.return_value.__enter__.return_value = mock_zip_instance
 
-    # Criamos um DataFrame com o padrão que vem no CSV do governo
-    df_cru = pl.DataFrame(
-        {
-            "idVotacao": ["A1"],
-            "idDeputado": ["12345"],  # Vem como String no CSV
-            "voto": ["Sim"],
-        }
-    )
+    df_bruto = pl.DataFrame({"id": ["1"], "nome": ["A"]})
+    mock_read_csv.return_value = df_bruto
 
-    # Passamos pelo padronizador interno da classe
-    df_padronizado = ext._standardize_schema(df_cru)
+    ext = BaseBulkExtractor(mock_client, domain_name="dummy")
+    await ext.extract()
 
-    # Asserções rigorosas de schema
-    assert "idDeputado" not in df_padronizado.columns
-    assert "deputado_id" in df_padronizado.columns
-    assert df_padronizado.schema["deputado_id"] == pl.Int64
+    mock_read_csv.assert_called_once()
+    _args, kwargs = mock_read_csv.call_args
+    assert kwargs.get("schema_overrides") == {"id": pl.Int64, "ano": pl.Int32}
 
 
-# --- TESTES DE BLINDAGEM DO TEMPLATE METHOD E REGISTRY ---
+@patch(
+    "ipolitico.extractors.camara.bulk.base_bulk.BULK_REGISTRY",
+    new={
+        "test_url_template": {
+            "requires_year": False,
+            "url_template": "https://dadosabertos.camara.leg.br/arquivos/teste/csv/teste.csv",
+            "bulk_granularity": "snapshot",
+            "bulk_filter_date_column": None,
+        },
+    },
+)
+def test_base_bulk_build_url_uses_url_template():
+    """
+    [URL TEMPLATE] Verifica que o _build_url() lê o campo ``url_template``
+    do BULK_REGISTRY (em substituição ao campo ``url``).
+    """
+    ext = BaseBulkExtractor(None, domain_name="test_url_template")
+    url = ext._build_url()
+    expected = "https://dadosabertos.camara.leg.br/arquivos/teste/csv/teste.csv"
+    assert url == expected
+
+
+@patch(
+    "ipolitico.extractors.camara.bulk.base_bulk.BULK_REGISTRY",
+    new={
+        "test_yearly": {
+            "requires_year": True,
+            "url_template": "https://example.com/data-{year}.csv",
+            "bulk_granularity": "year",
+            "bulk_filter_date_column": "data",
+        },
+    },
+)
+def test_base_bulk_build_url_year_template():
+    """
+    [URL TEMPLATE YEAR] Verifica que _build_url formata {year} no template.
+    """
+    ext = BaseBulkExtractor(None, domain_name="test_yearly")
+    url = ext._build_url(year=2026)
+    assert url == "https://example.com/data-2026.csv"
 
 
 def test_base_bulk_build_url_unmapped():
-    """Garante que falha rápido se o domínio não existir no registry."""
-    ext = UnmappedBulk(None)
+    ext = BaseBulkExtractor(None, domain_name="dominio_fantasma")
     with pytest.raises(ValueError, match="não mapeado no registry"):
         ext._build_url()
 
 
 def test_base_bulk_build_url_missing_year():
-    """Garante que falha rápido se esquecerem o ano em Dumps anuais."""
-    ext = MissingYearBulk(None)
+    ext = BaseBulkExtractor(None, domain_name="despesas")
     with pytest.raises(ValueError, match="exige o parâmetro 'year'"):
         ext._build_url()
 
 
-def test_base_bulk_standardize_schema_default():
-    """Testa o método abstrato devolvendo o DF intacto."""
-    ext = BaseBulkExtractor(None)
-    df = pl.DataFrame({"teste": [1, 2]})
-    assert ext._standardize_schema(df).equals(df)
-
-
 @pytest.mark.asyncio
 async def test_base_bulk_extract_missing_domain():
-    """O dev esqueceu de sobrescrever a classe."""
-    ext = EmptyDomainBulk(None)
-    with pytest.raises(NotImplementedError, match="domain_name deve ser definido"):
-        await ext.extract(sink_func=AsyncMock())
-
-
-# --- TESTES DE BLINDAGEM DE REDE, SISTEMA DE ARQUIVOS E CORRUPÇÃO ---
+    ext = BaseBulkExtractor(None, domain_name="")
+    with pytest.raises(NotImplementedError, match="domain_name deve ser fornecido no construtor"):
+        await ext.extract()
 
 
 @pytest.mark.asyncio
 async def test_base_bulk_extract_download_fails():
-    """
-    O Governo não disponibilizou o Dump (HTTP 404).
-    A extração deve abortar silenciosamente e não tentar ler o disco.
-    """
     client = AsyncMock()
-    client.download_file.return_value = False  # Simulando o 404 do client
-    ext = ValidCsvBulk(client)
-    mock_sink = AsyncMock()
+    client.download_file.return_value = False
+    ext = BaseBulkExtractor(client, domain_name="grupos")
 
-    await ext.extract(sink_func=mock_sink)
+    result = await ext.extract()
 
-    # O banco de dados nunca deve ser chamado
-    mock_sink.assert_not_called()
+    assert result.is_empty()
 
 
 @pytest.mark.asyncio
 async def test_base_bulk_extract_bad_zip_file():
-    """
-    Risco Crítico Governamental: O arquivo baixado tem a extensão .zip,
-    mas o conteúdo é uma página HTML de erro (proxy) ou o ZIP está corrompido.
-    """
     client = AsyncMock()
-    mock_sink = AsyncMock()
 
-    # Interceptamos o download para escrever um arquivo falso e corrompido no disco
     async def fake_download(url, dest):
-        with open(dest, "w") as f:
+        with open(dest, "w", encoding="utf-8") as f:
             f.write("Isto não é um arquivo ZIP válido. É um HTML de erro do NGINX.")
         return True
 
     client.download_file.side_effect = fake_download
-    ext = ValidZipBulk(client)
+    ext = BaseBulkExtractor(client, domain_name="despesas")
 
-    # Executamos a extração. O BadZipFile deve ser capturado e o log.error acionado.
-    await ext.extract(sink_func=mock_sink, year=2026)
+    result = await ext.extract(year=2026)
 
-    # O pipeline do Polars e o Sink não devem ter sido acionados
-    mock_sink.assert_not_called()
+    assert result.is_empty()
 
 
 @pytest.mark.asyncio
-@patch("ipolitico.extractors.camara.bulk.base_bulk.pl.scan_csv")
-async def test_base_bulk_extract_csv_parsing_exception(mock_scan):
+@patch(
+    "ipolitico.extractors.camara.bulk.base_bulk.BULK_REGISTRY",
+    new={
+        "orgaos_test": {
+            "requires_year": False,
+            "url_template": ("https://dadosabertos.camara.leg.br/arquivos/orgaos/csv/orgaos.csv"),
+            "bulk_granularity": "snapshot",
+            "bulk_filter_date_column": None,
+            "schema_overrides": {"idOrgao": pl.Int64},
+            "rename_map": {"idOrgao": "id"},
+        },
+    },
+)
+@patch("ipolitico.extractors.camara.bulk.base_bulk.pl.read_csv")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.ZipFile")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.is_zipfile")
+async def test_extract_applies_rename_map(
+    mock_is_zipfile, mock_zipfile, mock_read_csv, mock_client
+):
     """
-    Ocorreu uma falha violenta do Polars (erro de memória, disco, ou parsing irrecuperável).
-    A exceção bruta genérica (Exception) deve ser pega para não matar o orquestrador inteiro.
+    [RENAME MAP] Verifica que o extract() aplica o rename_map do BULK_REGISTRY
+    após a leitura do CSV, renomeando colunas como idOrgao → id.
     """
+    mock_is_zipfile.return_value = True
+    mock_zip_instance = MagicMock()
+    mock_zip_instance.namelist.return_value = ["orgaos.csv"]
+    mock_zipfile.return_value.__enter__.return_value = mock_zip_instance
+
+    # CSV com coluna idOrgao em vez de id
+    df_bruto = pl.DataFrame(
+        {"idOrgao": [1, 2], "sigla": ["CD", "SF"], "nome": ["Câmara", "Senado"]}
+    )
+    mock_read_csv.return_value = df_bruto
+
+    ext = BaseBulkExtractor(mock_client, domain_name="orgaos_test")
+    result = await ext.extract()
+
+    assert "id" in result.columns
+    assert "idOrgao" not in result.columns
+    assert result["id"].to_list() == [1, 2]
+
+
+@pytest.mark.asyncio
+@patch(
+    "ipolitico.extractors.camara.bulk.base_bulk.BULK_REGISTRY",
+    new={
+        "cache_test": {
+            "requires_year": False,
+            "url_template": "https://dadosabertos.camara.leg.br/arquivos/cachetest/csv/data.csv",
+            "bulk_granularity": "snapshot",
+            "bulk_filter_date_column": None,
+        },
+    },
+)
+@patch("ipolitico.extractors.camara.bulk.base_bulk.pl.read_csv")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.ZipFile")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.is_zipfile")
+async def test_extract_cache_hit_reuses_dataframe(
+    mock_is_zipfile, mock_zipfile, mock_read_csv, mock_client
+):
+    """
+    [CACHE] Verifica que o cache compartilhado funciona: ao chamar extract()
+    duas vezes com o mesmo domain_name, a segunda chamada retorna dados sem
+    baixar/parsear novamente (read_csv é chamado só na primeira).
+    """
+    mock_is_zipfile.return_value = True
+    mock_zip_instance = MagicMock()
+    mock_zip_instance.namelist.return_value = ["data.csv"]
+    mock_zipfile.return_value.__enter__.return_value = mock_zip_instance
+
+    df_original = pl.DataFrame({"id": [1, 2, 3], "nome": ["A", "B", "C"]})
+    mock_read_csv.return_value = df_original
+
+    ext = BaseBulkExtractor(mock_client, domain_name="cache_test")
+
+    # Primeira chamada → download + read_csv
+    result1 = await ext.extract()
+    mock_read_csv.assert_called_once()
+    assert result1.height == 3
+
+    # Segunda chamada → cache hit, read_csv NÃO é chamado novamente
+    result2 = await ext.extract()
+    mock_read_csv.assert_called_once()  # ainda 1x
+    assert result2.height == 3
+    assert result2["id"].to_list() == [1, 2, 3]
+
+
+@pytest.mark.asyncio
+@patch("ipolitico.extractors.camara.bulk.base_bulk.pl.read_csv")
+async def test_base_bulk_extract_csv_parsing_exception(mock_read_csv):
     client = AsyncMock()
-    client.download_file.return_value = True  # Sucesso no download falso
-    mock_sink = AsyncMock()
+    client.download_file.return_value = True
+    mock_read_csv.side_effect = Exception("Erro catastrófico de disco simulado")
 
-    # Simulamos o Polars estourando um erro catastrófico
-    mock_scan.side_effect = Exception("Erro catastrófico de disco simulado")
+    ext = BaseBulkExtractor(client, domain_name="grupos")
 
-    ext = ValidCsvBulk(client)
+    result = await ext.extract()
 
-    # Ele DEVE capturar a exceção e sair graciosamente, sem propagar o crash
-    await ext.extract(sink_func=mock_sink)
-
-    # Obviamente, nada vai para o banco
-    mock_sink.assert_not_called()
+    assert result.is_empty()

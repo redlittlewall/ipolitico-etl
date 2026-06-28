@@ -1,56 +1,121 @@
+"""Despesas Bulk: aliases CEAP → contrato Silver no CamaraDespesasTransformer."""
+
 import polars as pl
-from ipolitico.extractors.camara.bulk.despesas_bulk import DespesasBulkExtractor
 
-# ==========================================
-# TESTES: DESPESAS BULK (Conversão e Mapeamento)
-# ==========================================
+from ipolitico.transformers.bulk_window import BulkTemporalFilter
+from ipolitico.transformers.camara.despesas_transformer import CamaraDespesasTransformer
 
 
-def test_despesas_bulk_schema_standardization():
-    """
-    Testa a resiliência bruta de parsing financeiro:
-    1. Tradução do dicionário legado ('nuDeputadoId' -> 'id_deputado')
-    2. Conversão do padrão monetário Brasileiro (vírgula) para Americano (Float64)
-    3. Casting de datas.
-    """
-    ext = DespesasBulkExtractor(None)
+def test_despesas_transformer_bulk_aliases_and_currency():
+    tr = CamaraDespesasTransformer()
 
     df_sujo = pl.DataFrame(
         {
             "nuDeputadoId": ["100"],
             "datEmissao": ["2026-05-10T14:00:00"],
-            "vlrLiquido": ["1.234,56"],  # Pegadinha clássica: valor com vírgula
-            "vlrDocumento": ["-150,00"],  # Valores negativos (glosas)
+            "vlrLiquido": ["1.234,56"],
+            "vlrDocumento": ["-150,00"],
+            "codDocumento": ["1"],
+            "tipoDespesa": ["TE"],
+            "tipoDocumento": ["TD"],
+            "numDocumento": ["N"],
+            "parcela": ["1"],
+            "ano": ["2026"],
+            "mes": ["5"],
             "coluna_inutil": ["lixo"],
         }
     )
 
-    df_limpo = ext._standardize_schema(df_sujo)
+    df_limpo = tr.transform(df_sujo)
 
-    # Valida traduções de nomes
     assert "id_deputado" in df_limpo.columns
     assert "nuDeputadoId" not in df_limpo.columns
-    assert "coluna_inutil" in df_limpo.columns  # Colunas desconhecidas não devem ser apagadas
+    assert "coluna_inutil" not in df_limpo.columns
 
-    # Valida casting e conversões decimais
     assert df_limpo["id_deputado"][0] == 100
     assert df_limpo["valorLiquido"][0] == 1234.56
     assert df_limpo["valorDocumento"][0] == -150.00
-    assert df_limpo["dataDocumento"].dtype == pl.Datetime
+    assert df_limpo["dataDocumento"].dtype == pl.String
 
 
-def test_despesas_bulk_missing_columns():
-    """
-    Garante que a padronização não explode se o CSV vier
-    sem uma das colunas listadas no 'mapping' (ignora erros graciosamente
-    graças ao strict=False do Polars).
-    """
-    ext = DespesasBulkExtractor(None)
+def test_despesas_transformer_txt_fornecedor_alias():
+    tr = CamaraDespesasTransformer()
+    df_sujo = pl.DataFrame(
+        {
+            "txtFornecedor": ["Posto Gasolina"],
+            "codDocumento": ["9"],
+            "valorLiquido": ["10,00"],
+            "nuDeputadoId": ["1"],
+            "datEmissao": ["2026-01-01"],
+            "tipoDespesa": ["x"],
+            "tipoDocumento": ["y"],
+            "numDocumento": ["n"],
+            "parcela": ["0"],
+            "ano": ["2026"],
+            "mes": ["1"],
+        }
+    )
 
-    # Mandamos um DF quase vazio
-    df_sujo = pl.DataFrame({"txtFornecedor": ["Posto Gasolina"]})
-    df_limpo = ext._standardize_schema(df_sujo)
+    df_limpo = tr.transform(df_sujo)
 
-    # Renomeou o que tinha
     assert "nomeFornecedor" in df_limpo.columns
-    # E não crashou reclamando das outras colunas faltando
+    assert df_limpo["nomeFornecedor"][0] == "Posto Gasolina"
+
+
+def test_despesas_transformer_ceap_ide_documento_and_br_date():
+    """Colunas reais do dump Ano-{ano}.csv (ideDocumento, DD/MM/YYYY)."""
+    tr = CamaraDespesasTransformer()
+    df_ceap = pl.DataFrame(
+        {
+            "nuDeputadoId": ["204379"],
+            "ideDocumento": ["12345"],
+            "txtNumero": ["DOC-1"],
+            "numParcela": ["1"],
+            "numAno": ["2023"],
+            "numMes": ["6"],
+            "txtDescricao": ["MANUTENÇÃO DE ESCRITÓRIO"],
+            "indTipoDocumento": ["Recibo"],
+            "datEmissao": ["15/06/2023"],
+            "vlrLiquido": ["100,50"],
+            "vlrDocumento": ["100,50"],
+            "txtFornecedor": ["Fornecedor X"],
+            "txtCNPJCPF": ["00000000000191"],
+        }
+    )
+
+    df_limpo = tr.transform(
+        df_ceap,
+        bulk_temporal_filter=BulkTemporalFilter(
+            column="dataDocumento", start_iso="2023-01-01", end_iso="2023-12-31"
+        ),
+    )
+
+    assert df_limpo.height == 1
+    assert df_limpo["codDocumento"][0] == 12345
+    assert df_limpo["dataDocumento"][0] == "2023-06-15"
+    assert df_limpo["valorLiquido"][0] == 100.50
+
+
+def test_despesas_transformer_ceap_both_deputado_columns():
+    tr = CamaraDespesasTransformer()
+    df_ceap = pl.DataFrame(
+        {
+            "nuDeputadoId": ["204379"],
+            "ideCadastro": ["160510"],
+            "ideDocumento": ["99"],
+            "datEmissao": ["01/03/2024"],
+            "vlrLiquido": ["10,00"],
+            "vlrDocumento": ["10,00"],
+            "txtDescricao": ["X"],
+            "indTipoDocumento": ["R"],
+            "txtNumero": ["1"],
+            "numParcela": ["0"],
+            "numAno": ["2024"],
+            "numMes": ["3"],
+        }
+    )
+
+    df_limpo = tr.transform(df_ceap)
+
+    assert df_limpo.height == 1
+    assert df_limpo["id_deputado"][0] == 204379

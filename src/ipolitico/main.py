@@ -1,325 +1,323 @@
 import argparse
 import asyncio
+import logging
 import time
-from datetime import datetime
+from pathlib import Path
+
+import yaml
 
 from ipolitico.core.client import CamaraClient
-from ipolitico.core.config import SQLITE_DB_PATH
-from ipolitico.core.constants import DomainType, LoadStrategy, SinkType, SourceType
-from ipolitico.core.logger import setup_logger
-from ipolitico.extractors.camara.bulk.factory import CamaraExtractorFactory
+from ipolitico.core.constants import DOMAIN_LABELS, DomainType, LoadStrategy, SinkType
+from ipolitico.pipeline.builder import PipelineBuilder
+from ipolitico.pipeline.domain_order import (
+    FULL_CAMARA_PIPELINE,
+    expand_camara_domains_with_dependencies,
+)
+from ipolitico.pipeline.federation import FederationOrchestrator
+from ipolitico.pipeline.manager import PipelineManager
+from ipolitico.pipeline.optimizer import DataLakeOptimizer
+from ipolitico.pipeline.runner import PipelineRunner
 from ipolitico.sinks.datalake_sink import DataLakeSink
-from ipolitico.sinks.sqlite_sink import SQLiteSink
+from ipolitico.sources.camara_provider import CamaraSourceProvider
+from ipolitico.storage.gold_exporter import ExportFormat, GoldExporter
 
-logger = setup_logger()
-
-"""
-Orquestrador Principal do ETL iPolitico.
-Responsável por gerir o ciclo de vida da extração de dados,
-garantindo tolerância a falhas através de processamento em lotes (chunking).
-"""
-
-DOMAINS_EARLIEST_DATES = {
-    "deputados": "1826-04-29",
-    "proposicoes": "1988-01-01",
-    "votacoes": "1991-01-01",
-    "despesas": "2009-01-01",
-}
+logger = logging.getLogger(__name__)
 
 
-def chunk_list(lst: list, n: int):
-    """Gera lotes de tamanho n a partir de uma lista para salvamento progressivo."""
-    for i in range(0, len(lst), n):
-        yield lst[i : i + n]
+def load_config(file_path: Path) -> dict:
+    """Carrega as definições dinâmicas de pipeline em formato YAML."""
+    with open(file_path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
 
 
-async def run_pipeline(
-    sink,
-    state_store,
-    start_date: str = None,
-    end_date: str = None,
-    strategy: LoadStrategy = LoadStrategy.INCREMENTAL,
-    source: SourceType = SourceType.API,
-    domains: list[DomainType] = None,
-):
+def _print_domain_tree() -> None:
     """
-    Executa a pipeline de extração, transformação e carregamento (ETL).
+    Exibe a árvore hierárquica de domínios com labels descritivos.
 
-    Delega as extrações aos 'Extractors' instanciados dinamicamente via Factory,
-    operando com micro-batching e Backpressure estrito.
-
-    Args:
-        sink (SQLiteSink | DataLakeSink): Destino final dos dados.
-        state_store (SQLiteSink): Banco de metadados para controle de watermarks.
-        start_date (str, optional): Data de início ('YYYY-MM-DD').
-        end_date (str, optional): Data de fim ('YYYY-MM-DD').
-        strategy (LoadStrategy): FULL_LOAD (recria período) ou INCREMENTAL (Upsert).
-        source (str): Origem dos dados ("api" ou "bulk").
-        domains (list[str], optional): Lista de domínios a serem extraídos.
-            Padrão: ["deputados", "despesas", "proposicoes", "votacoes"].
+    Agrupa domínios em seções: Entidades Principais (pais), Referências
+    e Carga Massiva (bulk-only). Filhos são indentados sob seus pais
+    com caracteres de árvore (├── / └──).
     """
+    from ipolitico.core.domain_spec import DOMAIN_SPECS
+    from ipolitico.extractors.camara.bulk.registry import BULK_REGISTRY
 
-    client = CamaraClient()
+    # ── Catalogar domínios ────────────────────────────────────────────────────
+    bulk_only: set[DomainType] = {
+        DomainType(k) for k, v in BULK_REGISTRY.items() if v.get("bulk_only")
+    }
 
-    domains = domains or [
-        DomainType.DEPUTADOS,
-        DomainType.DESPESAS,
-        DomainType.PROPOSICOES,
-        DomainType.VOTACOES,
+    # Pais → filhos via DOMAIN_SPECS (depends_on)
+    parent_children: dict[DomainType, list[DomainType]] = {}
+    all_with_deps: set[DomainType] = set()
+    for domain, spec in DOMAIN_SPECS.items():
+        for parent in spec.depends_on:
+            parent_children.setdefault(parent, []).append(domain)
+            all_with_deps.add(domain)
+
+    # Ordem canônica como chave de ordenação
+    pipeline_order = {d: i for i, d in enumerate(FULL_CAMARA_PIPELINE)}
+
+    # Entidades raiz: não são bulk-only e não dependem de ninguém (via DOMAIN_SPECS)
+    EXCLUDED_ROOTS: set[DomainType] = {DomainType.REFERENCIAS}
+    roots: list[DomainType] = [
+        d
+        for d in DOMAIN_SPECS
+        if d not in bulk_only and d not in EXCLUDED_ROOTS and not DOMAIN_SPECS[d].depends_on
     ]
+    roots.sort(key=lambda d: pipeline_order.get(d, 999))
 
-    # Injeção Dinâmica: O Orquestrador recebe os extratores sem saber se são API ou BULK
-    deputados_ext = CamaraExtractorFactory.get_extractor(
-        DomainType.DEPUTADOS, source, client, state_store
+    # ── Helper de formatação ──────────────────────────────────────────────────
+    def _fmt(domain: DomainType, prefix: str = "") -> str:
+        name = domain.value
+        label = DOMAIN_LABELS.get(domain, name)
+        label_width = 50
+        return f"{prefix}{name:<20} {label:<{label_width}}"
+
+    def _section(title: str) -> None:
+        sep = "─" * (60 - len(title) - 4)
+        print(f"\n{sep} {title} {sep}")
+
+    # ── Seção 1: Entidades Principais ─────────────────────────────────────────
+    _section("Entidades Principais")
+    for root in roots:
+        children = parent_children.get(root, [])
+        children.sort(key=lambda d: pipeline_order.get(d, 999))
+
+        print(_fmt(root))
+        if children:
+            for i, child in enumerate(children):
+                branch = "  └─ " if i == len(children) - 1 else "  ├─ "
+                print(_fmt(child, branch))
+            print()
+        else:
+            print()
+
+    # ── Seção 2: Referências ──────────────────────────────────────────────────
+    if DomainType.REFERENCIAS not in bulk_only:
+        _section("Referencias")
+        print(_fmt(DomainType.REFERENCIAS))
+        print()
+
+    # ── Seção 3: Carga Massiva ────────────────────────────────────────────────
+    _section("Carga Massiva (Bulk)")
+    bulk_sorted = sorted(
+        (d for d in bulk_only if d in DOMAIN_LABELS),
+        key=lambda d: pipeline_order.get(d, 999),
     )
-    despesas_ext = CamaraExtractorFactory.get_extractor(
-        DomainType.DESPESAS, source, client, state_store
-    )
-    proposicoes_ext = CamaraExtractorFactory.get_extractor(
-        DomainType.PROPOSICOES, source, client, state_store
-    )
-    votacoes_ext = CamaraExtractorFactory.get_extractor(
-        DomainType.VOTACOES, source, client, state_store
-    )
-    try:
-        is_full = strategy == LoadStrategy.FULL_LOAD
-        actual_start = start_date
+    for domain in bulk_sorted:
+        print(_fmt(domain))
 
-        start_year = datetime.strptime(actual_start or "2023-01-01", "%Y-%m-%d").year
-        end_year = datetime.strptime(
-            end_date or datetime.now().strftime("%Y-%m-%d"), "%Y-%m-%d"
-        ).year
-        anos_alvo = list(range(start_year, end_year + 1))
+    print()
 
-        # ==========================================
-        # 1. DEPUTADOS
-        # ==========================================
-        if DomainType.DEPUTADOS in domains:
-            logger.info(f"Sincronizando Deputados via {source.value.upper()}...")
 
-            if source == SourceType.BULK:
-                await deputados_ext.extract(sink.save, unique_keys="id")
+def _print_audit_coverage() -> None:
+    """
+    Audita a cobertura dos dados no datalake (Silver e Gold).
 
-            else:
-                await deputados_ext.extract(
-                    sink.save, start_date=actual_start, end_date=end_date, full_load=is_full
-                )
+    Para cada domínio conhecido, conta registros nas camadas Silver e Gold
+    e exibe um status: OK, SILVER APENAS, SEM DADOS ou NUNCA EXTRAÍDO.
+    Domínios bulk-only são identificados com marcador (B).
+    """
+    import duckdb
 
-            # time.sleep(1)
-            deputados_ids = sink.get_existing_ids(DomainType.DEPUTADOS.value)
+    from ipolitico.extractors.camara.bulk.registry import BULK_REGISTRY
 
-            # DETALHES CADASTRAIS (Sempre via API)
-            if deputados_ids:
-                existent_ids = sink.get_existing_ids("deputados_detalhes")
-                ids_to_load = [d for d in deputados_ids if d not in existent_ids]
-                if ids_to_load:
-                    logger.info(
-                        f"     ∟ Baixando detalhes de {len(ids_to_load)} deputados (Via API)..."
-                    )
-                    detalhes_ext = CamaraExtractorFactory.get_extractor(
-                        DomainType.DEPUTADOS, SourceType.API, client, state_store
-                    )
-                    await detalhes_ext.extract_detalhes(sink.save, ids_to_load)
-                else:
-                    logger.info("     ∟ Detalhes cadastrais já estão atualizados.")
+    DATALAKE = Path("data/datalake")
+    conn = duckdb.connect()
 
-        # ==========================================
-        # 2. DESPESAS
-        # ==========================================
-        if DomainType.DESPESAS in domains:
-            if source == SourceType.BULK:
-                logger.info(
-                    f"Sincronizando Despesas de {start_year} a {end_year} via BULK (CSV)..."
-                )
-                for ano in anos_alvo:
-                    await despesas_ext.extract(
-                        sink.save,
-                        unique_keys=["id_deputado", "numDocumento", "codDocumento"],
-                        year=ano,
-                    )
-            else:
-                if is_full:
-                    start_despesas = start_date or DOMAINS_EARLIEST_DATES["despesas"]
-                    end_despesas = end_date or datetime.now().strftime("%Y-%m-%d")
-                    logger.warning(
-                        f"[FULL LOAD] Limpando Despesas ({start_despesas} a {end_despesas})..."
-                    )
-                    await sink.delete_period(
-                        "despesas", start_despesas, end_despesas, date_column="dataDocumento"
-                    )
-                else:
-                    start_despesas = (
-                        state_store.get_watermark("despesas", "dataDocumento") or "2023-02-01"
-                    )
-                    end_despesas = end_date or datetime.now().strftime("%Y-%m-%d")
-                    logger.info(
-                        f"Sincronizando Despesas a partir de "
-                        f"{start_despesas} até {end_despesas} via API..."
-                    )
+    bulk_only: set[DomainType] = {
+        DomainType(k) for k, v in BULK_REGISTRY.items() if v.get("bulk_only")
+    }
 
-                await despesas_ext.extract(
-                    sink.save,
-                    deputados_ids=deputados_ids,
-                    start_date=start_despesas,
-                    end_date=end_despesas,
-                )
+    # Ordena pela pipeline canônica; domínios fora da lista vão ao final
+    pipeline_order = {d: i for i, d in enumerate(FULL_CAMARA_PIPELINE)}
 
-        # ==========================================
-        # 3. PROPOSIÇÕES
-        # ==========================================
-        if DomainType.PROPOSICOES in domains:
-            if source == SourceType.BULK:
-                logger.info(f"Sincronizando Proposições de {start_year} a {end_year} via BULK...")
-                for ano in anos_alvo:
-                    await proposicoes_ext.extract(sink.save, unique_keys="id", year=ano)
-            else:
-                if is_full:
-                    start_prop = start_date or DOMAINS_EARLIEST_DATES["proposicoes"]
-                    end_prop = end_date or datetime.now().strftime("%Y-%m-%d")
-                    logger.warning(
-                        f"[FULL LOAD] Limpando Proposições ({start_prop} a {end_prop})..."
-                    )
-                    await sink.delete_period(
-                        "proposicoes", start_prop, end_prop, date_column="dataApresentacao"
-                    )
-                else:
-                    start_prop = (
-                        state_store.get_watermark("proposicoes", "dataApresentacao") or "2023-02-01"
-                    )
-                    end_prop = end_date or datetime.now().strftime("%Y-%m-%d")
+    sorted_domains = sorted(DomainType, key=lambda d: pipeline_order.get(d, 9999))
 
-                logger.info(
-                    f"Sincronizando Proposições a partir de {start_prop} até {end_prop} via API..."
-                )
-                await proposicoes_ext.extract(sink.save, start_prop, end_prop)
+    header = f"{'DOMÍNIO':<36} {'SILVER':>8} {'GOLD':>8}  STATUS"
+    print("=" * len(header))
+    print(header)
+    print("=" * len(header))
 
-        # ==========================================
-        # 4. VOTAÇÕES E VOTOS NOMINAIS
-        # ==========================================
-        if DomainType.VOTACOES in domains:
-            if source == SourceType.BULK:
-                logger.info(
-                    f"Sincronizando Votações e Votos de {start_year} a {end_year} via BULK..."
-                )
-                for ano in anos_alvo:
-                    await votacoes_ext.extract(sink.save, unique_keys="id", year=ano)
+    for domain in sorted_domains:
+        name = domain.value
+        tag = " (B)" if domain in bulk_only else ""
+        display_name = name + tag
 
-                    votos_ext = CamaraExtractorFactory.get_extractor(
-                        DomainType.VOTOS, SourceType.BULK, client
-                    )
-                    await votos_ext.extract(
-                        sink.save, unique_keys=["idVotacao", "deputado_id"], year=ano
-                    )
-            else:
-                if is_full:
-                    start_votacoes = start_date or DOMAINS_EARLIEST_DATES["votacoes"]
-                    end_votacoes = end_date or datetime.now().strftime("%Y-%m-%d")
-                    logger.warning(
-                        f"[FULL LOAD] Limpando Votações ({start_votacoes} a {end_votacoes})..."
-                    )
-                    await sink.delete_period(
-                        "votacoes", start_votacoes, end_votacoes, date_column="data"
-                    )
-                else:
-                    start_votacoes = state_store.get_watermark("votacoes", "data") or "1991-01-01"
-                    end_votacoes = end_date or datetime.now().strftime("%Y-%m-%d")
+        silver_dir = DATALAKE / "silver" / name
+        gold_dir = DATALAKE / "gold" / name
+        gold_file = gold_dir / f"{name}.parquet"
 
-                logger.info(
-                    f"Sincronizando Votações a partir de "
-                    f"{start_votacoes} até {end_votacoes} via API..."
-                )
-                await votacoes_ext.extract(
-                    sink.save, start_date=start_votacoes, end_date=end_votacoes
-                )
+        silver_count = 0
+        gold_count = 0
 
-                votacoes_ids = state_store.get_existing_ids("votacoes")
-                if votacoes_ids:
-                    logger.info(
-                        f"     ∟ Extraindo votos nominais para {len(votacoes_ids)} votações..."
-                    )
-                    await votacoes_ext.extract_votos(sink.save, votacoes_ids)
+        # Conta Silver (multi-file parquet)
+        if silver_dir.is_dir() and list(silver_dir.glob("*.parquet")):
+            try:
+                silver_count = conn.execute(
+                    f"SELECT COUNT(*) FROM read_parquet('{silver_dir}/*.parquet')"
+                ).fetchone()[0]
+            except Exception:
+                silver_count = -1  # erro de leitura
 
-        logger.info("Pipeline finalizado com sucesso!")
+        # Conta Gold (parquet consolidado)
+        if gold_file.exists():
+            try:
+                gold_count = conn.execute(
+                    f"SELECT COUNT(*) FROM read_parquet('{gold_file}')"
+                ).fetchone()[0]
+            except Exception:
+                gold_count = -1
 
-    except Exception as e:
-        logger.error(f"Falha crítica capturada no orquestrador: {e}")
-        raise
-    finally:
-        await client.close()
+        # Determina status
+        if gold_count > 0 and silver_count > 0:
+            status = "OK"
+        elif gold_count > 0 and silver_count == 0:
+            status = "OK (gold only)"
+        elif gold_count == 0 and silver_count > 0:
+            status = "SILVER APENAS"
+        elif silver_count == 0 and gold_dir.is_dir():
+            status = "DADOS VAZIOS"
+        elif silver_dir.is_dir() and not gold_dir.is_dir():
+            status = "SILVER APENAS"
+        elif silver_count == -1 or gold_count == -1:
+            status = "ERRO LEITURA"
+        else:
+            status = "NUNCA EXTRAÍDO"
+
+        silver_str = f"{silver_count:,}".replace(",", ".") if silver_count >= 0 else "ERR"
+        gold_str = f"{gold_count:,}".replace(",", ".") if gold_count >= 0 else "ERR"
+
+        print(f"{display_name:<36} {silver_str:>8} {gold_str:>8}  {status}")
+
+    conn.close()
 
 
 async def main():
-    parser = argparse.ArgumentParser(description="Motor ETL iPolitico - Dados da Câmara")
-
+    """
+    Ponto de Entrada (CLI).
+    Lê os parâmetros do usuário, monta as peças e aciona o Gestor. Nenhuma
+    regra de negócio ou IFs de domínio ocorrem aqui.
+    """
+    parser = argparse.ArgumentParser(description="Motor ETL iPolitico")
     parser.add_argument(
-        "--source",
-        type=SourceType,
-        choices=list(SourceType),
-        default=SourceType.API,
-        help="Origem dos dados.",
+        "--source", type=str, default="api", help="Descontinuado - O YAML gerencia a origem."
     )
     parser.add_argument(
-        "--sink",
-        type=SinkType,
-        choices=list(SinkType),
-        default=SinkType.SQLITE,
-        help="Destino dos dados.",
+        "--list-domains",
+        action="store_true",
+        help="Lista todos os domínios disponíveis com descrição e hierarquia.",
+    )
+    parser.add_argument(
+        "--audit-coverage",
+        action="store_true",
+        help="Audita cobertura dos dados: registros em Silver e Gold por domínio.",
+    )
+    parser.add_argument(
+        "--optimize",
+        action="store_true",
+        help="Executa a consolidação (Camada Gold) via DuckDB após a ingestão.",
     )
     parser.add_argument(
         "--strategy",
         type=LoadStrategy,
         choices=list(LoadStrategy),
         default=LoadStrategy.INCREMENTAL,
-        help="Estratégia de sincronização.",
     )
     parser.add_argument(
         "--domains",
+        action="append",
         nargs="+",
         type=DomainType,
         choices=list(DomainType),
         default=None,
-        help="Lista de domínios a processar.",
+    )
+    parser.add_argument("--start-date", type=str, default=None)
+    parser.add_argument("--end-date", type=str, default=None)
+    parser.add_argument(
+        "--no-warmup",
+        action="store_true",
+        help="Desativa o pré-aquecimento de cache para rotas 504-prone.",
+    )
+    parser.add_argument(
+        "--export-gold",
+        type=str,
+        choices=["sqlite", "duckdb"],
+        default=None,
+        help="Exporta a camada Gold para banco SQL (sqlite ou duckdb) após a ingestão.",
     )
 
-    parser.add_argument("--start-date", type=str, default=None, help="Data Inicial (YYYY-MM-DD)")
-    parser.add_argument("--end-date", type=str, default=None, help="Data Final (YYYY-MM-DD)")
-
     args = parser.parse_args()
+
+    if args.list_domains:
+        _print_domain_tree()
+        return
+
+    if args.audit_coverage:
+        _print_audit_coverage()
+        return
+
+    if args.domains is None:
+        args.domains = list(DomainType)
+    else:
+        args.domains = [d for group in args.domains for d in group]
+    args.domains = expand_camara_domains_with_dependencies(args.domains)
 
     start_time = time.perf_counter()
     logger.info("=" * 60)
     logger.info(
-        f" Iniciando iPolitico | Origem: {args.source.value.upper()}"
-        f" | Sink: {args.sink.value.upper()}"
-        f" | Estratégia: {args.strategy.value.upper()}"
+        f" iPolitico ETL (Ingestão) | Destino: DATALAKE  |"
+        f" Estratégia: {args.strategy.value.upper()}",
     )
     logger.info("=" * 60)
 
-    state_store = SQLiteSink(db_path=SQLITE_DB_PATH)
+    # Carregar Configuração Remota
+    config_path = Path(__file__).resolve().parent.parent.parent / "configs" / "camara_pipeline.yaml"
+    pipeline_config = load_config(config_path)
 
-    data_sink = (
-        SQLiteSink(db_path=SQLITE_DB_PATH) if args.sink == SinkType.SQLITE else DataLakeSink()
-    )
+    # Inicializar Infraestrutura Base
+    client = CamaraClient()
+    builder = PipelineBuilder(client)
+    runner = PipelineRunner()
 
-    if args.strategy == LoadStrategy.FULL_LOAD and not args.start_date:
-        hoje = datetime.now().strftime("%Y-%m-%d")
-        primeiro_dia_mes = datetime.now().strftime("%Y-%m-01")
-        actual_start, actual_end = primeiro_dia_mes, hoje
-    else:
-        actual_start, actual_end = args.start_date, args.end_date
+    state_store = DataLakeSink()
 
-    await run_pipeline(
-        sink=data_sink,
-        state_store=state_store,
-        start_date=actual_start,
-        end_date=actual_end,
-        strategy=args.strategy,
-        source=args.source,
-        domains=args.domains,
-    )
+    manager = PipelineManager(builder, runner, pipeline_config, state_store)
 
-    logger.info(f"Tempo total: {time.perf_counter() - start_time:.2f}s")
+    federation = FederationOrchestrator([CamaraSourceProvider(manager)])
+
+    try:
+        await federation.run_all(
+            args.domains,
+            args.strategy,
+            SinkType.DATALAKE,
+            args.start_date,
+            args.end_date,
+            warmup=not args.no_warmup,
+        )
+
+        if args.optimize:
+            for domain in args.domains:
+                logger.info(f"=== Otimizando Camada Gold para {domain.value.upper()} ===")
+                DataLakeOptimizer().compact_and_deduplicate(domain.value)
+
+        if args.export_gold:
+            fmt = ExportFormat(args.export_gold)
+            ext = "db" if fmt == ExportFormat.SQLITE else "duckdb"
+            output = Path(f"data/gold_export.{ext}")
+            logger.info("=== Exportando Gold para %s ===", output)
+            GoldExporter().export_all(str(output), format=fmt)
+    except Exception as e:
+        logger.error(f"Falha catastrófica no ETL: {e}")
+    finally:
+        await client.close()
+        logger.info(f"Tempo total de execução: {time.perf_counter() - start_time:.2f}s")
 
 
-if __name__ == "__main__":  # pragma: no cover
+def main_cli():
+    """Entry point para console_scripts (``ipolitico`` no terminal)."""
+    asyncio.run(main())
+
+
+if __name__ == "__main__":
     asyncio.run(main())
