@@ -1,0 +1,134 @@
+name: Pipeline + Release
+
+on:
+  schedule:
+    # Semanal: domingo 06:00 BRT (09:00 UTC)
+    - cron: '0 9 * * 0'
+    # Mensal: dia 1 06:00 BRT (09:00 UTC)
+    - cron: '0 9 1 * *'
+  workflow_dispatch:
+    inputs:
+      strategy:
+        description: 'Estratégia de carga'
+        required: true
+        default: 'incremental'
+        type: choice
+        options:
+          - incremental
+          - full_load
+
+concurrency:
+  group: pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  GOLD_ARCHIVE: gold.tar.gz
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install -U pip
+          pip install -e ".[dev]"
+
+      - name: Baixar dados Gold da release anterior
+        id: download
+        continue-on-error: true
+        run: |
+          mkdir -p data/datalake/gold
+          gh release download latest --pattern "${{ env.GOLD_ARCHIVE }}" --output /tmp/${{ env.GOLD_ARCHIVE }} 2>&1 || echo "Nenhuma release anterior encontrada. Full load completo será necessário."
+          if [ -f /tmp/${{ env.GOLD_ARCHIVE }} ]; then
+            tar xzf /tmp/${{ env.GOLD_ARCHIVE }} -C data/datalake/
+            echo "restored=true" >> "$GITHUB_OUTPUT"
+            echo "Dados Gold restaurados da release anterior."
+          else
+            echo "restored=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Executar pipeline
+        id: pipeline
+        run: |
+          STRATEGY="${{ github.event.inputs.strategy || 'incremental' }}"
+          echo "Estrategia: $STRATEGY"
+
+          # Se não temos release anterior e é incremental, força full_load
+          if [ "$STRATEGY" = "incremental" ] && [ "${{ steps.download.outputs.restored }}" = "false" ]; then
+            echo "Sem dados anteriores — usando FULL_LOAD na primeira execução."
+            STRATEGY="full_load"
+          fi
+
+          if [ "$STRATEGY" = "full_load" ]; then
+            python -m ipolitico.main --strategy full_load --optimize 2>&1 | tee pipeline.log
+          else
+            python -m ipolitico.main --strategy incremental --optimize 2>&1 | tee pipeline.log
+          fi
+
+          # Extrai resumo do log
+          echo "duration=$(grep -oP 'Tempo total de execução: \K[0-9.]+' pipeline.log | tail -1)" >> "$GITHUB_OUTPUT"
+
+      - name: Empacotar camada Gold
+        run: |
+          tar czf ${{ env.GOLD_ARCHIVE }} -C data/datalake gold/
+          echo "Gold empacotado: $(du -sh ${{ env.GOLD_ARCHIVE }} | cut -f1)"
+          ls -lh ${{ env.GOLD_ARCHIVE }}
+
+      - name: Upload como Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Gera tag da data
+          TAG="data-$(date +%Y%m%d)"
+          RELEASE_NOTES="## iPolitico ETL — Atualização $(date +%d/%m/%Y)
+
+          **Estratégia:** ${{ steps.pipeline.outputs.strategy || 'incremental' }}
+          **Duração:** ${{ steps.pipeline.outputs.duration || 'N/A' }}s
+
+          ### Domínios incluídos (64/64)
+          - Dados completos da Câmara dos Deputados (API Dados Abertos)
+          - 64 domínios | ~7,3 milhões registros Gold
+          - Formato: Parquet (colunar, compressão snappy)
+
+          ### Próximos passos
+          \`\`\`bash
+          # Baixar e usar
+          tar xzf gold.tar.gz
+          # → pasta gold/ com 1 .parquet por domínio
+          \`\`\`
+          "
+
+          # Cria release ou atualiza "latest"
+          gh release delete latest --yes 2>/dev/null || true
+          gh release create "$TAG" \
+            --title "Atualização $(date +%d/%m/%Y)" \
+            --notes "$RELEASE_NOTES" \
+            --latest
+
+          # Também marca como "latest" (tag efêmera)
+          gh release create latest \
+            --title "Última versão estável" \
+            --notes "Release apontada para a versão mais recente. Use esta URL para sempre baixar o dado mais atualizado." || true
+
+          gh release upload "$TAG" ${{ env.GOLD_ARCHIVE }} --clobber
+          gh release upload latest ${{ env.GOLD_ARCHIVE }} --clobber 2>/dev/null || true
+
+      - name: Resumo
+        run: |
+          echo ""
+          echo "═══════════════════════════════════════════"
+          echo "  Pipeline concluída com sucesso!"
+          echo "  Duração: ${{ steps.pipeline.outputs.duration }}s"
+          echo "  Release: https://github.com/${{ github.repository }}/releases/latest"
+          echo "═══════════════════════════════════════════"

@@ -235,6 +235,11 @@ async def main():
     parser.add_argument("--start-date", type=str, default=None)
     parser.add_argument("--end-date", type=str, default=None)
     parser.add_argument(
+        "--no-warmup",
+        action="store_true",
+        help="Desativa o pré-aquecimento de cache para rotas 504-prone.",
+    )
+    parser.add_argument(
         "--export-gold",
         type=str,
         choices=["sqlite", "duckdb"],
@@ -288,6 +293,7 @@ async def main():
             SinkType.DATALAKE,
             args.start_date,
             args.end_date,
+            warmup=not args.no_warmup,
         )
 
         if args.optimize:
@@ -306,6 +312,11 @@ async def main():
     finally:
         await client.close()
         logger.info(f"Tempo total de execução: {time.perf_counter() - start_time:.2f}s")
+
+
+def main_cli():
+    """Entry point para console_scripts (``ipolitico`` no terminal)."""
+    asyncio.run(main())
 
 
 if __name__ == "__main__":

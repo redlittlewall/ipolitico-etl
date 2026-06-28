@@ -182,39 +182,62 @@ class DataLakeRepository(StateStore):
 
     def get_watermark(self, table_name: str, watermark_column: str) -> Optional[str]:
         """
-        Retorna o maior valor da coluna watermark nos Parquet Silver.
+        Retorna o maior valor da coluna watermark nos Parquet (Silver ou Gold).
 
-        Implementa o contrato StateStore usando Polars Lazy API (scan)
-        para evitar carregar todos os dados em memória.
+        Tenta a Silver primeiro (dado bruto); se não encontrar ou estiver vazia,
+        cai na Gold como fallback. Isto permite que execuções incrementais no
+        GitHub Actions funcionem mesmo sem a camada Silver presente (apenas Gold).
 
         Args:
-            table_name: Nome da tabela/domínio.
-            watermark_column: Nome da coluna que serve como marca d'água.
+            table_name: Nome da tabela/domínio (ex: 'despesas', 'eventos').
+            watermark_column: Nome da coluna que serve como marca d'água
+                (ex: 'dataDocumento', 'dataHoraInicio').
 
         Returns:
-            Valor máximo em string ISO, ou None se não houver dados.
+            Valor máximo em string ISO, ou None se não houver dados em
+            nenhuma camada.
         """
         import polars as pl
 
-        layer_dir = self.base_dir / "silver" / table_name
-        if not layer_dir.exists() or not list(layer_dir.glob("*.parquet")):
-            return None
+        for layer in ("silver", "gold"):
+            layer_dir = self.base_dir / layer / table_name
+            if not layer_dir.exists():
+                continue
 
-        try:
-            lazy_df = pl.scan_parquet(layer_dir / "*.parquet")
-            max_val = lazy_df.select(pl.col(watermark_column).max()).collect().item()
+            if layer == "gold":
+                parquet_file = layer_dir / f"{table_name}.parquet"
+                paths = [parquet_file] if parquet_file.exists() else []
+            else:
+                paths = list(layer_dir.glob("*.parquet"))
 
-            if max_val is not None:
-                return str(max_val).replace(" ", "T")
+            if not paths:
+                continue
 
-            return None
-        except Exception as e:
-            logger.warning(
-                "[DataLakeRepository] Falha ao ler watermark de '%s': %s",
-                table_name,
-                e,
-            )
-            return None
+            try:
+                lazy_df = pl.scan_parquet(paths)
+                schema = lazy_df.collect_schema()
+                if watermark_column not in schema.names():
+                    logger.warning(
+                        "[DataLakeRepository] Coluna watermark '%s' ausente em %s/%s.",
+                        watermark_column,
+                        layer,
+                        table_name,
+                    )
+                    continue
+
+                max_val = lazy_df.select(pl.col(watermark_column).max()).collect().item()
+                if max_val is not None:
+                    return str(max_val).replace(" ", "T")
+            except Exception as e:
+                logger.warning(
+                    "[DataLakeRepository] Falha ao ler watermark de '%s' em %s/%s: %s",
+                    table_name,
+                    layer,
+                    watermark_column,
+                    e,
+                )
+
+        return None
 
     def list_votacao_ids_silver_or_gold(
         self,
@@ -354,6 +377,85 @@ class DataLakeRepository(StateStore):
             DomainType.ORGAOS.value, "gold", "id"
         )
 
+    def list_orgao_ids_in_window(self, start_iso: str, end_iso: str) -> List[Any]:
+        """
+        IDs de órgãos ativos na janela temporal, usando ``dataInicio``/``dataFim``.
+
+        Faz DuckDB JOIN entre ``gold/orgaos`` e ``gold/orgaos_detalhe`` para
+        filtrar apenas órgãos que estavam ativos na janela (``dataInicio <= end``
+        AND (``dataFim IS NULL`` OR ``dataFim >= start``)). Isto elimina chamadas
+        de API desnecessárias para órgãos extintos antes da janela.
+
+        Args:
+            start_iso: Início da janela (ISO 8601).
+            end_iso: Fim da janela (ISO 8601).
+
+        Returns:
+            Lista de IDs de órgãos ativos na janela, ou lista vazia.
+        """
+        lo, hi = start_iso[:10], end_iso[:10]
+        con = duckdb.connect(database=":memory:")
+        try:
+            # Usa gold/orgaos e gold/orgaos_detalhe (já extraído com dataInicio/dataFim)
+            gold_org = self.base_dir / "gold" / "orgaos" / "orgaos.parquet"
+            gold_det = self.base_dir / "gold" / "orgaos_detalhe" / "orgaos_detalhe.parquet"
+            if gold_org.exists() and gold_det.exists():
+                path_org = str(gold_org).replace("'", "''")
+                path_det = str(gold_det).replace("'", "''")
+                sql = (
+                    f"SELECT DISTINCT o.id FROM read_parquet('{path_org}') o "
+                    f"JOIN read_parquet('{path_det}') d ON o.id = d.id "
+                    f"WHERE CAST(d.dataInicio AS VARCHAR) <= '{hi}' "
+                    f"AND (d.dataFim IS NULL OR CAST(d.dataFim AS VARCHAR) >= '{lo}') "
+                    f"ORDER BY o.id"
+                )
+                result = con.execute(sql).df()
+                ids = result["id"].tolist() if not result.empty else []
+                logger.info(
+                    "[DataLakeRepository] DuckDB Gold: %s orgaos ativos (%s..%s).",
+                    len(ids),
+                    lo,
+                    hi,
+                )
+                return ids
+
+            # ── Fallback: Silver ─────────────────────────────────────────────
+            sil_org = self.base_dir / "silver" / "orgaos"
+            sil_det = self.base_dir / "silver" / "orgaos_detalhe"
+            if sil_org.exists() and sil_det.exists():
+                sil_org_path = str(sil_org).replace(chr(39), chr(39) + chr(39))
+                sil_det_path = str(sil_det).replace(chr(39), chr(39) + chr(39))
+                sql = (
+                    f"SELECT DISTINCT o.id FROM read_parquet('{sil_org_path}/*.parquet') o "
+                    f"JOIN read_parquet('{sil_det_path}/*.parquet') d ON o.id = d.id "
+                    f"WHERE CAST(d.dataInicio AS VARCHAR) <= '{hi}' "
+                    f"AND (d.dataFim IS NULL OR CAST(d.dataFim AS VARCHAR) >= '{lo}') "
+                    f"ORDER BY o.id"
+                )
+                result = con.execute(sql).df()
+                ids = result["id"].tolist() if not result.empty else []
+                logger.info(
+                    "[DataLakeRepository] DuckDB Silver: %s orgaos ativos (%s..%s).",
+                    len(ids),
+                    lo,
+                    hi,
+                )
+                return ids
+
+            # Fallback final: sem dados, retorna todos
+            logger.warning(
+                "[DataLakeRepository] orgaos_detalhe indisponivel"
+                " (Gold nem Silver); sem filtro temporal."
+            )
+            return self.list_orgao_ids_silver_or_gold()
+        except Exception as e:
+            logger.error(
+                "[DataLakeRepository] Falha DuckDB orgaos_in_window: %s. Fallback todos.", e
+            )
+            return self.list_orgao_ids_silver_or_gold()
+        finally:
+            con.close()
+
     def list_frente_ids_silver_or_gold(self, legislatura_id: int | None = None) -> List[Any]:
         import polars as pl
 
@@ -455,6 +557,97 @@ class DataLakeRepository(StateStore):
             except Exception as e:
                 logger.error("[DataLakeRepository] Falha ao listar blocos: %s", e)
         return []
+
+    def list_deputy_legislature_windows(
+        self,
+        earliest_start: str = "1995-01-01",
+    ) -> list[tuple[int, str, str]]:
+        """
+        Pares (id_deputado, dataInicio, dataFim) para cada legislatura ativa por deputado.
+
+        Faz o JOIN entre gold/legislaturas e gold/deputados_historico (ou Silver como
+        fallback) para obter a janela temporal real de cada legislatura que cada
+        deputado serviu. Cada legislatura tem ≤4 anos, eliminando a necessidade de
+        chunking temporal na extração de discursos/orgaos/eventos por deputado.
+
+        Args:
+            earliest_start: Data ISO mínima para filtrar legislaturas com
+                ``dataFim >= earliest_start`` (padrão ``1995-01-01``, data a partir
+                da qual discursos digitalizados existem).
+
+        Returns:
+            Lista de tuplas (id_deputado, dataInicio, dataFim) ordenadas por
+            deputado e data de início da legislatura, ou lista vazia se os dados
+            de origem não estiverem disponíveis.
+        """
+        leg_table = DomainType.LEGISLATURAS.value
+        hist_table = DomainType.DEPUTADOS_HISTORICO.value
+
+        con = duckdb.connect(database=":memory:")
+        try:
+            # ── Tenta Gold primeiro ──────────────────────────────────────────
+            gold_leg = self.base_dir / "gold" / leg_table / f"{leg_table}.parquet"
+            gold_hist = self.base_dir / "gold" / hist_table / f"{hist_table}.parquet"
+            if gold_leg.exists() and gold_hist.exists():
+                sql = (
+                    f"SELECT DISTINCT h.id_deputado,"
+                    f" CAST(l.dataInicio AS VARCHAR),"
+                    f" CAST(l.dataFim AS VARCHAR) "
+                    f"FROM read_parquet('{str(gold_hist).replace(chr(39), chr(39)+chr(39))}') h "
+                    f"JOIN read_parquet('{str(gold_leg).replace(chr(39), chr(39)+chr(39))}') l "
+                    f"  ON CAST(h.idLegislatura AS BIGINT) = l.id "
+                    f"WHERE CAST(l.dataFim AS VARCHAR) >= '{earliest_start}' "
+                    f"ORDER BY h.id_deputado, l.id"
+                )
+                result = con.execute(sql).fetchall()
+                if result:
+                    pairs = [(int(r[0]), str(r[1]), str(r[2])) for r in result]
+                    logger.info(
+                        "[DataLakeRepository] DuckDB Gold: %s pares deputado-legislatura (≥%s).",
+                        len(pairs),
+                        earliest_start[:10],
+                    )
+                    return pairs
+
+            # ── Fallback: Silver ─────────────────────────────────────────────
+            sil_leg = self.base_dir / "silver" / leg_table
+            sil_hist = self.base_dir / "silver" / hist_table
+            if sil_leg.exists() and sil_hist.exists():
+                leg_glob = str(sil_leg / "*.parquet")
+                hist_glob = str(sil_hist / "*.parquet")
+                sql = (
+                    f"SELECT DISTINCT h.id_deputado,"
+                    f" CAST(l.dataInicio AS VARCHAR),"
+                    f" CAST(l.dataFim AS VARCHAR) "
+                    f"FROM read_parquet('{hist_glob}') h "
+                    f"JOIN read_parquet('{leg_glob}') l "
+                    f"  ON CAST(h.idLegislatura AS BIGINT) = l.id "
+                    f"WHERE CAST(l.dataFim AS VARCHAR) >= '{earliest_start}' "
+                    f"ORDER BY h.id_deputado, l.id"
+                )
+                result = con.execute(sql).fetchall()
+                if result:
+                    pairs = [(int(r[0]), str(r[1]), str(r[2])) for r in result]
+                    logger.info(
+                        "[DataLakeRepository] DuckDB Silver: %s pares deputado-legislatura (≥%s).",
+                        len(pairs),
+                        earliest_start[:10],
+                    )
+                    return pairs
+
+            logger.warning(
+                "[DataLakeRepository] Nenhum dado de legislaturas ou deputados_historico "
+                "disponível (Gold nem Silver)."
+            )
+            return []
+        except Exception as e:
+            logger.error(
+                "[DataLakeRepository] Falha no JOIN legislaturas × deputados_historico: %s",
+                e,
+            )
+            return []
+        finally:
+            con.close()
 
     def list_deputy_expense_year_pairs(self) -> set[tuple[Any, int]]:
         """Pares (id_deputado, ano) já materializados na Silver de despesas."""
