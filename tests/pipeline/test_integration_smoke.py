@@ -17,6 +17,7 @@ from ipolitico.transformers.camara.proposicoes_transformer import CamaraProposic
 @pytest.mark.asyncio
 async def test_manager_run_domain_proposicoes_mocked():
     client = MagicMock()
+    client.warmup_for_domain = AsyncMock()
     builder = PipelineBuilder(client)
     runner = PipelineRunner(max_workers=1)
     state = MagicMock()

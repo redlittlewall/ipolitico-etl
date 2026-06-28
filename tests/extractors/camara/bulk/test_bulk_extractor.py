@@ -9,6 +9,12 @@ import pytest
 from ipolitico.extractors.camara.bulk.base_bulk import BaseBulkExtractor
 
 
+@pytest.fixture(autouse=True)
+def _clear_bulk_cache():
+    """Limpa cache compartilhado do BaseBulkExtractor antes de cada teste."""
+    BaseBulkExtractor.clear_cache()
+
+
 @pytest.fixture
 def mock_client():
     client = AsyncMock()
@@ -228,6 +234,51 @@ async def test_extract_applies_rename_map(
     assert "id" in result.columns
     assert "idOrgao" not in result.columns
     assert result["id"].to_list() == [1, 2]
+
+
+@pytest.mark.asyncio
+@patch(
+    "ipolitico.extractors.camara.bulk.base_bulk.BULK_REGISTRY",
+    new={
+        "cache_test": {
+            "requires_year": False,
+            "url_template": "https://dadosabertos.camara.leg.br/arquivos/cachetest/csv/data.csv",
+            "bulk_granularity": "snapshot",
+            "bulk_filter_date_column": None,
+        },
+    },
+)
+@patch("ipolitico.extractors.camara.bulk.base_bulk.pl.read_csv")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.ZipFile")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.is_zipfile")
+async def test_extract_cache_hit_reuses_dataframe(
+    mock_is_zipfile, mock_zipfile, mock_read_csv, mock_client
+):
+    """
+    [CACHE] Verifica que o cache compartilhado funciona: ao chamar extract()
+    duas vezes com o mesmo domain_name, a segunda chamada retorna dados sem
+    baixar/parsear novamente (read_csv é chamado só na primeira).
+    """
+    mock_is_zipfile.return_value = True
+    mock_zip_instance = MagicMock()
+    mock_zip_instance.namelist.return_value = ["data.csv"]
+    mock_zipfile.return_value.__enter__.return_value = mock_zip_instance
+
+    df_original = pl.DataFrame({"id": [1, 2, 3], "nome": ["A", "B", "C"]})
+    mock_read_csv.return_value = df_original
+
+    ext = BaseBulkExtractor(mock_client, domain_name="cache_test")
+
+    # Primeira chamada → download + read_csv
+    result1 = await ext.extract()
+    mock_read_csv.assert_called_once()
+    assert result1.height == 3
+
+    # Segunda chamada → cache hit, read_csv NÃO é chamado novamente
+    result2 = await ext.extract()
+    mock_read_csv.assert_called_once()  # ainda 1x
+    assert result2.height == 3
+    assert result2["id"].to_list() == [1, 2, 3]
 
 
 @pytest.mark.asyncio

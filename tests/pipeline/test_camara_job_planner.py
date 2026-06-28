@@ -156,7 +156,7 @@ def test_orientacoes_planner_batches_votacao_ids():
 def test_orgaos_membros_planner_passes_window():
     store = MagicMock()
     lake = MagicMock()
-    lake.list_orgao_ids_silver_or_gold.return_value = [10, 20]
+    lake.list_orgao_ids_in_window.return_value = [10, 20]
     lake.list_entity_ids_with_child_materialized.return_value = set()
     planner = CamaraJobPlanner(store, lake)
     plan = ExtractionPlan(source_type=SourceType.API)

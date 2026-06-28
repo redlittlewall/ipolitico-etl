@@ -23,8 +23,8 @@ REQUIRED_SCHEMA_OVERRIDE_DOMAINS = {
     # NOTA: orgaos removido intencionalmente — CSV bulk não tem id numérica
     "deputados_orgaos",
     "deputados_frentes",
-    "ocupacoes",
-    "profissoes",
+    # NOTA: profissoes e ocupacoes removidos — CSVs são catálogos de tipos,
+    # sem id_deputado. Não servem como fonte para dados por-deputado.
     "orientacoes",
     # Fase 3 — Domínios bulk-only (sem rota API)
     "funcionarios",
@@ -64,9 +64,7 @@ SNAPSHOT_DOMAINS = frozenset(
         # NOTA: orgaos removido — Bulk CSV inviável
         "deputados_orgaos",
         "deputados_frentes",
-        "ocupacoes",
-        "profissoes",
-        # Fase 3 — bulk-only snapshot
+        # NOTA: profissoes e ocupacoes removidos — CSVs sem id_deputado.
         "funcionarios",
         "tecad_categorias",
         "tecad_termos",

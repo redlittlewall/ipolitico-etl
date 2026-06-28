@@ -26,7 +26,7 @@
 
 ### Resiliência (Anti-DDOS)
 
-- **Semáforo de concorrência global.** `CAMARA_HTTP_CONCURRENCY` (padrão: 5)
+- **Semáforo de concorrência global.** `CAMARA_HTTP_CONCURRENCY` (padrão: 10, testado empiricamente sem perda)
   protege a API da Câmara. Nunca faça requisições fora do semáforo.
 - **Exponential Backoff (tenacity).** Todo worker de extração usa
   `@retry(wait=wait_exponential, stop=stop_after_attempt(5))`.
