@@ -43,6 +43,11 @@ data_backup_*/
 # Claude Code — pessoal do desenvolvedor
 .claude/projects/
 .claude/worktrees/
+.claude/scheduled_tasks.lock
+
+# Scripts ad hoc de debug/análise (não fazem parte do core)
+scripts/*.db
+scripts/*.log
 
 # Claude Code — skills pessoais (cada dev tem as suas)
 .claude/skills/diagnose/
@@ -53,3 +58,9 @@ data_backup_*/
 .claude/skills/tdd/
 .claude/skills/to-issues/
 .claude/skills/to-prd/
+
+# 🎭 Facehugger generated
+AGENT-SEED.md
+CONTEXT.md
+docs/agents/
+# 🎭 End Facehugger
