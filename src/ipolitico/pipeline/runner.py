@@ -36,7 +36,7 @@ class PipelineRunner:
         unique_keys: Optional[Union[str, List[str]]] = None,
         layer: MedallionLayer = MedallionLayer.SILVER,
         transform_kwargs: Optional[Dict[str, Any]] = None,
-    ) -> None:
+    ) -> int:
         """
         Executa o pipeline assíncrono para uma lista de itens (jobs).
 
@@ -51,6 +51,9 @@ class PipelineRunner:
             layer (MedallionLayer): Camada de destino para o salvamento.
             transform_kwargs (Dict[str, Any], optional): Parâmetros de contexto adicionais
                                                          para o Transformer.
+
+        Returns:
+            int: Número de itens que efetivamente produziram dados (DataFrames não vazios).
         """
         total_items = len(items)
         if total_items == 0:
@@ -68,6 +71,7 @@ class PipelineRunner:
         df_queue = asyncio.Queue(maxsize=10)
 
         processed_count = 0
+        data_count = 0  # itens que produziram dados não vazios
         log_threshold = max(1, total_items // 10)
         t_kwargs = transform_kwargs or {}
 
@@ -121,6 +125,8 @@ class PipelineRunner:
 
                 if clean_df is not None:
                     await df_queue.put(clean_df)
+                    nonlocal data_count
+                    data_count += 1
 
                 processed_count += 1
                 if processed_count % log_threshold == 0 or processed_count == total_items:
@@ -161,3 +167,5 @@ class PipelineRunner:
 
         # Garante que todo buffer residual seja descarregado
         await components.sink.flush(table_name=table_name, layer=layer.value)
+
+        return data_count

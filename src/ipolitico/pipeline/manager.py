@@ -31,6 +31,11 @@ class PipelineManager:
     Gerencia o ciclo de vida dos dados, decidindo a janela de extração com base
     em watermarks reais consultados no banco (Estratégia Incremental) ou reiniciando
     o estado desde a origem dos tempos (Full Load).
+
+    Otimiza execuções incrementais:
+    - Domínios estáveis (stable=True) com Silver existente são pulados.
+    - Filhos de um domínio que não produziu dados na mesma execução são pulados.
+    - Warmup pode ser desligado via flag ``warmup=False``.
     """
 
     def __init__(
@@ -59,6 +64,10 @@ class PipelineManager:
         self._job_planner = CamaraJobPlanner(state_store=self._lake, lake_repository=self._lake)
         self._window_resolver = WindowResolver(state_store=self._lake)
 
+        # Rastreamento de domínios que produziram dados nesta execução.
+        # Usado para pular filhos cujo pai não gerou dados novos.
+        self._domains_with_new_data: set[str] = set()
+
     async def run_domain(
         self,
         domain: DomainType,
@@ -70,10 +79,30 @@ class PipelineManager:
     ) -> None:
         logger.info(f"=== Inicializando Domínio: {domain.value.upper()} ===")
 
+        # ── Skip domínios estáveis se já têm Silver ────────────────────────
+        if self._window_resolver.should_skip_stable(domain):
+            return
+
         domain_cfg = self.config.get("domain_configs", {}).get(domain.value)
         if not domain_cfg:
             logger.error(f"Configuração não encontrada no YAML para o domínio {domain.value}")
             return
+
+        # ── Skip filhos se pai não produziu dados nesta execução ────────────
+        spec = spec_for(domain)
+        if spec and spec.depends_on:
+            parent_domains_updated = {
+                p.value for p in spec.depends_on if p.value in self._domains_with_new_data
+            }
+            parents_missing = {p.value for p in spec.depends_on} - parent_domains_updated
+            if parents_missing:
+                logger.info(
+                    "[%s] Pais %s não produziram dados nesta execução. "
+                    "Saltando filho (não há dados novos).",
+                    domain.value.upper(),
+                    parents_missing,
+                )
+                return
 
         current_leg = await self._metadata.get_current_legislature_id()
         legis_start = await self._metadata.get_legislature_start_date(current_leg)
@@ -138,7 +167,7 @@ class PipelineManager:
         ):
             await self.builder.client.warmup_for_domain(domain, jobs)
 
-        spec = spec_for(domain)
+        # spec já resolvido acima (linha 92)
         unique_keys: list[str] = list(spec.unique_keys) if spec else ["id"]
         t_kwargs: dict[str, Any] = {}
         if spec and spec.sub_domain:
@@ -158,7 +187,7 @@ class PipelineManager:
                 end_iso=extraction_plan.bulk_eff_end_iso,
             )
 
-        await self.runner.execute(
+        data_count = await self.runner.execute(
             components=components,
             items=jobs,
             extract_kwargs_mapper=extract_kwargs_mapper,
@@ -167,3 +196,12 @@ class PipelineManager:
             unique_keys=unique_keys,
             transform_kwargs=t_kwargs,
         )
+
+        # Rastreia pais que produziram dados para skip de filhos
+        if data_count > 0:
+            self._domains_with_new_data.add(domain.value)
+            logger.debug(
+                "[%s] Produziu %d registros — filhos não serão pulados.",
+                domain.value.upper(),
+                data_count,
+            )

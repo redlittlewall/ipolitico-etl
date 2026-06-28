@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, Tuple
 
-from ipolitico.core.constants import DomainType, LoadStrategy
+from ipolitico.core.constants import DomainType, LoadStrategy, MedallionLayer
 from ipolitico.core.domain_spec import spec_for
 from ipolitico.storage.state_store import StateStore
 
@@ -65,6 +66,46 @@ class WindowResolver:
 
     def __init__(self, state_store: StateStore) -> None:
         self._store = state_store
+        # Tenta extrair base_dir do state_store (DataLakeSink/DataLakeRepository)
+        self._base_dir: Path | None = None
+        if hasattr(state_store, "base_dir") and state_store.base_dir:
+            self._base_dir = Path(state_store.base_dir)
+
+    def should_skip_stable(self, domain: DomainType) -> bool:
+        """
+        Verifica se um domínio estável (stable=True) já tem dados Silver.
+
+        Domínios estáveis como REFERENCIAS, FUNCIONARIOS, TECAD_*, LICITACOES*
+        e outros bulk-only NUNCA mudam entre execuções. Se já foram extraídos
+        uma vez, pular completamente.
+
+        Args:
+            domain: Tipo do domínio a verificar.
+
+        Returns:
+            True se o domínio é estável E já existe Silver, False caso contrário.
+        """
+        spec = spec_for(domain)
+        if not spec or not spec.stable:
+            return False
+
+        if self._base_dir is None:
+            return False
+
+        silver_dir = self._base_dir / MedallionLayer.SILVER.value / domain.value
+        if not silver_dir.exists():
+            return False
+
+        parquet_files = list(silver_dir.glob("*.parquet"))
+        if not parquet_files:
+            return False
+
+        logger.info(
+            "[%s] Domínio estável com dados Silver existentes. "
+            "Saltando extração (não há dados novos desde a última carga).",
+            domain.value.upper(),
+        )
+        return True
 
     @staticmethod
     def watermark_column(domain: DomainType) -> Optional[str]:

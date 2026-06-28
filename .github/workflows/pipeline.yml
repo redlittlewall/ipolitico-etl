@@ -73,7 +73,7 @@ jobs:
           if [ "$STRATEGY" = "full_load" ]; then
             python -m ipolitico.main --strategy full_load --optimize 2>&1 | tee pipeline.log
           else
-            python -m ipolitico.main --strategy incremental --optimize 2>&1 | tee pipeline.log
+            python -m ipolitico.main --strategy incremental --optimize --no-warmup 2>&1 | tee pipeline.log
           fi
 
           # Extrai resumo do log

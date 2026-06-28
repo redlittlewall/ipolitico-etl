@@ -223,12 +223,15 @@ class CamaraClient:
         domain: DomainType,
         jobs: list[dict[str, Any]],
         only_new: bool = True,
+        parallel: bool = False,
+        max_parallel: int = 5,
     ) -> None:
         """Pré-aquece o cache da API para URLs de um domínio (best-effort).
 
-        Cada URL é chamada uma única vez de forma sequencial (sem concorrência)
-        para que o proxy reverso da Câmara cacheie a resposta antes da extração
-        concorrente normal. Erros são ignorados — o warmup é sempre opcional.
+        Por padrão (parallel=False), cada URL é chamada sequencialmente.
+        Com parallel=True, até ``max_parallel`` URLs são aquecidas em paralelo,
+        reduzindo o tempo total de warmup em troca de maior chance de 504
+        da API. Erros são ignorados — o warmup é sempre opcional.
 
         Args:
             domain: Tipo do domínio a aquecer.
@@ -236,6 +239,8 @@ class CamaraClient:
                   Usada apenas para extrair IDs; o conteúdo é irrelevante.
             only_new: Se True (padrão), pula URLs já aquecidas nesta sessão
                       via ``_warmed_urls``.
+            parallel: Se True, faz requisições paralelas (até max_parallel).
+            max_parallel: Número máximo de requisições simultâneas no warmup.
         """
         # Import lazy para evitar dependência circular
         from ipolitico.core.warmup import WARMUP_CONFIG, build_warmup_urls
@@ -263,26 +268,39 @@ class CamaraClient:
             )
             return
 
+        modo = "paralelo" if parallel else "sequencial"
         logger.info(
-            "[WARMUP] %s: aquecendo %d URLs (saltou %d repetidas, sequencial, best-effort)...",
+            "[WARMUP] %s: aquecendo %d URLs (saltou %d repetidas, %s, best-effort)...",
             domain.value.upper(),
             len(new_urls),
             skipped,
+            modo,
         )
 
-        # Requisições sequenciais — sem semáforo, sem concorrência.
-        # A primeira chamada a cada recurso é tipicamente 5-12s (cache frio);
-        # queremos exatamente UMA chamada lenta, não N simultâneas.
         warmed = 0
+
+        async def _warm_one(client: httpx.AsyncClient, url: str) -> None:
+            nonlocal warmed
+            try:
+                await client.get(url, timeout=30.0)
+                warmed += 1
+            except Exception:
+                pass  # Best-effort
+            finally:
+                self._warmed_urls.add(url)
+
         async with httpx.AsyncClient(timeout=60.0, headers=self.headers) as client:
-            for url in new_urls:
-                try:
-                    await client.get(url, timeout=30.0)
-                    warmed += 1
-                except Exception:
-                    pass  # Best-effort: falha no warmup não aborta a extração
-                finally:
-                    self._warmed_urls.add(url)
+            if parallel:
+                sem = asyncio.Semaphore(max_parallel)
+
+                async def _bounded(url: str) -> None:
+                    async with sem:
+                        await _warm_one(client, url)
+
+                await asyncio.gather(*[_bounded(u) for u in new_urls])
+            else:
+                for url in new_urls:
+                    await _warm_one(client, url)
 
         logger.info(
             "[WARMUP] %s: concluído — %d/%d URLs aquecidas (ignorando erros).",

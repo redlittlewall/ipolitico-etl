@@ -18,6 +18,7 @@ class DomainSpec:
     unique_keys: tuple[str, ...] = ("id",)
     sub_domain: str | None = None
     bulk_granularity: str | None = None
+    stable: bool = False
 
 
 def _spec(
@@ -26,6 +27,7 @@ def _spec(
     deps: FrozenSet[DomainType] = frozenset(),
     uk: tuple[str, ...] = ("id",),
     sub: str | None = None,
+    stable: bool = False,
 ) -> DomainSpec:
     meta = BULK_REGISTRY.get(domain.value, {})
     return DomainSpec(
@@ -36,6 +38,7 @@ def _spec(
         unique_keys=uk,
         sub_domain=sub,
         bulk_granularity=meta.get("bulk_granularity"),
+        stable=stable,
     )
 
 
@@ -219,6 +222,7 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         DomainType.REFERENCIAS,
         None,
         uk=("referencia", "cod", "sigla", "nome"),
+        stable=True,
     ),
     DomainType.DEPUTADOS_DETALHE: _spec(
         DomainType.DEPUTADOS_DETALHE,
@@ -334,63 +338,75 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         DomainType.FUNCIONARIOS,
         None,
         uk=("ponto",),
+        stable=True,
     ),
     DomainType.TECAD_CATEGORIAS: _spec(
         DomainType.TECAD_CATEGORIAS,
         None,
         uk=("codCategoria", "codSubCategoria"),
+        stable=True,
     ),
     DomainType.TECAD_TERMOS: _spec(
         DomainType.TECAD_TERMOS,
         None,
         uk=("codTermo",),
+        stable=True,
     ),
     # ── Domínios bulk-only de eventos/votações (Fase 3) ──────────────────────
     DomainType.EVENTOS_PRESENCA_DEPUTADOS: _spec(
         DomainType.EVENTOS_PRESENCA_DEPUTADOS,
         None,
         uk=("idEvento", "idDeputado"),
+        stable=True,
     ),
     DomainType.EVENTOS_REQUERIMENTOS: _spec(
         DomainType.EVENTOS_REQUERIMENTOS,
         None,
         uk=("idEvento", "tituloRequerimento", "uriRequerimento"),
+        stable=True,
     ),
     DomainType.VOTACOES_OBJETOS: _spec(
         DomainType.VOTACOES_OBJETOS,
         None,
         uk=("idVotacao", "proposicao_id"),
+        stable=True,
     ),
     DomainType.VOTACOES_PROPOSICOES: _spec(
         DomainType.VOTACOES_PROPOSICOES,
         None,
         uk=("idVotacao", "proposicao_id"),
+        stable=True,
     ),
     # ── Domínios bulk-only de licitações (Fase 3) ────────────────────────────
     DomainType.LICITACOES: _spec(
         DomainType.LICITACOES,
         None,
         uk=("idLicitacao",),
+        stable=True,
     ),
     DomainType.LICITACOES_CONTRATOS: _spec(
         DomainType.LICITACOES_CONTRATOS,
         None,
         uk=("idLicitacao", "numContrato", "anoContrato"),
+        stable=True,
     ),
     DomainType.LICITACOES_ITENS: _spec(
         DomainType.LICITACOES_ITENS,
         None,
         uk=("idLicitacao", "numItem", "numSubitem"),
+        stable=True,
     ),
     DomainType.LICITACOES_PEDIDOS: _spec(
         DomainType.LICITACOES_PEDIDOS,
         None,
         uk=("idLicitacao", "numPedido", "anoPedido"),
+        stable=True,
     ),
     DomainType.LICITACOES_PROPOSTAS: _spec(
         DomainType.LICITACOES_PROPOSTAS,
         None,
         uk=("idLicitacao", "numItem", "numProposta", "fornecedorCpfCnpj"),
+        stable=True,
     ),
 }
 
