@@ -264,7 +264,7 @@ class CamaraClient:
             return
 
         logger.info(
-            "[WARMUP] %s: aquecendo %d URLs (saltou %d repetidas, " "sequencial, best-effort)...",
+            "[WARMUP] %s: aquecendo %d URLs (saltou %d repetidas, sequencial, best-effort)...",
             domain.value.upper(),
             len(new_urls),
             skipped,

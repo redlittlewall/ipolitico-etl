@@ -175,8 +175,7 @@ class BaseBulkExtractor(BaseExtractor):
                 config_hash = hash(str(config_registry))
                 BaseBulkExtractor._bulk_cache[cache_key] = (df.clone(), config_hash)
                 logger.debug(
-                    f"[{self.domain_name}] Cache armazenado para '{cache_key}' "
-                    f"({len(df)} linhas)."
+                    f"[{self.domain_name}] Cache armazenado para '{cache_key}' ({len(df)} linhas)."
                 )
 
                 return df
