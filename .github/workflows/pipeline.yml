@@ -48,12 +48,13 @@ jobs:
         id: download
         continue-on-error: true
         run: |
-          mkdir -p data/datalake/gold
-          gh release download latest --pattern "${{ env.GOLD_ARCHIVE }}" --output /tmp/${{ env.GOLD_ARCHIVE }} 2>&1 || echo "Nenhuma release anterior encontrada. Full load completo será necessário."
-          if [ -f /tmp/${{ env.GOLD_ARCHIVE }} ]; then
-            tar xzf /tmp/${{ env.GOLD_ARCHIVE }} -C data/datalake/
+          mkdir -p data/datalake/gold /tmp/gold_download
+          gh release download latest --pattern "gold*" --dir /tmp/gold_download 2>&1 || echo "Nenhuma release anterior encontrada."
+          GOLD_FILE=$(ls /tmp/gold_download/gold* 2>/dev/null | head -1)
+          if [ -n "$GOLD_FILE" ]; then
+            tar xzf "$GOLD_FILE" -C data/datalake/
             echo "restored=true" >> "$GITHUB_OUTPUT"
-            echo "Dados Gold restaurados da release anterior."
+            echo "Dados Gold restaurados de $(basename "$GOLD_FILE")."
           else
             echo "restored=false" >> "$GITHUB_OUTPUT"
           fi
