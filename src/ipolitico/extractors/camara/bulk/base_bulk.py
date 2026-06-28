@@ -27,7 +27,22 @@ class BaseBulkExtractor(BaseExtractor):
     presentes) para tipar colunas conhecidas na origem, evitando o segundo passe
     de cast nos transformers. Colunas de moeda BR permanecem como ``pl.Utf8``
     para processamento posterior pelo helper ``convert_br_currency_columns``.
+
+    Implementa cache de DataFrames por chave (domínio, ano) para evitar downloads
+    redundantes do mesmo arquivo CSV quando múltiplos jobs processam o mesmo
+    snapshot (ex: 7275 jobs para deputados_frentes que baixam o mesmo CSV).
+    O cache é compartilhado entre todos os domínios via dicionário de classe;
+    cada entrada contém uma tupla (DataFrame, config_registry) para detectar
+    mudanças de schema. Use ``clear_cache()`` para resetar entre execuções.
     """
+
+    # Cache compartilhado: {(domain_name, year): (DataFrame, config_hash)}
+    _bulk_cache: dict[tuple[str, int | None], tuple[pl.DataFrame, int]] = {}
+
+    @classmethod
+    def clear_cache(cls) -> None:
+        """Limpa o cache de DataFrames. Útil entre execuções de pipeline."""
+        cls._bulk_cache.clear()
 
     def __init__(self, client: CamaraClient, domain_name: str = ""):
         """
@@ -77,12 +92,28 @@ class BaseBulkExtractor(BaseExtractor):
             year (int, optional): Ano para particionamento do arquivo.
             **kwargs: Parâmetros contextuais adicionais.
 
+        Utiliza cache compartilhado (``_bulk_cache``) para evitar downloads
+        redundantes do mesmo arquivo CSV quando múltiplos jobs processam o
+        mesmo snapshot. O cache é chaveado por (domain_name, year) e inclui
+        um hash da configuração do registro para invalidar em mudanças de schema.
+
         Returns:
             pl.DataFrame: DataFrame contendo os dados estritamente brutos.
                           Retorna um DataFrame vazio em caso de falha ou arquivo inexistente.
         """
         if not self.domain_name:
             raise NotImplementedError("domain_name deve ser fornecido no construtor.")
+
+        # ── Cache hit: retorna clone do DataFrame em cache ────────────────
+        cache_key: tuple[str, int | None] = (self.domain_name, year)
+        cached = BaseBulkExtractor._bulk_cache.get(cache_key)
+        if cached is not None:
+            df_cached, _ = cached
+            logger.debug(
+                f"[{self.domain_name}] Cache hit para '{cache_key}', "
+                f"reutilizando {len(df_cached)} linhas."
+            )
+            return df_cached.clone()
 
         url = self._build_url(year)
 
@@ -139,6 +170,14 @@ class BaseBulkExtractor(BaseExtractor):
                     existing = {k: v for k, v in rename_map.items() if k in df.columns}
                     if existing:
                         df = df.rename(existing)
+
+                # ── Popula cache antes de retornar ────────────────────────
+                config_hash = hash(str(config_registry))
+                BaseBulkExtractor._bulk_cache[cache_key] = (df.clone(), config_hash)
+                logger.debug(
+                    f"[{self.domain_name}] Cache armazenado para '{cache_key}' "
+                    f"({len(df)} linhas)."
+                )
 
                 return df
 

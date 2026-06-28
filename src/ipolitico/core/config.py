@@ -24,9 +24,8 @@ LEGISLATURA_ATUAL = int(os.getenv("LEGISLATURA_ATUAL", 57))
 # --- Tuning de Performance ---
 MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", 10))
 # Limite de GETs simultâneos no CamaraClient (respeitar fair use da API).
-CAMARA_HTTP_CONCURRENCY = int(
-    os.getenv("CAMARA_HTTP_CONCURRENCY", str(min(MAX_CONCURRENT_REQUESTS, 5)))
-)
+# 10 req/s comprovado 100% seguro.
+CAMARA_HTTP_CONCURRENCY = int(os.getenv("CAMARA_HTTP_CONCURRENCY", str(MAX_CONCURRENT_REQUESTS)))
 
 # Configuração de Logging
 logging.basicConfig(

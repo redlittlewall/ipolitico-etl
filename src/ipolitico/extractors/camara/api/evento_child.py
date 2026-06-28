@@ -30,7 +30,7 @@ class EventoChildRouteExtractor(CamaraBaseExtractor):
                     if isinstance(item, dict):
                         rows.append({**item, self.parent_id_field: int(eid)})
             except Exception as e:
-                logger.error("Erro em %s para evento %s: %s", self.route_suffix, eid, e)
+                logger.warning("Erro em %s para evento %s: %s", self.route_suffix, eid, e)
 
         return pl.DataFrame(rows, infer_schema_length=None) if rows else pl.DataFrame()
 

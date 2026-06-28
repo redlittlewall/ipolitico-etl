@@ -29,7 +29,7 @@ class VotosExtractor(CamaraBaseExtractor):
                         item["votacao_id"] = v_id
                     all_votos.extend(data)
             except Exception as e:
-                logger.error(f"Erro ao extrair votos da votação {v_id}: {e}")
+                logger.warning(f"Erro ao extrair votos da votação {v_id}: {e}")
                 continue
 
         return pl.DataFrame(all_votos) if all_votos else pl.DataFrame()

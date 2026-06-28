@@ -94,7 +94,7 @@ class PipelineBuilder:
         extractor_class = self._import_class(domain_config[extractor_path_key])
 
         extractor_kwargs: dict[str, Any] = {"client": self.client}
-        if domain_name and source_type == SourceType.BULK and domain_config.get("extractor_bulk"):
+        if domain_name and source_type == SourceType.BULK:
             extractor_kwargs["domain_name"] = domain_name
         extractor_instance = extractor_class(**extractor_kwargs)
 

@@ -50,11 +50,11 @@ class ReferenciasExtractor(CamaraBaseExtractor):
 
         for path in paths:
             try:
-                data = await self.fetch_paginated(path, {})
+                data = await self.fetch_unpaginated(path, {})
                 for item in data:
                     if isinstance(item, dict):
                         rows.append({**item, "referencia": path})
             except Exception as e:
-                logger.error("Erro em referência %s: %s", path, e)
+                logger.warning("Erro em referência %s: %s", path, e)
 
         return pl.DataFrame(rows, infer_schema_length=None) if rows else pl.DataFrame()

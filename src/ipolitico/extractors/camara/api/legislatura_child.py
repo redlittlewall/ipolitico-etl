@@ -31,7 +31,7 @@ class LegislaturaChildRouteExtractor(CamaraBaseExtractor):
                     if isinstance(item, dict):
                         rows.append({**item, "id_legislatura": int(lid)})
             except Exception as e:
-                logger.error("Erro em %s da legislatura %s: %s", self.route_suffix, lid, e)
+                logger.warning("Erro em %s da legislatura %s: %s", self.route_suffix, lid, e)
 
         return pl.DataFrame(rows, infer_schema_length=None) if rows else pl.DataFrame()
 

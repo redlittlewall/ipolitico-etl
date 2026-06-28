@@ -28,7 +28,7 @@ class DetailByIdExtractor(CamaraBaseExtractor):
                 if isinstance(data, dict):
                     rows.append(data)
             except Exception as e:
-                logger.error("Erro em detalhe %s/%s: %s", self.base_route, eid, e)
+                logger.warning("Erro em detalhe %s/%s: %s", self.base_route, eid, e)
 
         return pl.DataFrame(rows, infer_schema_length=None) if rows else pl.DataFrame()
 

@@ -59,9 +59,14 @@ class CamaraVotacoesTransformer(BaseTransformer):
 
     def _transform_votacoes(self, df: pl.DataFrame, kwargs: dict) -> pl.DataFrame:
         date_cols = ["data", "dataHoraRegistro"]
-        transformations = [
-            pl.col(c).str.to_datetime(strict=False) for c in date_cols if c in df.columns
-        ]
+        transformations = []
+        for c in date_cols:
+            if c not in df.columns:
+                continue
+            # Garante que a coluna é String antes de .str.to_datetime()
+            # para evitar "expected String, got null" quando a coluna é toda nula
+            df = df.with_columns(pl.col(c).cast(pl.String).alias(c))
+            transformations.append(pl.col(c).str.to_datetime(strict=False))
         if transformations:
             df = df.with_columns(transformations)
 

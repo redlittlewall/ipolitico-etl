@@ -155,6 +155,10 @@ BULK_REGISTRY: dict[str, dict] = {
         "bulk_granularity": "snapshot",
         "bulk_filter_date_column": None,
         "schema_overrides": {},
+        "rename_map": {
+            "deputado_.id": "id_deputado",
+            "deputado_.idLegislatura": "idLegislatura",
+        },
     },
     "ocupacoes": {
         "requires_year": False,
@@ -162,7 +166,10 @@ BULK_REGISTRY: dict[str, dict] = {
             "https://dadosabertos.camara.leg.br/arquivos/deputadosOcupacoes/"
             "csv/deputadosOcupacoes.csv"
         ),
-        "bulk_granularity": "snapshot",
+        # NOTA: bulk_granularity removida de propósito — o CSV não tem
+        # id_deputado e não serve como fonte para dados por-deputado.
+        # SourceRouter retorna API, não Bulk. Mantemos a URL como
+        # documentação do que existe no portal Dados Abertos.
         "bulk_filter_date_column": None,
         "schema_overrides": {},
     },
@@ -172,7 +179,8 @@ BULK_REGISTRY: dict[str, dict] = {
             "https://dadosabertos.camara.leg.br/arquivos/deputadosProfissoes/"
             "csv/deputadosProfissoes.csv"
         ),
-        "bulk_granularity": "snapshot",
+        # NOTA: Mesmo motivo de ocupacoes — CSV é catálogo de tipos, sem
+        # id_deputado. SourceRouter retorna API.
         "bulk_filter_date_column": None,
         "schema_overrides": {},
     },

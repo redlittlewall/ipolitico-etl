@@ -27,6 +27,6 @@ class BlocoPartidosExtractor(CamaraBaseExtractor):
                     if isinstance(item, dict):
                         rows.append({**item, "id_bloco": int(bid)})
             except Exception as e:
-                logger.error("Erro em partidos do bloco %s: %s", bid, e)
+                logger.warning("Erro em partidos do bloco %s: %s", bid, e)
 
         return pl.DataFrame(rows, infer_schema_length=None) if rows else pl.DataFrame()

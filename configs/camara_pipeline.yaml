@@ -20,12 +20,17 @@ domain_configs:
     extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
     transformer: "ipolitico.transformers.camara.votacoes_transformer.CamaraVotacoesTransformer"
   profissoes:
+    # NOTA: Sem extractor_bulk. O CSV bulk (deputadosProfissoes.csv) é um
+    # catálogo de tipos de profissão sem coluna id_deputado, não dados
+    # por-deputado. O extrator API (/deputados/{id}/profissoes) é a fonte
+    # correta com id_deputado por deputado.
     extractor: "ipolitico.extractors.camara.api.deputado_child.ProfissoesExtractor"
-    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
     transformer: "ipolitico.transformers.camara.deputado_child_transformer.CamaraDeputadoChildTransformer"
   ocupacoes:
+    # NOTA: Sem extractor_bulk. O CSV bulk (deputadosOcupacoes.csv) é um
+    # catálogo de ocupações sem coluna id_deputado. O extrator API
+    # (/deputados/{id}/ocupacoes) é a fonte correta.
     extractor: "ipolitico.extractors.camara.api.deputado_child.OcupacoesExtractor"
-    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
     transformer: "ipolitico.transformers.camara.deputado_child_transformer.CamaraDeputadoChildTransformer"
   orgaos:
     extractor: "ipolitico.extractors.camara.api.orgaos.OrgaosExtractor"
@@ -87,7 +92,6 @@ domain_configs:
     transformer: "ipolitico.transformers.camara.deputado_child_transformer.CamaraDeputadoChildTransformer"
   deputados_orgaos:
     extractor: "ipolitico.extractors.camara.api.deputado_child.OrgaosDeputadoExtractor"
-    extractor_bulk: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
     transformer: "ipolitico.transformers.camara.deputado_child_transformer.CamaraDeputadoChildTransformer"
   deputados_eventos:
     extractor: "ipolitico.extractors.camara.api.deputado_child.EventosDeputadoExtractor"

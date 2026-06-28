@@ -41,7 +41,7 @@ class OrgaoChildRouteExtractor(CamaraBaseExtractor):
                     if isinstance(item, dict):
                         rows.append({**item, "id_orgao": int(oid)})
             except Exception as e:
-                logger.error("Erro em %s do órgão %s: %s", self.route_suffix, oid, e)
+                logger.warning("Erro em %s do órgão %s: %s", self.route_suffix, oid, e)
 
         return pl.DataFrame(rows, infer_schema_length=None) if rows else pl.DataFrame()
 

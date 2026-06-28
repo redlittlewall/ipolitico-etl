@@ -27,6 +27,6 @@ class FrenteMembrosExtractor(CamaraBaseExtractor):
                     if isinstance(item, dict):
                         rows.append({**item, "id_frente": int(fid)})
             except Exception as e:
-                logger.error("Erro em membros da frente %s: %s", fid, e)
+                logger.warning("Erro em membros da frente %s: %s", fid, e)
 
         return pl.DataFrame(rows, infer_schema_length=None) if rows else pl.DataFrame()

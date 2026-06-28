@@ -18,12 +18,13 @@ class FederationOrchestrator:
         sink_type: SinkType,
         start_date: str | None,
         end_date: str | None,
+        warmup: bool = True,
     ) -> None:
         if not self._providers:
             return
         await asyncio.gather(
             *(
-                p.run_domains(domains, strategy, sink_type, start_date, end_date)
+                p.run_domains(domains, strategy, sink_type, start_date, end_date, warmup=warmup)
                 for p in self._providers
             )
         )

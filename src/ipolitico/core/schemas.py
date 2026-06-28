@@ -314,7 +314,7 @@ SILVER_SCHEMAS = {
         "cod": pl.String,
         "sigla": pl.String,
         "nome": pl.String,
-        "uri": pl.String,
+        "descricao": pl.String,
     },
     DomainType.DEPUTADOS_DETALHE.value: {
         "id": pl.Int64,

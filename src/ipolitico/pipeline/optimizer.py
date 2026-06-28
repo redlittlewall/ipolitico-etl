@@ -28,11 +28,25 @@ class DataLakeOptimizer:
 
     @staticmethod
     def _resolve_pk_cols(source_path: Path) -> str:
-        """Define a cláusula PARTITION BY inspecionando o schema dos parquet."""
-        with duckdb.connect(database=":memory:") as con:
+        """Define a cláusula PARTITION BY inspecionando o schema dos parquet.
+
+        Regras:
+          1. Se existir coluna ``id`` com valores **não-nulos** → ``PARTITION BY id``.
+             Se ``id`` for 100 % null (schema fantasma) → cai para regra 3.
+          2. Se existir ``id_deputado`` e ``votacao_id`` (tabela de votos) →
+             ``PARTITION BY votacao_id, id_deputado``.
+          3. Caso contrário → ``PARTITION BY`` todas as colunas exceto metadados
+             (dedup exato de linha).
+
+        A verificação de nulidade impede que colunas ``id`` sempre-nulas (criadas
+        por schema contracts que a API não preenche) colapsem todos os registros
+        em uma única partição.
+        """
+        conn = duckdb.connect(database=":memory:")
+        try:
             cols = [
                 row[0]
-                for row in con.execute(
+                for row in conn.execute(
                     "SELECT column_name FROM (DESCRIBE SELECT * FROM read_parquet('{}'))".format(
                         source_path
                     )
@@ -40,13 +54,23 @@ class DataLakeOptimizer:
                 if row[0] not in _EXCLUDED_COLS_DEDUP
             ]
 
-        if "id" in cols:
-            return "id"
+            if "id" in cols:
+                total = conn.execute(
+                    "SELECT COUNT(*) FROM read_parquet('{}')".format(source_path)
+                ).fetchone()[0]
+                nulls = conn.execute(
+                    "SELECT COUNT(*) FROM read_parquet('{}') WHERE id IS NULL".format(source_path)
+                ).fetchone()[0]
+                if nulls < total or total == 0:
+                    return "id"
+                cols.remove("id")
 
-        if "id_deputado" in cols and "votacao_id" in cols:
-            return "votacao_id, id_deputado"
+            if "id_deputado" in cols and "votacao_id" in cols:
+                return "votacao_id, id_deputado"
 
-        return ", ".join(cols)
+            return ", ".join(cols)
+        finally:
+            conn.close()
 
     def compact_and_deduplicate(
         self,

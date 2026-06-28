@@ -23,10 +23,16 @@ class CamaraDiscursosTransformer(BaseTransformer):
         for col in ("dataHoraInicio", "dataHoraFim"):
             if col in df.columns:
                 # Alguns discursos não têm dataHoraFim → coluna nula;
-                # cast para Utf8 primeiro para evitar erro "expected String, got null"
+                # cast para String primeiro para evitar erro "expected String, got null"
+                # quando o Polars infere a coluna como pl.Null (todos os valores nulos).
+                # O cast(pl.Utf8) converte pl.Null → String com nulls antes do .str accessor.
+                df = df.with_columns(
+                    pl.col(col).cast(pl.Utf8).alias(col)  # garante dtype String antes do .str
+                )
                 df = df.with_columns(
                     pl.when(pl.col(col).is_not_null())
-                    .then(pl.col(col).cast(pl.Utf8).str.to_datetime(strict=False))
+                    .then(pl.col(col).str.to_datetime(strict=False))
+                    .otherwise(pl.lit(None, dtype=pl.Datetime))
                     .alias(col)
                 )
 

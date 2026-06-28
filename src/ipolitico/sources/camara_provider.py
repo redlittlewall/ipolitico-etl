@@ -14,6 +14,7 @@ class SourceProvider(Protocol):
         sink_type: SinkType,
         start_date: str | None,
         end_date: str | None,
+        warmup: bool = True,
     ) -> None: ...
 
 
@@ -32,6 +33,7 @@ class CamaraSourceProvider:
         sink_type: SinkType,
         start_date: str | None,
         end_date: str | None,
+        warmup: bool = True,
     ) -> None:
         for domain in domains:
             await self._manager.run_domain(
@@ -40,4 +42,5 @@ class CamaraSourceProvider:
                 strategy=strategy,
                 start_date=start_date,
                 end_date=end_date,
+                warmup=warmup,
             )

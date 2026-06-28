@@ -10,6 +10,7 @@ from typing import Any
 import httpx
 
 from ipolitico.core.config import CAMARA_API_BASE_URL, CAMARA_HTTP_CONCURRENCY
+from ipolitico.core.constants import DomainType
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +28,16 @@ class CamaraClient:
     Cliente HTTP Assíncrono focado na resiliência contra infraestruturas estatais.
 
     Implementa defesas ativas contra Throttling (HTTP 429), timeouts e falhas
-    determinísticas (falsos positivos de HTTP 404).
+    determinísticas (falsos positivos de HTTP 404). Também gerencia
+    pré-aquecimento seletivo de cache (warmup) para rotas com histórico de 504.
     """
 
     BASE_URL = CAMARA_API_BASE_URL
+
+    # Rastreamento global de URLs já aquecidas nesta sessão.
+    # Evita re-aquecer a mesma URL quando domínios compartilham recursos
+    # ou quando o mesmo domínio roda múltiplas vezes.
+    _warmed_urls: set[str] | None = None  # class-level sentinel
 
     def __init__(self, max_retries: int = 10):
         self.max_retries = max_retries
@@ -40,6 +47,9 @@ class CamaraClient:
         }
         self._init_telemetry()
         self._semaphore = asyncio.Semaphore(CAMARA_HTTP_CONCURRENCY)
+        # Inicializa o cache de warmup como atributo de instância.
+        # O sentinel class-level (None) nunca é usado diretamente.
+        self._warmed_urls: set[str] = set()
 
     def _init_telemetry(self):
         """Inicializa um banco SQLite super leve apenas para logs de requisições."""
@@ -207,6 +217,79 @@ class CamaraClient:
         Garante a compatibilidade com a interface do orquestrador.
         """
         pass
+
+    async def warmup_for_domain(
+        self,
+        domain: DomainType,
+        jobs: list[dict[str, Any]],
+        only_new: bool = True,
+    ) -> None:
+        """Pré-aquece o cache da API para URLs de um domínio (best-effort).
+
+        Cada URL é chamada uma única vez de forma sequencial (sem concorrência)
+        para que o proxy reverso da Câmara cacheie a resposta antes da extração
+        concorrente normal. Erros são ignorados — o warmup é sempre opcional.
+
+        Args:
+            domain: Tipo do domínio a aquecer.
+            jobs: Lista de jobs gerados pelo ``CamaraJobPlanner``.
+                  Usada apenas para extrair IDs; o conteúdo é irrelevante.
+            only_new: Se True (padrão), pula URLs já aquecidas nesta sessão
+                      via ``_warmed_urls``.
+        """
+        # Import lazy para evitar dependência circular
+        from ipolitico.core.warmup import WARMUP_CONFIG, build_warmup_urls
+
+        spec = WARMUP_CONFIG.get(domain)
+        if spec is None or not jobs:
+            return
+
+        urls = build_warmup_urls(self.BASE_URL, jobs, spec)
+        if not urls:
+            return
+
+        if only_new:
+            new_urls = [u for u in urls if u not in self._warmed_urls]
+            skipped = len(urls) - len(new_urls)
+        else:
+            new_urls = list(urls)
+            skipped = 0
+
+        if not new_urls:
+            logger.info(
+                "[WARMUP] %s: todas as %d URLs já aquecidas anteriormente.",
+                domain.value.upper(),
+                len(urls),
+            )
+            return
+
+        logger.info(
+            "[WARMUP] %s: aquecendo %d URLs (saltou %d repetidas, " "sequencial, best-effort)...",
+            domain.value.upper(),
+            len(new_urls),
+            skipped,
+        )
+
+        # Requisições sequenciais — sem semáforo, sem concorrência.
+        # A primeira chamada a cada recurso é tipicamente 5-12s (cache frio);
+        # queremos exatamente UMA chamada lenta, não N simultâneas.
+        warmed = 0
+        async with httpx.AsyncClient(timeout=60.0, headers=self.headers) as client:
+            for url in new_urls:
+                try:
+                    await client.get(url, timeout=30.0)
+                    warmed += 1
+                except Exception:
+                    pass  # Best-effort: falha no warmup não aborta a extração
+                finally:
+                    self._warmed_urls.add(url)
+
+        logger.info(
+            "[WARMUP] %s: concluído — %d/%d URLs aquecidas (ignorando erros).",
+            domain.value.upper(),
+            warmed,
+            len(new_urls),
+        )
 
     async def _backoff(self, attempt: int) -> None:
         """Pausa a execução usando Crescimento Exponencial (2s, 4s, 8s...)"""

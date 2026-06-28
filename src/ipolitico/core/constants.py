@@ -179,7 +179,11 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.FRENTES: EarliestDates.FRENTES,
     DomainType.GRUPOS: EarliestDates.DEPUTADOS,
     DomainType.LEGISLATURAS: EarliestDates.DEPUTADOS,
-    DomainType.DISCURSOS: EarliestDates.DEPUTADOS,
+    # DISCURSOS usa 1995-01-01 (e não DEPUTADOS/1826) porque:
+    # 1) A API rejeita janelas >4 anos (HTTP 400)
+    # 2) Discursos digitalizados existem a partir de ~1999
+    # 3) Evita 51 chunks/deputado × 7275 = 371K requisições desnecessárias
+    DomainType.DISCURSOS: "1995-01-01",
     DomainType.TRAMITACOES: EarliestDates.PROPOSICOES,
     DomainType.AUTORES: EarliestDates.PROPOSICOES,
     DomainType.ORIENTACOES: EarliestDates.VOTACOES,

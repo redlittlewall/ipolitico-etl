@@ -32,7 +32,7 @@ class VotacaoChildRouteExtractor(CamaraBaseExtractor):
                     if isinstance(item, dict):
                         rows.append({**item, "votacao_id": vid})
             except Exception as e:
-                logger.error("Erro em %s para votação %s: %s", self.route_suffix, vid, e)
+                logger.warning("Erro em %s para votação %s: %s", self.route_suffix, vid, e)
 
         return pl.DataFrame(rows, infer_schema_length=None) if rows else pl.DataFrame()
 

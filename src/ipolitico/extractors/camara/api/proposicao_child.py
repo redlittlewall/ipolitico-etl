@@ -31,7 +31,7 @@ class ProposicaoChildRouteExtractor(CamaraBaseExtractor):
                     if isinstance(item, dict):
                         rows.append({**item, "id_proposicao": int(pid)})
             except Exception as e:
-                logger.error("Erro em %s para proposição %s: %s", self.route_suffix, pid, e)
+                logger.warning("Erro em %s para proposição %s: %s", self.route_suffix, pid, e)
 
         return pl.DataFrame(rows, infer_schema_length=None) if rows else pl.DataFrame()
 

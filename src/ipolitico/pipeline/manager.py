@@ -66,6 +66,7 @@ class PipelineManager:
         strategy: LoadStrategy,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        warmup: bool = True,
     ) -> None:
         logger.info(f"=== Inicializando Domínio: {domain.value.upper()} ===")
 
@@ -125,6 +126,17 @@ class PipelineManager:
 
         if not jobs:
             return
+
+        # Pré-aquecimento seletivo de cache para rotas 504-prone.
+        # Apenas domínios listados em WARMUP_CONFIG recebem warmup.
+        # Não faz warmup para fontes Bulk (CSV) — não consomem API REST.
+        if (
+            warmup
+            and extraction_plan.source_type != SourceType.BULK
+            and hasattr(self.builder, "client")
+            and self.builder.client is not None
+        ):
+            await self.builder.client.warmup_for_domain(domain, jobs)
 
         spec = spec_for(domain)
         unique_keys: list[str] = list(spec.unique_keys) if spec else ["id"]

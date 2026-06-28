@@ -245,6 +245,21 @@ class DeputyChildStrategy(DomainJobStrategy):
         state_store: StateStore,
         lake: DataLakeRepository | None,
     ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
+        # ── Quando a fonte é BULK (snapshot CSV), um único job cobre todos os ──
+        # ── deputados. Gerar 1 job por deputado faria o BaseBulkExtractor     ──
+        # ── retornar o CSV completo N vezes, inflando a Silver sem ganho.     ──
+        if extraction_plan.source_type == SourceType.BULK:
+            logger.info(
+                "[%s] Fonte=BULK → 1 job snapshot (em vez de 1/deputado).",
+                domain.value.upper(),
+            )
+            jobs: list[dict[str, Any]] = [{}]
+
+            def snapshot_mapper(job: dict) -> dict:
+                return {}
+
+            return jobs, snapshot_mapper
+
         deputados_ids = resolve_deputy_ids_for_calendar_window(
             start_iso=start,
             end_iso=end,
@@ -292,6 +307,99 @@ class DeputyChildStrategy(DomainJobStrategy):
 
         mapper = static_child_mapper if not self.include_date_range else temporal_child_mapper
         return jobs, mapper
+
+
+class DeputyLegislatureStrategy(DomainJobStrategy):
+    """
+    Estratégia para domínios temporais filhos de deputado usando janelas reais
+    de legislatura em vez de uma janela única global por deputado.
+
+    Lê o JOIN entre ``deputados_historico`` e ``legislaturas`` no lake para
+    gerar **1 job por par (deputado, legislatura)** com a janela exata de cada
+    legislatura (≤4 anos cada). Isto reduz chamadas de API desnecessárias em
+    ~81% comparado ao ``DeputyChildStrategy(include_date_range=True)`` que
+    emite 1 job/deputado com chaveamento temporal de 4 anos.
+
+    Aplica-se a domínios cujo extrator é ``DeputadoTemporalChildExtractor``:
+    discursos, deputados_orgaos, deputados_eventos.
+    """
+
+    def build(
+        self,
+        domain: DomainType,
+        spec: DomainSpec,
+        start: str,
+        end: str,
+        current_leg: int,
+        anchor_year: int,
+        extraction_plan: ExtractionPlan,
+        state_store: StateStore,
+        lake: DataLakeRepository | None,
+    ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
+        # ── Quando a fonte é BULK, um único job cobre tudo ────────────────
+        if extraction_plan.source_type == SourceType.BULK:
+            logger.info(
+                "[%s] Fonte=BULK → 1 job snapshot (em vez de 1/deputado/legislatura).",
+                domain.value.upper(),
+            )
+            jobs: list[dict[str, Any]] = [{}]
+
+            def snapshot_mapper(job: dict) -> dict:
+                return {}
+
+            return jobs, snapshot_mapper
+
+        if lake is None:
+            logger.error(
+                "[%s] Abortando: DataLakeRepository necessário para resolver "
+                "janelas de legislatura. Rode '%s' e '%s' antes.",
+                domain.value.upper(),
+                DomainType.DEPUTADOS.value,
+                DomainType.LEGISLATURAS.value,
+            )
+            return [], lambda x: {}
+
+        windows = lake.list_deputy_legislature_windows(earliest_start=start)
+        if not windows:
+            logger.error(
+                "[%s] Abortando: nenhuma janela deputado-legislatura encontrada. "
+                "Rode '%s' e '%s' antes.",
+                domain.value.upper(),
+                DomainType.DEPUTADOS_HISTORICO.value,
+                DomainType.LEGISLATURAS.value,
+            )
+            return [], lambda x: {}
+
+        # Filtra janelas que intersectam a janela da pipeline
+        jobs = [
+            {"deputado_id": dep_id, "start_date": leg_start, "end_date": leg_end}
+            for dep_id, leg_start, leg_end in windows
+            if leg_end >= start and leg_start <= end
+        ]
+
+        if lake is not None:
+            # NOTA: filter_deputado_child_jobs filtra por deputado_id, não por
+            # (deputado_id, legislatura). Para FULL_LOAD (sem dados prévios)
+            # isso é inócuo. Para incremental futuro, seria necessário um filtro
+            # mais granular por par (deputado, legislatura).
+            covered = lake.list_deputy_ids_in_child_table(domain.value)
+            jobs = filter_deputado_child_jobs(jobs, covered)
+
+        logger.info(
+            "[%s] %s jobs (1/par deputado-legislatura, ~%s deputados).",
+            domain.value.upper(),
+            len(jobs),
+            len(set(j["deputado_id"] for j in jobs)),
+        )
+
+        def leg_temporal_mapper(job: dict) -> dict:
+            return {
+                "deputado_id": job["deputado_id"],
+                "start_date": job["start_date"],
+                "end_date": job["end_date"],
+            }
+
+        return jobs, leg_temporal_mapper
 
 
 class VotosStrategy(DomainJobStrategy):
@@ -814,6 +922,30 @@ def _resolve_orgao_ids(
     )
 
 
+def _resolve_orgao_ids_in_window(
+    lake: DataLakeRepository | None,
+    state_store: StateStore,
+    start: str,
+    end: str,
+    **kwargs: Any,
+) -> list[Any]:
+    """
+    IDs de órgãos ativos na janela temporal, filtrando por dataInicio/dataFim.
+
+    Usa `DataLakeRepository.list_orgao_ids_in_window()` que faz JOIN com
+    ``gold/orgaos_detalhe`` para obter apenas órgãos ativos na janela.
+    Em FULL_LOAD (janela ~1826-2026) retorna todos os 2.386; em INCREMENTAL
+    (janela ~2023-2026) retorna ~445 — eliminando ~1.900 chamadas por domínio.
+    """
+    if lake:
+        return lake.list_orgao_ids_in_window(start, end)
+    return state_store.get_existing_ids(
+        table_name=DomainType.ORGAOS.value,
+        layer=MedallionLayer.SILVER.value,
+        column="id",
+    )
+
+
 def _resolve_evento_ids(
     lake: DataLakeRepository | None,
     state_store: StateStore,
@@ -937,33 +1069,36 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     DomainType.OCUPACOES: DeputyChildStrategy(include_date_range=False),
     DomainType.DEPUTADOS_FRENTES: DeputyChildStrategy(include_date_range=False),
     DomainType.DEPUTADOS_HISTORICO: DeputyChildStrategy(include_date_range=False),
-    # Filhos temporais de deputado
-    DomainType.DISCURSOS: DeputyChildStrategy(include_date_range=True),
-    DomainType.DEPUTADOS_ORGAOS: DeputyChildStrategy(include_date_range=True),
-    DomainType.DEPUTADOS_EVENTOS: DeputyChildStrategy(include_date_range=True),
+    # Filhos temporais de deputado (janelas reais de legislatura)
+    # NOTA: DeputyLegislatureStrategy lê deputados_historico + legislaturas do
+    # lake para gerar 1 job exato por (deputado, legislatura), eliminando ~81%
+    # das chamadas versus o naive DeputyChildStrategy(include_date_range=True).
+    # Pré-requisito: deputados_historico e legislaturas já processados no lake.
+    DomainType.DISCURSOS: DeputyLegislatureStrategy(),
+    DomainType.DEPUTADOS_ORGAOS: DeputyLegislatureStrategy(),
+    DomainType.DEPUTADOS_EVENTOS: DeputyLegislatureStrategy(),
     # Votos e orientações
     DomainType.VOTOS: VotosStrategy(),
     DomainType.ORIENTACOES: OrientacoesStrategy(),
-    # Órgãos aninhados
+    # Órgãos aninhados (com filtro temporal — usa dataInicio/dataFim de orgaos_detalhe)
     DomainType.ORGAOS_MEMBROS: ParentBatchedStrategy(
         parent_key="orgao_ids",
         batch_size=15,
-        resolve_fn=_resolve_orgao_ids,
+        resolve_fn=_resolve_orgao_ids_in_window,
         extra_params=lambda start, end, _leg: {"start_date": start, "end_date": end},
         parent_col="id_orgao",
     ),
     DomainType.ORGAOS_EVENTOS: ParentBatchedStrategy(
         parent_key="orgao_ids",
         batch_size=15,
-        resolve_fn=_resolve_orgao_ids,
+        resolve_fn=_resolve_orgao_ids_in_window,
         extra_params=lambda start, end, _leg: {"start_date": start, "end_date": end},
         parent_col="id_orgao",
     ),
     DomainType.ORGAOS_VOTACOES: ParentBatchedStrategy(
         parent_key="orgao_ids",
         batch_size=15,
-        resolve_fn=_resolve_orgao_ids,
-        extra_params=lambda start, end, _leg: {"start_date": start, "end_date": end},
+        resolve_fn=_resolve_orgao_ids_in_window,
         parent_col="id_orgao",
     ),
     # Filhos de evento
