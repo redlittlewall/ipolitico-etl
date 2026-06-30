@@ -789,4 +789,27 @@ SILVER_SCHEMAS = {
         "data_inclusao": pl.String,
         "emendas": pl.String,
     },
+    # ── Senado — Vetos Presidenciais (Issue 06) ──────────────────────────────
+    DomainType.VETOS_PRESIDENCIAIS.value: {
+        "codigo": pl.Int64,
+        "ano": pl.Int64,
+        "numero": pl.String,
+        "tipo": pl.String,
+        "casa_origem": pl.String,
+        "sigla_proposicao": pl.String,
+        "ementa": pl.String,
+        "autor": pl.String,
+        "data_apreciacao": pl.String,
+        "resultado": pl.String,
+    },
+    DomainType.VETOS_DETALHE.value: {
+        "codigo": pl.Int64,
+        "data_votacao": pl.String,
+        "resultado": pl.String,
+        "descricao_resultado": pl.String,
+        "total_parlamentares": pl.Int64,
+        "total_sim": pl.Int64,
+        "total_nao": pl.Int64,
+        "total_abstencao": pl.Int64,
+    },
 }

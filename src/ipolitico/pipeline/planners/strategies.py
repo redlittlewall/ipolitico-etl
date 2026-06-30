@@ -832,6 +832,16 @@ class DetailStrategy(DomainJobStrategy):
                 ), DomainType.SENADORES.value
             return [], DomainType.SENADORES.value
 
+        if domain_val == DomainType.VETOS_DETALHE.value:
+            if lake:
+                ids = lake.list_ids(
+                    table_name=DomainType.VETOS_PRESIDENCIAIS.value,
+                    layer=MedallionLayer.SILVER.value,
+                    column="codigo",
+                )
+                return ids, DomainType.VETOS_PRESIDENCIAIS.value
+            return [], DomainType.VETOS_PRESIDENCIAIS.value
+
         return [], ""
 
 
@@ -1307,6 +1317,9 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     # ── Senado — Orçamento (Issue 05) ─────────────────────────────────────────
     DomainType.ORCAMENTO_EMENDAS: AnnualWindowStrategy(),
     DomainType.ORCAMENTO_OFICIOS: AnnualWindowStrategy(),
+    # ── Senado — Vetos Presidenciais (Issue 06) ────────────────────────────────
+    DomainType.VETOS_PRESIDENCIAIS: AnnualWindowStrategy(),
+    DomainType.VETOS_DETALHE: DetailStrategy(),
 }
 
 

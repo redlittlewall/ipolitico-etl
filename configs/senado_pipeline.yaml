@@ -33,3 +33,9 @@ domain_configs:
   orcamento_oficios:
     extractor: "ipolitico.extractors.senado.api.orcamento.OrcamentoOficiosExtractor"
     transformer: "ipolitico.transformers.senado.orcamento_transformer.OrcamentoOficiosTransformer"
+  vetos_presidenciais:
+    extractor: "ipolitico.extractors.senado.api.vetos.VetosPresidenciaisExtractor"
+    transformer: "ipolitico.transformers.senado.vetos_transformer.VetosPresidenciaisTransformer"
+  vetos_detalhe:
+    extractor: "ipolitico.extractors.senado.api.vetos.VetosDetalheExtractor"
+    transformer: "ipolitico.transformers.senado.vetos_transformer.VetosDetalheTransformer"
