@@ -9,6 +9,15 @@ domain_configs:
   processos:
     extractor: "ipolitico.extractors.senado.api.processos.SenadoProcessosExtractor"
     transformer: "ipolitico.transformers.senado.processos_transformer.SenadoProcessosTransformer"
+  processos_detalhe:
+    extractor: "ipolitico.extractors.senado.api.processos.SenadoProcessosDetalheExtractor"
+    transformer: "ipolitico.transformers.senado.processos_transformer.SenadoProcessosDetalheTransformer"
+  processos_emendas:
+    extractor: "ipolitico.extractors.senado.api.processos.SenadoProcessosEmendasExtractor"
+    transformer: "ipolitico.transformers.senado.processos_transformer.SenadoProcessosEmendasTransformer"
+  processos_documentos:
+    extractor: "ipolitico.extractors.senado.api.processos.SenadoProcessosDocumentosExtractor"
+    transformer: "ipolitico.transformers.senado.processos_transformer.SenadoProcessosDocumentosTransformer"
   votacoes_senado:
     extractor: "ipolitico.extractors.senado.api.votacoes_senado.SenadoVotacoesExtractor"
     transformer: "ipolitico.transformers.senado.votacoes_senado_transformer.SenadoVotacoesTransformer"
