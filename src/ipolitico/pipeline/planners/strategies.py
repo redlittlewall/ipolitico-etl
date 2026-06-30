@@ -914,6 +914,45 @@ class DefaultWindowStrategy(DomainJobStrategy):
         return jobs, default_mapper
 
 
+class AnnualWindowStrategy(DomainJobStrategy):
+    """Estratégia para domínios com 1 job por ano.
+
+    Domínios anuais (orçamento, vetos) usam endpoints com filtro ``ano``
+    em vez de janela mensal. Esta estratégia gera 1 job por ano civil
+    dentro da janela temporal, cada um com o parâmetro ``ano``.
+    """
+
+    def build(
+        self,
+        domain: DomainType,
+        spec: DomainSpec,
+        start: str,
+        end: str,
+        current_leg: int,
+        anchor_year: int,
+        extraction_plan: ExtractionPlan,
+        state_store: StateStore,
+        lake: DataLakeRepository | None,
+    ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
+        start_year = int(start.split("-")[0])
+        end_year = int(end.split("-")[0])
+
+        jobs = [{"ano": y} for y in range(start_year, end_year + 1)]
+
+        logger.info(
+            "[%s] Jobs anuais: %s (%s-%s).",
+            domain.value.upper(),
+            len(jobs),
+            start_year,
+            end_year,
+        )
+
+        def annual_mapper(job: dict) -> dict:
+            return {"ano": job["ano"]}
+
+        return jobs, annual_mapper
+
+
 # ─── Helpers de resolução para ParentBatchedStrategy ────────────────────────
 
 
@@ -1265,6 +1304,9 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     DomainType.PROCESSOS: DefaultWindowStrategy(),
     DomainType.VOTACOES_SENADO: TimeWindowStrategy(),
     DomainType.VOTOS_SENADO: TimeWindowStrategy(),
+    # ── Senado — Orçamento (Issue 05) ─────────────────────────────────────────
+    DomainType.ORCAMENTO_EMENDAS: AnnualWindowStrategy(),
+    DomainType.ORCAMENTO_OFICIOS: AnnualWindowStrategy(),
 }
 
 

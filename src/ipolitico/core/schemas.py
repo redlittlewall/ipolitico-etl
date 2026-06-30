@@ -767,4 +767,26 @@ SILVER_SCHEMAS = {
         "proposicao_numero": pl.Int64,
         "proposicao_ano": pl.Int64,
     },
+    # ── Senado — Orçamento (Issue 05) ──────────────────────────────────────────
+    DomainType.ORCAMENTO_EMENDAS.value: {
+        "nome_autor_orcamento": pl.String,
+        "indicador_ativo": pl.String,
+        "email_autor_orcamento": pl.String,
+        "codigo_autor_orcamento": pl.Int64,
+        "data_operacao": pl.String,
+        "quantidade_emendas": pl.Int64,
+        "ano_execucao": pl.Int64,
+        "numero_materia": pl.Int64,
+        "ano_materia": pl.Int64,
+        "sigla_tipo_pl_orcamento": pl.String,
+        "descricao_tipo_pl_orcamento": pl.String,
+    },
+    DomainType.ORCAMENTO_OFICIOS.value: {
+        "id": pl.Int64,
+        "tratamento": pl.String,
+        "nome": pl.String,
+        "numero_protocolo_apresentacao": pl.String,
+        "data_inclusao": pl.String,
+        "emendas": pl.String,
+    },
 }

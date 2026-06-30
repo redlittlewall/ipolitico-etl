@@ -27,3 +27,9 @@ domain_configs:
   votacoes_comissao:
     extractor: "ipolitico.extractors.senado.api.votacoes_comissao.SenadoVotacoesComissaoExtractor"
     transformer: "ipolitico.transformers.senado.votacoes_comissao_transformer.SenadoVotacoesComissaoTransformer"
+  orcamento_emendas:
+    extractor: "ipolitico.extractors.senado.api.orcamento.OrcamentoEmendasExtractor"
+    transformer: "ipolitico.transformers.senado.orcamento_transformer.OrcamentoEmendasTransformer"
+  orcamento_oficios:
+    extractor: "ipolitico.extractors.senado.api.orcamento.OrcamentoOficiosExtractor"
+    transformer: "ipolitico.transformers.senado.orcamento_transformer.OrcamentoOficiosTransformer"
