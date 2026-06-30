@@ -1,14 +1,14 @@
 from unittest.mock import MagicMock
 
 from ipolitico.core.constants import DomainType, SourceType
-from ipolitico.pipeline.planners.camara_jobs import CamaraJobPlanner
+from ipolitico.pipeline.planners.camara_jobs import JobPlanner
 from ipolitico.pipeline.source_router import ExtractionPlan
 
 
 def test_despesas_bulk_jobs_one_row_per_year():
     store = MagicMock()
     lake = MagicMock()
-    planner = CamaraJobPlanner(store, lake)
+    planner = JobPlanner(store, lake)
     plan = ExtractionPlan(source_type=SourceType.BULK)
     jobs, mapper = planner.build(
         DomainType.DESPESAS,
@@ -23,7 +23,7 @@ def test_despesas_bulk_jobs_one_row_per_year():
 
 def test_proposicoes_api_monthly_jobs_march_has_31_days():
     store = MagicMock()
-    planner = CamaraJobPlanner(store, None)
+    planner = JobPlanner(store, None)
     plan = ExtractionPlan(source_type=SourceType.API)
     jobs, mapper = planner.build(
         DomainType.PROPOSICOES,
@@ -43,7 +43,7 @@ def test_votos_planner_uses_windowed_votacao_ids():
     store = MagicMock()
     lake = MagicMock()
     lake.list_votacao_ids_silver_or_gold.return_value = ["a", "b"]
-    planner = CamaraJobPlanner(store, lake)
+    planner = JobPlanner(store, lake)
     plan = ExtractionPlan(source_type=SourceType.API)
     jobs, _ = planner.build(
         DomainType.VOTOS,
@@ -63,7 +63,7 @@ def test_despesas_api_jobs_skip_existing_pairs():
     lake = MagicMock()
     lake.list_deputy_ids_for_legislature_bounds.return_value = [1]
     lake.list_deputy_expense_year_pairs.return_value = {(1, 2024)}
-    planner = CamaraJobPlanner(store, lake)
+    planner = JobPlanner(store, lake)
     plan = ExtractionPlan(source_type=SourceType.API)
     jobs, _ = planner.build(
         DomainType.DESPESAS,
@@ -82,7 +82,7 @@ def test_profissoes_jobs_one_per_deputy():
     lake = MagicMock()
     lake.list_deputy_ids_for_legislature_bounds.return_value = [100, 200]
     lake.list_deputy_ids_in_child_table.return_value = set()
-    planner = CamaraJobPlanner(store, lake)
+    planner = JobPlanner(store, lake)
     plan = ExtractionPlan(source_type=SourceType.API)
     jobs, mapper = planner.build(
         DomainType.PROFISSÕES,
@@ -101,7 +101,7 @@ def test_tramitacoes_planner_batches_proposicao_ids():
     lake = MagicMock()
     lake.list_proposicao_ids_silver_or_gold.return_value = list(range(30))
     lake.list_proposicao_ids_with_child_materialized.return_value = set()
-    planner = CamaraJobPlanner(store, lake)
+    planner = JobPlanner(store, lake)
     plan = ExtractionPlan(source_type=SourceType.API)
     jobs, mapper = planner.build(
         DomainType.TRAMITACOES,
@@ -120,7 +120,7 @@ def test_blocos_full_load_one_job_per_legislature():
     from ipolitico.core.constants import EARLIEST_DATE_MAP
 
     store = MagicMock()
-    planner = CamaraJobPlanner(store, None)
+    planner = JobPlanner(store, None)
     plan = ExtractionPlan(source_type=SourceType.API)
     jobs, mapper = planner.build(
         DomainType.BLOCOS,
@@ -139,7 +139,7 @@ def test_orientacoes_planner_batches_votacao_ids():
     lake = MagicMock()
     lake.list_votacao_ids_silver_or_gold.return_value = ["v1", "v2"]
     lake.list_votacao_ids_with_orientacoes_materialized.return_value = set()
-    planner = CamaraJobPlanner(store, lake)
+    planner = JobPlanner(store, lake)
     plan = ExtractionPlan(source_type=SourceType.API)
     jobs, mapper = planner.build(
         DomainType.ORIENTACOES,
@@ -158,7 +158,7 @@ def test_orgaos_membros_planner_passes_window():
     lake = MagicMock()
     lake.list_orgao_ids_in_window.return_value = [10, 20]
     lake.list_entity_ids_with_child_materialized.return_value = set()
-    planner = CamaraJobPlanner(store, lake)
+    planner = JobPlanner(store, lake)
     plan = ExtractionPlan(source_type=SourceType.API)
     jobs, mapper = planner.build(
         DomainType.ORGAOS_MEMBROS,
@@ -179,7 +179,7 @@ def test_eventos_deputados_planner_batches_evento_ids():
     lake = MagicMock()
     lake.list_evento_ids_silver_or_gold.return_value = [1, 2, 3]
     lake.list_entity_ids_with_child_materialized.return_value = set()
-    planner = CamaraJobPlanner(store, lake)
+    planner = JobPlanner(store, lake)
     plan = ExtractionPlan(source_type=SourceType.API)
     jobs, mapper = planner.build(
         DomainType.EVENTOS_DEPUTADOS,
@@ -195,7 +195,7 @@ def test_eventos_deputados_planner_batches_evento_ids():
 
 def test_referencias_planner_single_job():
     store = MagicMock()
-    planner = CamaraJobPlanner(store, None)
+    planner = JobPlanner(store, None)
     plan = ExtractionPlan(source_type=SourceType.API)
     jobs, mapper = planner.build(
         DomainType.REFERENCIAS,

@@ -21,6 +21,10 @@ CAMARA_API_BASE_URL = os.getenv("CAMARA_API_BASE_URL", "https://dadosabertos.cam
 CAMARA_PAGE_SIZE = int(os.getenv("CAMARA_PAGE_SIZE", 1000))
 LEGISLATURA_ATUAL = int(os.getenv("LEGISLATURA_ATUAL", 57))
 
+# --- Configurações do Senado ---
+SENADO_API_BASE_URL = os.getenv("SENADO_API_BASE_URL", "https://legis.senado.leg.br/dadosabertos")
+SENADO_HTTP_CONCURRENCY = int(os.getenv("SENADO_HTTP_CONCURRENCY", "5"))
+
 # --- Tuning de Performance ---
 MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", 10))
 # Limite de GETs simultâneos no CamaraClient (respeitar fair use da API).

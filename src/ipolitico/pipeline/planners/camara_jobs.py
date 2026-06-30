@@ -20,7 +20,7 @@ from ipolitico.storage.state_store import StateStore
 logger = logging.getLogger(__name__)
 
 
-class CamaraJobPlanner:
+class JobPlanner:
     """Geração de jobs e mapeadores kw para chamadas à API/Bulk.
 
     Cada tipo de domínio possui uma estratégia registrada em STRATEGY_REGISTRY

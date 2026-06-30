@@ -8,7 +8,7 @@ from typing import Any, Optional
 import polars as pl
 import polars.selectors as cs
 
-from ipolitico.core.client import CamaraClient
+from ipolitico.core.camara_client import CamaraClient
 from ipolitico.extractors.base import BaseExtractor
 from ipolitico.extractors.camara.bulk.registry import BULK_REGISTRY
 

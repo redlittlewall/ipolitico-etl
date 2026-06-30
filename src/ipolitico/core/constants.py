@@ -134,6 +134,37 @@ class DomainType(str, Enum):
     LICITACOES_PEDIDOS = "licitacoes_pedidos"
     LICITACOES_PROPOSTAS = "licitacoes_propostas"
 
+    # ── Domínios do Senado ───────────────────────────────────────────────
+    SENADORES = "senadores"
+    SENADORES_DETALHE = "senadores_detalhe"
+    PROCESSOS = "processos"
+    PROCESSOS_DETALHE = "processos_detalhe"
+    PROCESSOS_EMENDAS = "processos_emendas"
+    PROCESSOS_DOCUMENTOS = "processos_documentos"
+    VOTACOES_SENADO = "votacoes_senado"
+    VOTOS_SENADO = "votos_senado"
+    VOTACOES_COMISSAO = "votacoes_comissao"
+    ORCAMENTO_EMENDAS = "orcamento_emendas"
+    ORCAMENTO_OFICIOS = "orcamento_oficios"
+    VETOS_PRESIDENCIAIS = "vetos_presidenciais"
+    VETOS_DETALHE = "vetos_detalhe"
+    SENADORES_DISCURSOS = "senadores_discursos"
+    DISCURSOS_PLENARIO = "discursos_plenario"
+    DISCURSOS_TEXTO = "discursos_texto"
+    NOTAS_TAQUIGRAFIA_SESSAO = "notas_taquigrafia_sessao"
+    NOTAS_TAQUIGRAFIA_REUNIAO = "notas_taquigrafia_reuniao"
+    COMISSOES_SENADO = "comissoes_senado"
+    COMISSOES_DETALHE = "comissoes_detalhe"
+    COMISSOES_REUNIOES = "comissoes_reunioes"
+    COMISSOES_MEMBROS = "comissoes_membros"
+    PLENARIO_AGENDA = "plenario_agenda"
+    PLENARIO_RESULTADOS = "plenario_resultados"
+    PLENARIO_SESSOES = "plenario_sessoes"
+    BLOCOS_SENADO = "blocos_senado"
+    LIDERANCAS_SENADO = "liderancas_senado"
+    MESA_SENADO = "mesa_senado"
+    MESA_CONGRESSO = "mesa_congresso"
+
 
 class MedallionLayer(str, Enum):
     """Camadas da Arquitetura Medallion[cite: 2]."""
@@ -162,6 +193,36 @@ class EarliestDates:
     VOTACOES_OBJETOS = "1991-01-01"
     VOTACOES_PROPOSICOES = "1991-01-01"
     LICITACOES = "1999-01-01"
+    # ── Senado ──────────────────────────────────────────────────────────
+    SENADORES = "1949-01-01"
+    SENADORES_DETALHE = "1949-01-01"
+    PROCESSOS = "1949-01-01"
+    PROCESSOS_DETALHE = "1949-01-01"
+    PROCESSOS_EMENDAS = "1949-01-01"
+    PROCESSOS_DOCUMENTOS = "1949-01-01"
+    VOTACOES_SENADO = "1991-01-01"
+    VOTOS_SENADO = "1991-01-01"
+    VOTACOES_COMISSAO = "1991-01-01"
+    ORCAMENTO_EMENDAS = "2000-01-01"
+    ORCAMENTO_OFICIOS = "2000-01-01"
+    VETOS_PRESIDENCIAIS = "1995-01-01"
+    VETOS_DETALHE = "1995-01-01"
+    SENADORES_DISCURSOS = "1995-01-01"
+    DISCURSOS_PLENARIO = "1995-01-01"
+    DISCURSOS_TEXTO = "1995-01-01"
+    NOTAS_TAQUIGRAFIA_SESSAO = "2003-01-01"
+    NOTAS_TAQUIGRAFIA_REUNIAO = "2003-01-01"
+    COMISSOES_SENADO = "1949-01-01"
+    COMISSOES_DETALHE = "1949-01-01"
+    COMISSOES_REUNIOES = "2003-01-01"
+    COMISSOES_MEMBROS = "1949-01-01"
+    PLENARIO_AGENDA = "2003-01-01"
+    PLENARIO_RESULTADOS = "2003-01-01"
+    PLENARIO_SESSOES = "2003-01-01"
+    BLOCOS_SENADO = "1995-01-01"
+    LIDERANCAS_SENADO = "1995-01-01"
+    MESA_SENADO = "1995-01-01"
+    MESA_CONGRESSO = "1995-01-01"
 
 
 # Facilita o acesso dinâmico: EarliestDateMap[DomainType.DESPESAS]
@@ -236,6 +297,36 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.LICITACOES_ITENS: EarliestDates.LICITACOES,
     DomainType.LICITACOES_PEDIDOS: EarliestDates.LICITACOES,
     DomainType.LICITACOES_PROPOSTAS: EarliestDates.LICITACOES,
+    # ── Domínios do Senado ──────────────────────────────────────────────
+    DomainType.SENADORES: EarliestDates.SENADORES,
+    DomainType.SENADORES_DETALHE: EarliestDates.SENADORES_DETALHE,
+    DomainType.PROCESSOS: EarliestDates.PROCESSOS,
+    DomainType.PROCESSOS_DETALHE: EarliestDates.PROCESSOS_DETALHE,
+    DomainType.PROCESSOS_EMENDAS: EarliestDates.PROCESSOS_EMENDAS,
+    DomainType.PROCESSOS_DOCUMENTOS: EarliestDates.PROCESSOS_DOCUMENTOS,
+    DomainType.VOTACOES_SENADO: EarliestDates.VOTACOES_SENADO,
+    DomainType.VOTOS_SENADO: EarliestDates.VOTOS_SENADO,
+    DomainType.VOTACOES_COMISSAO: EarliestDates.VOTACOES_COMISSAO,
+    DomainType.ORCAMENTO_EMENDAS: EarliestDates.ORCAMENTO_EMENDAS,
+    DomainType.ORCAMENTO_OFICIOS: EarliestDates.ORCAMENTO_OFICIOS,
+    DomainType.VETOS_PRESIDENCIAIS: EarliestDates.VETOS_PRESIDENCIAIS,
+    DomainType.VETOS_DETALHE: EarliestDates.VETOS_DETALHE,
+    DomainType.SENADORES_DISCURSOS: EarliestDates.SENADORES_DISCURSOS,
+    DomainType.DISCURSOS_PLENARIO: EarliestDates.DISCURSOS_PLENARIO,
+    DomainType.DISCURSOS_TEXTO: EarliestDates.DISCURSOS_TEXTO,
+    DomainType.NOTAS_TAQUIGRAFIA_SESSAO: EarliestDates.NOTAS_TAQUIGRAFIA_SESSAO,
+    DomainType.NOTAS_TAQUIGRAFIA_REUNIAO: EarliestDates.NOTAS_TAQUIGRAFIA_REUNIAO,
+    DomainType.COMISSOES_SENADO: EarliestDates.COMISSOES_SENADO,
+    DomainType.COMISSOES_DETALHE: EarliestDates.COMISSOES_DETALHE,
+    DomainType.COMISSOES_REUNIOES: EarliestDates.COMISSOES_REUNIOES,
+    DomainType.COMISSOES_MEMBROS: EarliestDates.COMISSOES_MEMBROS,
+    DomainType.PLENARIO_AGENDA: EarliestDates.PLENARIO_AGENDA,
+    DomainType.PLENARIO_RESULTADOS: EarliestDates.PLENARIO_RESULTADOS,
+    DomainType.PLENARIO_SESSOES: EarliestDates.PLENARIO_SESSOES,
+    DomainType.BLOCOS_SENADO: EarliestDates.BLOCOS_SENADO,
+    DomainType.LIDERANCAS_SENADO: EarliestDates.LIDERANCAS_SENADO,
+    DomainType.MESA_SENADO: EarliestDates.MESA_SENADO,
+    DomainType.MESA_CONGRESSO: EarliestDates.MESA_CONGRESSO,
 }
 
 
@@ -318,4 +409,34 @@ DOMAIN_LABELS: dict[DomainType, str] = {
     DomainType.LICITACOES_ITENS: "Itens de licitacao",
     DomainType.LICITACOES_PEDIDOS: "Pedidos de licitacao",
     DomainType.LICITACOES_PROPOSTAS: "Propostas de licitacao",
+    # ── Senado ──────────────────────────────────────────────────────────────────
+    DomainType.SENADORES: "Senadores (mandato ativo e historico)",
+    DomainType.SENADORES_DETALHE: "Dados cadastrais detalhados dos senadores",
+    DomainType.PROCESSOS: "Processos legislativos do Senado",
+    DomainType.PROCESSOS_DETALHE: "Detalhes de processos legislativos",
+    DomainType.PROCESSOS_EMENDAS: "Emendas a processos legislativos",
+    DomainType.PROCESSOS_DOCUMENTOS: "Documentos de processos legislativos",
+    DomainType.VOTACOES_SENADO: "Votacoes nominais no plenario do Senado",
+    DomainType.VOTOS_SENADO: "Votos individuais dos senadores",
+    DomainType.VOTACOES_COMISSAO: "Votacoes em comissoes do Senado",
+    DomainType.ORCAMENTO_EMENDAS: "Emendas ao orcamento (exclusivo Senado)",
+    DomainType.ORCAMENTO_OFICIOS: "Oficios orcamentarios (exclusivo Senado)",
+    DomainType.VETOS_PRESIDENCIAIS: "Vetos presidenciais (exclusivo Senado)",
+    DomainType.VETOS_DETALHE: "Detalhes de vetos presidenciais",
+    DomainType.SENADORES_DISCURSOS: "Discursos de senadores",
+    DomainType.DISCURSOS_PLENARIO: "Discursos em plenario do Senado",
+    DomainType.DISCURSOS_TEXTO: "Texto integral de discursos",
+    DomainType.NOTAS_TAQUIGRAFIA_SESSAO: "Notas taquigraficas de sessoes",
+    DomainType.NOTAS_TAQUIGRAFIA_REUNIAO: "Notas taquigraficas de reunioes",
+    DomainType.COMISSOES_SENADO: "Comissoes do Senado Federal",
+    DomainType.COMISSOES_DETALHE: "Detalhes de comissoes do Senado",
+    DomainType.COMISSOES_REUNIOES: "Reunioes de comissoes do Senado",
+    DomainType.COMISSOES_MEMBROS: "Membros de comissoes do Senado",
+    DomainType.PLENARIO_AGENDA: "Agenda do plenario do Senado",
+    DomainType.PLENARIO_RESULTADOS: "Resultados de votacoes em plenario",
+    DomainType.PLENARIO_SESSOES: "Sessoes do plenario do Senado",
+    DomainType.BLOCOS_SENADO: "Blocos parlamentares do Senado",
+    DomainType.LIDERANCAS_SENADO: "Liderancas no Senado",
+    DomainType.MESA_SENADO: "Mesa diretora do Senado",
+    DomainType.MESA_CONGRESSO: "Mesa diretora do Congresso Nacional",
 }

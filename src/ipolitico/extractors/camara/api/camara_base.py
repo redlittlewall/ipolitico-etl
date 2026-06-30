@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Dict, List
 
-from ipolitico.core.client import CamaraClient
+from ipolitico.core.camara_client import CamaraClient
 from ipolitico.core.config import CAMARA_PAGE_SIZE
 from ipolitico.core.constants import ApiParams
 from ipolitico.extractors.base import BaseExtractor

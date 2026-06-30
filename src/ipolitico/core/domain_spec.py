@@ -408,6 +408,72 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         uk=("idLicitacao", "numItem", "numProposta", "fornecedorCpfCnpj"),
         stable=True,
     ),
+    # ── Domínios do Senado (Fase 1) ─────────────────────────────────────────
+    DomainType.SENADORES: _spec(DomainType.SENADORES, None),
+    DomainType.SENADORES_DETALHE: _spec(
+        DomainType.SENADORES_DETALHE,
+        None,
+        frozenset({DomainType.SENADORES}),
+        uk=("codigo",),
+    ),
+    DomainType.PROCESSOS: _spec(DomainType.PROCESSOS, "dataApresentacao"),
+    DomainType.PROCESSOS_DETALHE: _spec(
+        DomainType.PROCESSOS_DETALHE, None, frozenset({DomainType.PROCESSOS})
+    ),
+    DomainType.PROCESSOS_EMENDAS: _spec(
+        DomainType.PROCESSOS_EMENDAS, "dataApresentacao", frozenset({DomainType.PROCESSOS})
+    ),
+    DomainType.PROCESSOS_DOCUMENTOS: _spec(
+        DomainType.PROCESSOS_DOCUMENTOS, "data", frozenset({DomainType.PROCESSOS})
+    ),
+    DomainType.VOTACOES_SENADO: _spec(
+        DomainType.VOTACOES_SENADO, "dataSessao", frozenset({DomainType.PROCESSOS})
+    ),
+    DomainType.VOTOS_SENADO: _spec(
+        DomainType.VOTOS_SENADO,
+        None,
+        frozenset({DomainType.VOTACOES_SENADO}),
+        uk=("codigoParlamentar", "votacao_id"),
+    ),
+    DomainType.VOTACOES_COMISSAO: _spec(
+        DomainType.VOTACOES_COMISSAO, "dataSessao", frozenset({DomainType.PROCESSOS})
+    ),
+    DomainType.ORCAMENTO_EMENDAS: _spec(DomainType.ORCAMENTO_EMENDAS, None),
+    DomainType.ORCAMENTO_OFICIOS: _spec(DomainType.ORCAMENTO_OFICIOS, None),
+    DomainType.VETOS_PRESIDENCIAIS: _spec(DomainType.VETOS_PRESIDENCIAIS, None),
+    DomainType.VETOS_DETALHE: _spec(
+        DomainType.VETOS_DETALHE, None, frozenset({DomainType.VETOS_PRESIDENCIAIS})
+    ),
+    DomainType.SENADORES_DISCURSOS: _spec(
+        DomainType.SENADORES_DISCURSOS, "data", frozenset({DomainType.SENADORES})
+    ),
+    DomainType.DISCURSOS_PLENARIO: _spec(DomainType.DISCURSOS_PLENARIO, "data"),
+    DomainType.DISCURSOS_TEXTO: _spec(
+        DomainType.DISCURSOS_TEXTO, None, frozenset({DomainType.DISCURSOS_PLENARIO})
+    ),
+    DomainType.NOTAS_TAQUIGRAFIA_SESSAO: _spec(
+        DomainType.NOTAS_TAQUIGRAFIA_SESSAO, None, frozenset({DomainType.PLENARIO_SESSOES})
+    ),
+    DomainType.NOTAS_TAQUIGRAFIA_REUNIAO: _spec(
+        DomainType.NOTAS_TAQUIGRAFIA_REUNIAO, None, frozenset({DomainType.COMISSOES_REUNIOES})
+    ),
+    DomainType.COMISSOES_SENADO: _spec(DomainType.COMISSOES_SENADO, None),
+    DomainType.COMISSOES_DETALHE: _spec(
+        DomainType.COMISSOES_DETALHE, None, frozenset({DomainType.COMISSOES_SENADO})
+    ),
+    DomainType.COMISSOES_REUNIOES: _spec(
+        DomainType.COMISSOES_REUNIOES, "data", frozenset({DomainType.COMISSOES_SENADO})
+    ),
+    DomainType.COMISSOES_MEMBROS: _spec(
+        DomainType.COMISSOES_MEMBROS, None, frozenset({DomainType.COMISSOES_SENADO})
+    ),
+    DomainType.PLENARIO_AGENDA: _spec(DomainType.PLENARIO_AGENDA, "data"),
+    DomainType.PLENARIO_RESULTADOS: _spec(DomainType.PLENARIO_RESULTADOS, "data"),
+    DomainType.PLENARIO_SESSOES: _spec(DomainType.PLENARIO_SESSOES, "data"),
+    DomainType.BLOCOS_SENADO: _spec(DomainType.BLOCOS_SENADO, None),
+    DomainType.LIDERANCAS_SENADO: _spec(DomainType.LIDERANCAS_SENADO, None),
+    DomainType.MESA_SENADO: _spec(DomainType.MESA_SENADO, None),
+    DomainType.MESA_CONGRESSO: _spec(DomainType.MESA_CONGRESSO, None),
 }
 
 

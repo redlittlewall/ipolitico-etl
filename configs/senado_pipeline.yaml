@@ -1,0 +1,3 @@
+# Configuração do pipeline de dados do Senado Federal
+# Preenchido conforme domínios forem implementados nas issues seguintes
+domain_configs: {}

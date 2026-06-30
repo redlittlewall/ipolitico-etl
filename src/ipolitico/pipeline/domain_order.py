@@ -7,7 +7,7 @@ from typing import Iterable
 from ipolitico.core.constants import DomainType
 
 # Ordem estável quando todos os upstreams devem rodar primeiro
-FULL_CAMARA_PIPELINE: tuple[DomainType, ...] = (
+FULL_PIPELINE: tuple[DomainType, ...] = (
     DomainType.DEPUTADOS,
     DomainType.DEPUTADOS_DETALHE,
     DomainType.LEGISLATURAS,
@@ -70,6 +70,36 @@ FULL_CAMARA_PIPELINE: tuple[DomainType, ...] = (
     DomainType.EVENTOS_REQUERIMENTOS,
     DomainType.VOTACOES_OBJETOS,
     DomainType.VOTACOES_PROPOSICOES,
+    # ── Senado ────────────────────────────────────────────────────────────
+    DomainType.SENADORES,
+    DomainType.SENADORES_DETALHE,
+    DomainType.PROCESSOS,
+    DomainType.PROCESSOS_DETALHE,
+    DomainType.PROCESSOS_EMENDAS,
+    DomainType.PROCESSOS_DOCUMENTOS,
+    DomainType.VOTACOES_SENADO,
+    DomainType.VOTOS_SENADO,
+    DomainType.VOTACOES_COMISSAO,
+    DomainType.ORCAMENTO_EMENDAS,
+    DomainType.ORCAMENTO_OFICIOS,
+    DomainType.VETOS_PRESIDENCIAIS,
+    DomainType.VETOS_DETALHE,
+    DomainType.SENADORES_DISCURSOS,
+    DomainType.DISCURSOS_PLENARIO,
+    DomainType.DISCURSOS_TEXTO,
+    DomainType.NOTAS_TAQUIGRAFIA_SESSAO,
+    DomainType.NOTAS_TAQUIGRAFIA_REUNIAO,
+    DomainType.COMISSOES_SENADO,
+    DomainType.COMISSOES_DETALHE,
+    DomainType.COMISSOES_REUNIOES,
+    DomainType.COMISSOES_MEMBROS,
+    DomainType.PLENARIO_AGENDA,
+    DomainType.PLENARIO_RESULTADOS,
+    DomainType.PLENARIO_SESSOES,
+    DomainType.BLOCOS_SENADO,
+    DomainType.LIDERANCAS_SENADO,
+    DomainType.MESA_SENADO,
+    DomainType.MESA_CONGRESSO,
 )
 
 # Dependências obrigatórias (silver/gold já populado antes do domínio)
@@ -113,10 +143,24 @@ DOMAIN_UPSTREAM_REQUIREMENTS: dict[DomainType, frozenset[DomainType]] = {
     DomainType.GRUPOS_HISTORICO: frozenset({DomainType.GRUPOS}),
     DomainType.LEGISLATURAS_LIDERES: frozenset({DomainType.LEGISLATURAS}),
     DomainType.LEGISLATURAS_MESA: frozenset({DomainType.LEGISLATURAS}),
+    # ── Senado ────────────────────────────────────────────────────────────
+    DomainType.SENADORES_DETALHE: frozenset({DomainType.SENADORES}),
+    DomainType.PROCESSOS_DETALHE: frozenset({DomainType.PROCESSOS}),
+    DomainType.PROCESSOS_EMENDAS: frozenset({DomainType.PROCESSOS}),
+    DomainType.PROCESSOS_DOCUMENTOS: frozenset({DomainType.PROCESSOS}),
+    DomainType.VOTACOES_SENADO: frozenset({DomainType.PROCESSOS}),
+    DomainType.VOTOS_SENADO: frozenset({DomainType.VOTACOES_SENADO}),
+    DomainType.VOTACOES_COMISSAO: frozenset({DomainType.PROCESSOS}),
+    DomainType.VETOS_DETALHE: frozenset({DomainType.VETOS_PRESIDENCIAIS}),
+    DomainType.SENADORES_DISCURSOS: frozenset({DomainType.SENADORES}),
+    DomainType.DISCURSOS_TEXTO: frozenset({DomainType.DISCURSOS_PLENARIO}),
+    DomainType.COMISSOES_DETALHE: frozenset({DomainType.COMISSOES_SENADO}),
+    DomainType.COMISSOES_REUNIOES: frozenset({DomainType.COMISSOES_SENADO}),
+    DomainType.COMISSOES_MEMBROS: frozenset({DomainType.COMISSOES_SENADO}),
 }
 
 
-def expand_camara_domains_with_dependencies(requested: Iterable[DomainType]) -> list[DomainType]:
+def expand_domains_with_dependencies(requested: Iterable[DomainType]) -> list[DomainType]:
     """
     Injera domínios faltantes (ex.: deputados antes de despesas) preservando ordenação canônica.
     """
@@ -131,7 +175,7 @@ def expand_camara_domains_with_dependencies(requested: Iterable[DomainType]) -> 
                     wanted.add(up)
                     expanded = True
 
-    ordered = [d for d in FULL_CAMARA_PIPELINE if d in wanted]
+    ordered = [d for d in FULL_PIPELINE if d in wanted]
     # Algum domínio fora da tupla fixa aparece ao final preservando sequência solicitada original
     extra = [d for d in requested if d not in ordered]
     seen: set[DomainType] = set()

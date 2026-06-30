@@ -6,19 +6,18 @@ from pathlib import Path
 
 import yaml
 
-from ipolitico.core.client import CamaraClient
+from ipolitico.core.camara_client import CamaraClient
 from ipolitico.core.constants import DOMAIN_LABELS, DomainType, LoadStrategy, SinkType
 from ipolitico.pipeline.builder import PipelineBuilder
 from ipolitico.pipeline.domain_order import (
-    FULL_CAMARA_PIPELINE,
-    expand_camara_domains_with_dependencies,
+    FULL_PIPELINE,
+    expand_domains_with_dependencies,
 )
 from ipolitico.pipeline.federation import FederationOrchestrator
 from ipolitico.pipeline.manager import PipelineManager
 from ipolitico.pipeline.optimizer import DataLakeOptimizer
 from ipolitico.pipeline.runner import PipelineRunner
 from ipolitico.sinks.datalake_sink import DataLakeSink
-from ipolitico.sources.camara_provider import CamaraSourceProvider
 from ipolitico.storage.gold_exporter import ExportFormat, GoldExporter
 
 logger = logging.getLogger(__name__)
@@ -55,7 +54,7 @@ def _print_domain_tree() -> None:
             all_with_deps.add(domain)
 
     # Ordem canônica como chave de ordenação
-    pipeline_order = {d: i for i, d in enumerate(FULL_CAMARA_PIPELINE)}
+    pipeline_order = {d: i for i, d in enumerate(FULL_PIPELINE)}
 
     # Entidades raiz: não são bulk-only e não dependem de ninguém (via DOMAIN_SPECS)
     EXCLUDED_ROOTS: set[DomainType] = {DomainType.REFERENCIAS}
@@ -130,7 +129,7 @@ def _print_audit_coverage() -> None:
     }
 
     # Ordena pela pipeline canônica; domínios fora da lista vão ao final
-    pipeline_order = {d: i for i, d in enumerate(FULL_CAMARA_PIPELINE)}
+    pipeline_order = {d: i for i, d in enumerate(FULL_PIPELINE)}
 
     sorted_domains = sorted(DomainType, key=lambda d: pipeline_order.get(d, 9999))
 
@@ -201,7 +200,11 @@ async def main():
     """
     parser = argparse.ArgumentParser(description="Motor ETL iPolitico")
     parser.add_argument(
-        "--source", type=str, default="api", help="Descontinuado - O YAML gerencia a origem."
+        "--source",
+        type=str,
+        choices=["camara", "senado", "all"],
+        default="all",
+        help="Fonte de dados: camara, senado, ou all (ambas em paralelo).",
     )
     parser.add_argument(
         "--list-domains",
@@ -261,9 +264,18 @@ async def main():
         args.domains = list(DomainType)
     else:
         args.domains = [d for group in args.domains for d in group]
-    args.domains = expand_camara_domains_with_dependencies(args.domains)
+    args.domains = expand_domains_with_dependencies(args.domains)
 
     start_time = time.perf_counter()
+
+    # Seleciona componentes com base na fonte
+    source_name = args.source
+    if source_name == "camara":
+        providers_configs = ["camara"]
+    elif source_name == "senado":
+        providers_configs = ["senado"]
+    else:  # all
+        providers_configs = ["camara", "senado"]
     logger.info("=" * 60)
     logger.info(
         f" iPolitico ETL (Ingestão) | Destino: DATALAKE  |"
@@ -271,20 +283,42 @@ async def main():
     )
     logger.info("=" * 60)
 
-    # Carregar Configuração Remota
-    config_path = Path(__file__).resolve().parent.parent.parent / "configs" / "camara_pipeline.yaml"
-    pipeline_config = load_config(config_path)
+    # Carregar Configurações
+    base_dir = Path(__file__).resolve().parent.parent.parent / "configs"
+    camara_config = load_config(base_dir / "camara_pipeline.yaml")
+    senado_config = load_config(base_dir / "senado_pipeline.yaml")
 
-    # Inicializar Infraestrutura Base
-    client = CamaraClient()
-    builder = PipelineBuilder(client)
     runner = PipelineRunner()
-
     state_store = DataLakeSink()
 
-    manager = PipelineManager(builder, runner, pipeline_config, state_store)
+    providers = []
 
-    federation = FederationOrchestrator([CamaraSourceProvider(manager)])
+    if "camara" in providers_configs:
+        from ipolitico.services.metadata import CamaraMetadataService
+        from ipolitico.sources.camara_provider import CamaraSourceProvider
+
+        camara_client = CamaraClient()
+        camara_builder = PipelineBuilder(camara_client)
+        camara_metadata = CamaraMetadataService(camara_client)
+        camara_manager = PipelineManager(
+            camara_builder, runner, camara_config, state_store, camara_metadata
+        )
+        providers.append(CamaraSourceProvider(camara_manager))
+
+    if "senado" in providers_configs:
+        from ipolitico.core.senado_client import SenadoClient
+        from ipolitico.services.senado_metadata import SenadoMetadataService
+        from ipolitico.sources.senado_provider import SenadoSourceProvider
+
+        senado_client = SenadoClient()
+        senado_builder = PipelineBuilder(senado_client)
+        senado_metadata = SenadoMetadataService()
+        senado_manager = PipelineManager(
+            senado_builder, runner, senado_config, state_store, senado_metadata
+        )
+        providers.append(SenadoSourceProvider(senado_manager))
+
+    federation = FederationOrchestrator(providers)
 
     try:
         await federation.run_all(
@@ -310,7 +344,15 @@ async def main():
     except Exception as e:
         logger.error(f"Falha catastrófica no ETL: {e}")
     finally:
-        await client.close()
+        for p in providers:
+            if (
+                hasattr(p, "_manager")
+                and hasattr(p._manager, "builder")
+                and p._manager.builder.client
+            ):
+                maybe_client = p._manager.builder.client
+                if hasattr(maybe_client, "close"):
+                    await maybe_client.close()
         logger.info(f"Tempo total de execução: {time.perf_counter() - start_time:.2f}s")
 
 

@@ -2,7 +2,7 @@
 
 import pytest
 
-from ipolitico.core.client import CamaraClient
+from ipolitico.core.camara_client import CamaraClient
 from ipolitico.core.constants import SinkType
 from ipolitico.pipeline.builder import PipelineBuilder
 from ipolitico.sinks.datalake_sink import DataLakeSink

@@ -6,7 +6,7 @@ from ipolitico.core.constants import DomainType, SourceType
 from ipolitico.extractors.base import BaseExtractor
 
 if TYPE_CHECKING:
-    from ipolitico.core.client import CamaraClient
+    from ipolitico.core.camara_client import CamaraClient
 
 
 class CamaraExtractorFactory:
