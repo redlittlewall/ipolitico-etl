@@ -1,5 +1,5 @@
 ---
-Status: wontfix
+Status: completed
 Type: AFK
 ---
 
