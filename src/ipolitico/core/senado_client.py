@@ -63,6 +63,25 @@ class SenadoClient:
         }
         self._semaphore = asyncio.Semaphore(SENADO_HTTP_CONCURRENCY)
 
+    async def warmup_for_domain(
+        self,
+        domain: Any,
+        jobs: list[dict[str, Any]] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """No-op: API do Senado não exige pré-aquecimento de cache.
+
+        A API do Senado é mais estável que a da Câmara e não possui
+        histórico de 504 nas rotas de consulta. Este método existe apenas
+        para compatibilidade com a interface esperada pelo PipelineManager.
+
+        Args:
+            domain: Tipo do domínio (ignorado — sem warmup necessário).
+            jobs: Lista de jobs (ignorado — sem warmup necessário).
+            **kwargs: Argumentos adicionais (ignorados).
+        """
+        return None
+
     async def fetch(self, endpoint: str, params: dict[str, Any] | None = None) -> Any:
         """
         Executa requisição GET à API do Senado com retry e backoff.
