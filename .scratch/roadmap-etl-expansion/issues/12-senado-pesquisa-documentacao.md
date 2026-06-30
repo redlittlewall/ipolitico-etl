@@ -1,8 +1,9 @@
 ---
-Status: needs-triage
+Status: completed
 Date: 2026-06-04
 Area: senado
 Fase: 4
+Completed: 2026-06-30
 ---
 
 # Pesquisar e documentar a API de Dados Abertos do Senado Federal

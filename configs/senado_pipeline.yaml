@@ -1,3 +1,17 @@
-# Configuração do pipeline de dados do Senado Federal
-# Preenchido conforme domínios forem implementados nas issues seguintes
-domain_configs: {}
+# Mapeamento dinâmico de dependências para a API do Senado Federal
+domain_configs:
+  senadores:
+    extractor: "ipolitico.extractors.senado.api.senadores.SenadoSenadoresExtractor"
+    transformer: "ipolitico.transformers.senado.senadores_transformer.SenadoSenadoresTransformer"
+  senadores_detalhe:
+    extractor: "ipolitico.extractors.senado.api.senadores_detalhe.SenadoSenadoresDetalheExtractor"
+    transformer: "ipolitico.transformers.senado.senadores_detalhe_transformer.SenadoSenadoresDetalheTransformer"
+  processos:
+    extractor: "ipolitico.extractors.senado.api.processos.SenadoProcessosExtractor"
+    transformer: "ipolitico.transformers.senado.processos_transformer.SenadoProcessosTransformer"
+  votacoes_senado:
+    extractor: "ipolitico.extractors.senado.api.votacoes_senado.SenadoVotacoesExtractor"
+    transformer: "ipolitico.transformers.senado.votacoes_senado_transformer.SenadoVotacoesTransformer"
+  votos_senado:
+    extractor: "ipolitico.extractors.senado.api.votos_senado.SenadoVotosExtractor"
+    transformer: "ipolitico.transformers.senado.votos_senado_transformer.SenadoVotosTransformer"

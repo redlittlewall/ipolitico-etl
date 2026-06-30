@@ -823,6 +823,15 @@ class DetailStrategy(DomainJobStrategy):
                 )
             return [], DomainType.PROPOSICOES.value
 
+        if domain_val == DomainType.SENADORES_DETALHE.value:
+            if lake:
+                return lake.list_ids(
+                    table_name=DomainType.SENADORES.value,
+                    layer=MedallionLayer.SILVER.value,
+                    column="codigo",
+                ), DomainType.SENADORES.value
+            return [], DomainType.SENADORES.value
+
         return [], ""
 
 
@@ -1250,6 +1259,12 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     DomainType.LICITACOES_ITENS: TimeWindowStrategy(),
     DomainType.LICITACOES_PEDIDOS: TimeWindowStrategy(),
     DomainType.LICITACOES_PROPOSTAS: TimeWindowStrategy(),
+    # ── Senado ──────────────────────────────────────────────────────────────
+    DomainType.SENADORES: LegislaturaScopeStrategy(),
+    DomainType.SENADORES_DETALHE: DetailStrategy(),
+    DomainType.PROCESSOS: DefaultWindowStrategy(),
+    DomainType.VOTACOES_SENADO: TimeWindowStrategy(),
+    DomainType.VOTOS_SENADO: TimeWindowStrategy(),
 }
 
 
