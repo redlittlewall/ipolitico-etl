@@ -322,3 +322,142 @@ class PlenarioSessoesTransformer(BaseTransformer):
         return _apply_senado_contract(
             df, _PLENARIO_SESSOES_FIELD_MAP, DomainType.PLENARIO_SESSOES.value
         )
+
+
+# ── Composição (Issue 08c) ─────────────────────────────────────────────────────
+
+_BLOCOS_SENADO_FIELD_MAP: dict[str, tuple[str, type]] = {
+    "CodigoBloco": ("codigo", pl.Int64),
+    "NomeBloco": ("nome", pl.String),
+    "NomeApelido": ("nome_apelido", pl.String),
+    "DataCriacao": ("data_criacao", pl.String),
+    "Membros": ("membros", pl.String),
+}
+
+_LIDERANCAS_SENADO_FIELD_MAP: dict[str, tuple[str, type]] = {
+    "codigo": ("codigo", pl.Int64),
+    "casa": ("casa", pl.String),
+    "idTipoUnidadeLideranca": ("id_tipo_unidade_lideranca", pl.Int64),
+    "siglaTipoUnidadeLideranca": ("sigla_tipo_unidade_lideranca", pl.String),
+    "descricaoTipoUnidadeLideranca": ("descricao_tipo_unidade_lideranca", pl.String),
+    "codigoParlamentar": ("codigo_parlamentar", pl.Int64),
+    "nomeParlamentar": ("nome_parlamentar", pl.String),
+    "dataDesignacao": ("data_designacao", pl.String),
+    "dataTermino": ("data_termino", pl.String),
+    "siglaTipoLideranca": ("sigla_tipo_lideranca", pl.String),
+    "descricaoTipoLideranca": ("descricao_tipo_lideranca", pl.String),
+    "numeroOrdemViceLider": ("numero_ordem_vice_lider", pl.Int64),
+    "codigoBloco": ("codigo_bloco", pl.Int64),
+    "siglaBloco": ("sigla_bloco", pl.String),
+    "nomeBloco": ("nome_bloco", pl.String),
+    "codigoPartido": ("codigo_partido", pl.Int64),
+    "siglaPartido": ("sigla_partido", pl.String),
+    "nomePartido": ("nome_partido", pl.String),
+    "codigoPartidoFiliacao": ("codigo_partido_filiacao", pl.Int64),
+    "siglaPartidoFiliacao": ("sigla_partido_filiacao", pl.String),
+    "nomePartidoFiliacao": ("nome_partido_filiacao", pl.String),
+}
+
+_MESA_SENADO_FIELD_MAP: dict[str, tuple[str, type]] = {
+    "CodigoColegiado": ("codigo_colegiado", pl.Int64),
+    "NomeColegiado": ("nome_colegiado", pl.String),
+    "SiglaColegiado": ("sigla_colegiado", pl.String),
+    "Cargo": ("cargo", pl.String),
+    "NomeParlamentar": ("nome_parlamentar", pl.String),
+    "Bancada": ("bancada", pl.String),
+    "Http": ("codigo_parlamentar", pl.Int64),
+    "NumeroOrdemImpressao": ("numero_ordem_impressao", pl.String),
+    "Origem": ("origem", pl.String),
+}
+
+_MESA_CONGRESSO_FIELD_MAP: dict[str, tuple[str, type]] = {
+    "CodigoColegiado": ("codigo_colegiado", pl.Int64),
+    "NomeColegiado": ("nome_colegiado", pl.String),
+    "SiglaColegiado": ("sigla_colegiado", pl.String),
+    "TipoCargo": ("tipo_cargo", pl.String),
+    "CodigoCargo": ("codigo_cargo", pl.String),
+    "NomeParlamentar": ("nome_parlamentar", pl.String),
+    "CodigoParlamentar": ("codigo_parlamentar", pl.String),
+    "Bancada": ("bancada", pl.String),
+    "CodigoDeputadoNaCamara": ("codigo_deputado_camara", pl.String),
+}
+
+
+class BlocosSenadoTransformer(BaseTransformer):
+    """Aplica contrato Silver à lista de blocos parlamentares do Senado.
+
+    O campo ``Membros`` já vem serializado como JSON string pelo extrator.
+    """
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        """Transforma DataFrame bruto dos blocos parlamentares.
+
+        Args:
+            df: DataFrame com colunas da API (CodigoBloco, NomeBloco, ...).
+            **kwargs: Parâmetros adicionais (ignorados).
+
+        Returns:
+            DataFrame no schema Silver de ``blocos_senado``.
+        """
+        return _apply_senado_contract(df, _BLOCOS_SENADO_FIELD_MAP, DomainType.BLOCOS_SENADO.value)
+
+
+class LiderancasSenadoTransformer(BaseTransformer):
+    """Aplica contrato Silver à lista de lideranças do Senado."""
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        """Transforma DataFrame bruto das lideranças.
+
+        Args:
+            df: DataFrame com colunas da API (codigo, casa,
+                codigoParlamentar, nomeParlamentar, ...).
+            **kwargs: Parâmetros adicionais (ignorados).
+
+        Returns:
+            DataFrame no schema Silver de ``liderancas_senado``.
+        """
+        return _apply_senado_contract(
+            df, _LIDERANCAS_SENADO_FIELD_MAP, DomainType.LIDERANCAS_SENADO.value
+        )
+
+
+class MesaSenadoTransformer(BaseTransformer):
+    """Aplica contrato Silver à composição da mesa diretora do Senado."""
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        """Transforma DataFrame bruto da mesa do Senado.
+
+        Cada linha corresponde a um cargo dentro de um colegiado,
+        com metadados do colegiado anexados.
+
+        Args:
+            df: DataFrame com colunas da API (CodigoColegiado, Cargo,
+                NomeParlamentar, Bancada, ...).
+            **kwargs: Parâmetros adicionais (ignorados).
+
+        Returns:
+            DataFrame no schema Silver de ``mesa_senado``.
+        """
+        return _apply_senado_contract(df, _MESA_SENADO_FIELD_MAP, DomainType.MESA_SENADO.value)
+
+
+class MesaCongressoTransformer(BaseTransformer):
+    """Aplica contrato Silver à composição da mesa diretora do Congresso."""
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        """Transforma DataFrame bruto da mesa do Congresso.
+
+        Cada linha corresponde a um cargo dentro de um colegiado,
+        com metadados do colegiado anexados.
+
+        Args:
+            df: DataFrame com colunas da API (CodigoColegiado, TipoCargo,
+                NomeParlamentar, Bancada, ...).
+            **kwargs: Parâmetros adicionais (ignorados).
+
+        Returns:
+            DataFrame no schema Silver de ``mesa_congresso``.
+        """
+        return _apply_senado_contract(
+            df, _MESA_CONGRESSO_FIELD_MAP, DomainType.MESA_CONGRESSO.value
+        )

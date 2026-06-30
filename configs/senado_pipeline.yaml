@@ -78,3 +78,16 @@ domain_configs:
   plenario_sessoes:
     extractor: "ipolitico.extractors.senado.api.plenario.PlenarioSessoesExtractor"
     transformer: "ipolitico.transformers.senado.institutional_transformer.PlenarioSessoesTransformer"
+  # ── Composição (Issue 08c) ──────────────────────────────────────────────────
+  blocos_senado:
+    extractor: "ipolitico.extractors.senado.api.composicao.BlocosSenadoExtractor"
+    transformer: "ipolitico.transformers.senado.institutional_transformer.BlocosSenadoTransformer"
+  liderancas_senado:
+    extractor: "ipolitico.extractors.senado.api.composicao.LiderancasSenadoExtractor"
+    transformer: "ipolitico.transformers.senado.institutional_transformer.LiderancasSenadoTransformer"
+  mesa_senado:
+    extractor: "ipolitico.extractors.senado.api.composicao.MesaSenadoExtractor"
+    transformer: "ipolitico.transformers.senado.institutional_transformer.MesaSenadoTransformer"
+  mesa_congresso:
+    extractor: "ipolitico.extractors.senado.api.composicao.MesaCongressoExtractor"
+    transformer: "ipolitico.transformers.senado.institutional_transformer.MesaCongressoTransformer"
