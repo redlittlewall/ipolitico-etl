@@ -1,5 +1,5 @@
 ---
-Status: ready-for-human
+Status: completed
 Type: AFK
 ---
 

@@ -55,3 +55,16 @@ domain_configs:
   notas_taquigrafia_reuniao:
     extractor: "ipolitico.extractors.senado.api.discursos.NotasTaquigrafiaReuniaoExtractor"
     transformer: "ipolitico.transformers.senado.discursos_transformer.NotasTaquigrafiaReuniaoTransformer"
+  # ── Comissões (Issue 08a) ────────────────────────────────────────────────────
+  comissoes_senado:
+    extractor: "ipolitico.extractors.senado.api.comissoes.SenadoComissoesListaExtractor"
+    transformer: "ipolitico.transformers.senado.institutional_transformer.SenadoComissoesListaTransformer"
+  comissoes_detalhe:
+    extractor: "ipolitico.extractors.senado.api.comissoes.SenadoComissoesDetalheExtractor"
+    transformer: "ipolitico.transformers.senado.institutional_transformer.SenadoComissoesDetalheTransformer"
+  comissoes_reunioes:
+    extractor: "ipolitico.extractors.senado.api.comissoes.SenadoComissoesReunioesExtractor"
+    transformer: "ipolitico.transformers.senado.institutional_transformer.SenadoComissoesReunioesTransformer"
+  comissoes_membros:
+    extractor: "ipolitico.extractors.senado.api.comissoes.SenadoComissoesMembrosExtractor"
+    transformer: "ipolitico.transformers.senado.institutional_transformer.SenadoComissoesMembrosTransformer"
