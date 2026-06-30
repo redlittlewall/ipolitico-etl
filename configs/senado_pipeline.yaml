@@ -24,3 +24,6 @@ domain_configs:
   votos_senado:
     extractor: "ipolitico.extractors.senado.api.votos_senado.SenadoVotosExtractor"
     transformer: "ipolitico.transformers.senado.votos_senado_transformer.SenadoVotosTransformer"
+  votacoes_comissao:
+    extractor: "ipolitico.extractors.senado.api.votacoes_comissao.SenadoVotacoesComissaoExtractor"
+    transformer: "ipolitico.transformers.senado.votacoes_comissao_transformer.SenadoVotacoesComissaoTransformer"

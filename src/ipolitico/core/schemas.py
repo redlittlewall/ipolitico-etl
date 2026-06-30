@@ -713,6 +713,18 @@ SILVER_SCHEMAS = {
         "sigla_uf": pl.String,
         "voto": pl.String,
     },
+    DomainType.VOTACOES_COMISSAO.value: {
+        "votacao_id": pl.Int64,
+        "codigo_materia": pl.Int64,
+        "id_processo": pl.Int64,
+        "identificacao": pl.String,
+        "ementa": pl.String,
+        "data_apresentacao": pl.String,
+        "data_sessao": pl.String,
+        "descricao_votacao": pl.String,
+        "resultado": pl.String,
+        "sigla_comissao": pl.String,
+    },
     # ── Domínios bulk-only de eventos/votações (Fase 3) ────────────────────────
     DomainType.EVENTOS_PRESENCA_DEPUTADOS.value: {
         "idEvento": pl.Int64,
