@@ -94,7 +94,9 @@ class SenadoClient:
     async def _fetch_with_retry(self, url: str, params: dict[str, Any] | None) -> Any:
         """Método interno que carrega o decorator @retry (separado do fetch público)."""
         async with self._semaphore:
-            async with httpx.AsyncClient(timeout=30.0, headers=self.headers) as client:
+            async with httpx.AsyncClient(
+                timeout=30.0, headers=self.headers, follow_redirects=True
+            ) as client:
                 try:
                     response = await client.get(url, params=params)
                 except httpx.RequestError as e:
