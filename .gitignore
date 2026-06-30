@@ -50,15 +50,8 @@ data_backup_*/
 scripts/*.db
 scripts/*.log
 
-# Claude Code — skills pessoais (cada dev tem as suas)
-.claude/skills/diagnose/
-.claude/skills/grill-me/
-.claude/skills/grill-with-docs/
-.claude/skills/in-progress/
-.claude/skills/setup-matt-pocock-skills/
-.claude/skills/tdd/
-.claude/skills/to-issues/
-.claude/skills/to-prd/
+# Claude Code — skills (symlinks para Facehugger, pessoal de cada dev)
+.claude/skills/
 
 # 🎭 Facehugger generated
 AGENT-SEED.md
