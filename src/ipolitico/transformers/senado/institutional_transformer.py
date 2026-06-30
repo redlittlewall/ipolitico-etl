@@ -196,3 +196,129 @@ class SenadoComissoesMembrosTransformer(BaseTransformer):
         return _apply_senado_contract(
             df, _COMISSOES_MEMBROS_FIELD_MAP, DomainType.COMISSOES_MEMBROS.value
         )
+
+
+# ── Plenário (Issue 08b) ──────────────────────────────────────────────────────
+
+_PLENARIO_AGENDA_FIELD_MAP: dict[str, tuple[str, type]] = {
+    "CodigoSessao": ("codigo_sessao", pl.Int64),
+    "Data": ("data", pl.String),
+    "DiaSemana": ("dia_semana", pl.String),
+    "Hora": ("hora", pl.String),
+    "NumeroSessao": ("numero_sessao", pl.String),
+    "TipoSessao": ("tipo_sessao", pl.String),
+    "LocalSessao": ("local_sessao", pl.String),
+    "Casa": ("casa", pl.String),
+    "SessaoLegislativa": ("sessao_legislativa", pl.String),
+    "Legislatura": ("legislatura", pl.String),
+    "CodigoSituacaoSessao": ("codigo_situacao_sessao", pl.Int64),
+    "SituacaoSessao": ("situacao_sessao", pl.String),
+    "Realizada": ("realizada", pl.String),
+    "PautaConfirmada": ("pauta_confirmada", pl.String),
+    "TipoPresenca": ("tipo_presenca", pl.String),
+    "DescricaoTipoPresenca": ("descricao_tipo_presenca", pl.String),
+    "Evento": ("evento", pl.String),
+    "Oradores": ("oradores", pl.String),
+}
+
+_PLENARIO_RESULTADOS_FIELD_MAP: dict[str, tuple[str, type]] = {
+    "codigoSessao": ("codigo_sessao", pl.String),
+    "codigoItem": ("codigo_item", pl.String),
+    "codigoMateria": ("codigo_materia", pl.String),
+    "idIdentificacao": ("id_identificacao", pl.String),
+    "identificacao": ("identificacao", pl.String),
+    "parecer": ("parecer", pl.String),
+    "ementaPapeleta": ("ementa_papeleta", pl.String),
+    "siglaCasaMateria": ("sigla_casa_materia", pl.String),
+    "siglaMateria": ("sigla_materia", pl.String),
+    "numeroMateria": ("numero_materia", pl.String),
+    "anoMateria": ("ano_materia", pl.String),
+    "DescricaoIdentificacaoMateria": ("descricao_identificacao_materia", pl.String),
+    "textoResultado": ("texto_resultado", pl.String),
+    "indicadorDeliberacao": ("indicador_deliberacao", pl.String),
+    "descricaoDeliberacao": ("descricao_deliberacao", pl.String),
+    "sequencialItem": ("sequencial_item", pl.String),
+    "tipoPauta": ("tipo_pauta", pl.String),
+    "descricaoTipoPauta": ("descricao_tipo_pauta", pl.String),
+    "indicadorRevisado": ("indicador_revisado", pl.String),
+    "codigoTipoApreciacao": ("codigo_tipo_apreciacao", pl.String),
+    "descricaoTipoApreciacao": ("descricao_tipo_apreciacao", pl.String),
+    "autorMateria": ("autor_materia", pl.String),
+    "dataSessao": ("data_sessao", pl.String),
+    "siglaCasa": ("sigla_casa", pl.String),
+}
+
+_PLENARIO_SESSOES_FIELD_MAP: dict[str, tuple[str, type]] = {
+    "NumeroLegislatura": ("numero_legislatura", pl.Int64),
+    "NumeroSessaoLegislativa": ("numero_sessao_legislativa", pl.Int64),
+    "TipoSessaoLegislativa": ("tipo_sessao_legislativa", pl.String),
+    "DataInicio": ("data_inicio", pl.String),
+    "DataFim": ("data_fim", pl.String),
+    "DataEleicao": ("data_eleicao", pl.String),
+    "DataInicioLegislatura": ("data_inicio_legislatura", pl.String),
+    "DataFimLegislatura": ("data_fim_legislatura", pl.String),
+}
+
+
+class PlenarioAgendaTransformer(BaseTransformer):
+    """Aplica contrato Silver à agenda do plenário do Senado.
+
+    Serializa structs (Evento, Oradores) como JSON string e renomeia
+    campos PascalCase para snake_case.
+    """
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        """Transforma DataFrame bruto da agenda do plenário.
+
+        Args:
+            df: DataFrame com colunas da API (CodigoSessao, Data, Hora, ...).
+            **kwargs: Parâmetros adicionais (ignorados).
+
+        Returns:
+            DataFrame no schema Silver de ``plenario_agenda``.
+        """
+        return _apply_senado_contract(
+            df, _PLENARIO_AGENDA_FIELD_MAP, DomainType.PLENARIO_AGENDA.value
+        )
+
+
+class PlenarioResultadosTransformer(BaseTransformer):
+    """Aplica contrato Silver aos resultados de votações em plenário."""
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        """Transforma DataFrame bruto dos resultados de votações.
+
+        Args:
+            df: DataFrame com colunas da API (codigoItem, codigoMateria, ...).
+            **kwargs: Parâmetros adicionais (ignorados).
+
+        Returns:
+            DataFrame no schema Silver de ``plenario_resultados``.
+        """
+        return _apply_senado_contract(
+            df, _PLENARIO_RESULTADOS_FIELD_MAP, DomainType.PLENARIO_RESULTADOS.value
+        )
+
+
+class PlenarioSessoesTransformer(BaseTransformer):
+    """Aplica contrato Silver às sessões legislativas do Senado.
+
+    Cada linha corresponde a uma SessaoLegislativa dentro de uma
+    Legislatura, com metadados da legislatura (NumeroLegislatura,
+    DataEleicao, etc.)
+    """
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        """Transforma DataFrame bruto das sessões legislativas.
+
+        Args:
+            df: DataFrame com colunas da API (NumeroSessaoLegislativa,
+                TipoSessaoLegislativa, DataInicio, ...).
+            **kwargs: Parâmetros adicionais (ignorados).
+
+        Returns:
+            DataFrame no schema Silver de ``plenario_sessoes``.
+        """
+        return _apply_senado_contract(
+            df, _PLENARIO_SESSOES_FIELD_MAP, DomainType.PLENARIO_SESSOES.value
+        )

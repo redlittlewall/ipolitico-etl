@@ -991,6 +991,52 @@ class DefaultWindowStrategy(DomainJobStrategy):
         return jobs, default_mapper
 
 
+class DailyWindowStrategy(DomainJobStrategy):
+    """Estratégia para domínios com 1 job por dia (ex: plenário).
+
+    Endpoints diários (ex: ``/plenario/agenda/dia/{data}``) recebem
+    uma data no lugar de janela mensal. Gera 1 job por dia dentro
+    da janela temporal, cada um com o parâmetro ``data`` no formato
+    ``YYYY-MM-DD``.
+    """
+
+    def build(
+        self,
+        domain: DomainType,
+        spec: DomainSpec,
+        start: str,
+        end: str,
+        current_leg: int,
+        anchor_year: int,
+        extraction_plan: ExtractionPlan,
+        state_store: StateStore,
+        lake: DataLakeRepository | None,
+    ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
+        from datetime import date, timedelta
+
+        start_date = date.fromisoformat(start)
+        end_date = date.fromisoformat(end)
+
+        jobs: list[dict[str, Any]] = []
+        current = start_date
+        while current <= end_date:
+            jobs.append({"data": current.isoformat()})
+            current += timedelta(days=1)
+
+        logger.info(
+            "[%s] Jobs diários: %s (%s a %s).",
+            domain.value.upper(),
+            len(jobs),
+            start,
+            end,
+        )
+
+        def daily_mapper(job: dict) -> dict:
+            return {"data": job["data"]}
+
+        return jobs, daily_mapper
+
+
 class AnnualWindowStrategy(DomainJobStrategy):
     """Estratégia para domínios com 1 job por ano.
 
@@ -1486,6 +1532,10 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
         resolve_fn=_resolve_reuniao_ids,
         parent_col="id_reuniao",
     ),
+    # ── Senado — Plenário (Issue 08b) ────────────────────────────────────────────
+    DomainType.PLENARIO_AGENDA: DailyWindowStrategy(),
+    DomainType.PLENARIO_RESULTADOS: DailyWindowStrategy(),
+    DomainType.PLENARIO_SESSOES: DailyWindowStrategy(),
 }
 
 
