@@ -812,4 +812,39 @@ SILVER_SCHEMAS = {
         "total_nao": pl.Int64,
         "total_abstencao": pl.Int64,
     },
+    # ── Senado — Discursos e Notas Taquigráficas (Issue 07) ──────────────────────
+    DomainType.SENADORES_DISCURSOS.value: {
+        "codigo": pl.Int64,
+        "codigo_parlamentar": pl.Int64,
+        "nome_parlamentar": pl.String,
+        "sigla_partido": pl.String,
+        "uf": pl.String,
+        "data": pl.String,
+        "hora": pl.String,
+        "tipo_discurso": pl.String,
+        "resumo": pl.String,
+        "texto": pl.String,
+    },
+    DomainType.DISCURSOS_PLENARIO.value: {
+        "codigo": pl.Int64,
+        "data": pl.String,
+        "tipo_discurso": pl.String,
+        "fase": pl.String,
+        "resumo": pl.String,
+        "nome_parlamentar": pl.String,
+        "sigla_partido": pl.String,
+        "uf": pl.String,
+    },
+    DomainType.DISCURSOS_TEXTO.value: {
+        "codigo": pl.Int64,
+        "texto": pl.String,
+    },
+    DomainType.NOTAS_TAQUIGRAFIA_SESSAO.value: {
+        "id_sessao": pl.Int64,
+        "texto": pl.String,
+    },
+    DomainType.NOTAS_TAQUIGRAFIA_REUNIAO.value: {
+        "id_reuniao": pl.Int64,
+        "texto": pl.String,
+    },
 }

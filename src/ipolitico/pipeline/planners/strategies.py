@@ -402,6 +402,73 @@ class DeputyLegislatureStrategy(DomainJobStrategy):
         return jobs, leg_temporal_mapper
 
 
+class SenatorChildStrategy(DomainJobStrategy):
+    """Estratégia para domínios filhos de senadores (ex: senadores_discursos).
+
+    Para cada senador no lake, gera 1 job com ``codigo`` e janela temporal.
+    Análogo ao ``DeputyChildStrategy(include_date_range=True)`` mas para Senado.
+    """
+
+    def build(
+        self,
+        domain: DomainType,
+        spec: DomainSpec,
+        start: str,
+        end: str,
+        current_leg: int,
+        anchor_year: int,
+        extraction_plan: ExtractionPlan,
+        state_store: StateStore,
+        lake: DataLakeRepository | None,
+    ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
+        if extraction_plan.source_type == SourceType.BULK:
+            jobs: list[dict[str, Any]] = [{}]
+
+            def snapshot_mapper(job: dict) -> dict:
+                return {}
+
+            return jobs, snapshot_mapper
+
+        if lake is None:
+            logger.error(
+                "[%s] Abortando: DataLakeRepository necessário para resolver senadores.",
+                domain.value.upper(),
+            )
+            return [], lambda x: {}
+
+        senador_ids = lake.list_ids(
+            table_name=DomainType.SENADORES.value,
+            layer=MedallionLayer.SILVER.value,
+            column="codigo",
+        )
+        if not senador_ids:
+            logger.error(
+                "[%s] Abortando: nenhum senador no lake. Rode '%s' antes.",
+                domain.value.upper(),
+                DomainType.SENADORES.value,
+            )
+            return [], lambda x: {}
+
+        jobs = [{"codigo": sid, "dataInicio": start, "dataFim": end} for sid in senador_ids]
+
+        logger.info(
+            "[%s] %s jobs (1/senador, janela %s a %s).",
+            domain.value.upper(),
+            len(jobs),
+            start,
+            end,
+        )
+
+        def senator_mapper(job: dict) -> dict:
+            return {
+                "codigo": job["codigo"],
+                "dataInicio": job["dataInicio"],
+                "dataFim": job["dataFim"],
+            }
+
+        return jobs, senator_mapper
+
+
 class VotosStrategy(DomainJobStrategy):
     """Estratégia para o domínio votos (batch de votacao_ids)."""
 
@@ -1106,6 +1173,84 @@ def _resolve_legislatura_ids(
     return [current_leg]
 
 
+def _resolve_senador_ids(
+    lake: DataLakeRepository | None,
+    state_store: StateStore,
+    **kwargs: Any,
+) -> list[Any]:
+    if lake:
+        return lake.list_ids(
+            table_name=DomainType.SENADORES.value,
+            layer=MedallionLayer.SILVER.value,
+            column="codigo",
+        )
+    return state_store.get_existing_ids(
+        table_name=DomainType.SENADORES.value,
+        layer=MedallionLayer.SILVER.value,
+        column="codigo",
+    )
+
+
+def _resolve_discurso_ids(
+    lake: DataLakeRepository | None,
+    state_store: StateStore,
+    start: str,
+    end: str,
+    **kwargs: Any,
+) -> list[Any]:
+    if lake:
+        return lake.list_ids(
+            table_name=DomainType.DISCURSOS_PLENARIO.value,
+            layer=MedallionLayer.SILVER.value,
+            column="codigo",
+        )
+    return state_store.get_existing_ids(
+        table_name=DomainType.DISCURSOS_PLENARIO.value,
+        layer=MedallionLayer.SILVER.value,
+        column="codigo",
+    )
+
+
+def _resolve_sessao_ids(
+    lake: DataLakeRepository | None,
+    state_store: StateStore,
+    start: str,
+    end: str,
+    **kwargs: Any,
+) -> list[Any]:
+    if lake:
+        return lake.list_ids(
+            table_name=DomainType.PLENARIO_SESSOES.value,
+            layer=MedallionLayer.SILVER.value,
+            column="codigo",
+        )
+    return state_store.get_existing_ids(
+        table_name=DomainType.PLENARIO_SESSOES.value,
+        layer=MedallionLayer.SILVER.value,
+        column="codigo",
+    )
+
+
+def _resolve_reuniao_ids(
+    lake: DataLakeRepository | None,
+    state_store: StateStore,
+    start: str,
+    end: str,
+    **kwargs: Any,
+) -> list[Any]:
+    if lake:
+        return lake.list_ids(
+            table_name=DomainType.COMISSOES_REUNIOES.value,
+            layer=MedallionLayer.SILVER.value,
+            column="codigo",
+        )
+    return state_store.get_existing_ids(
+        table_name=DomainType.COMISSOES_REUNIOES.value,
+        layer=MedallionLayer.SILVER.value,
+        column="codigo",
+    )
+
+
 # ─── Registry ────────────────────────────────────────────────────────────────
 
 
@@ -1320,6 +1465,27 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     # ── Senado — Vetos Presidenciais (Issue 06) ────────────────────────────────
     DomainType.VETOS_PRESIDENCIAIS: AnnualWindowStrategy(),
     DomainType.VETOS_DETALHE: DetailStrategy(),
+    # ── Senado — Discursos e Notas Taquigráficas (Issue 07) ──────────────────────
+    DomainType.SENADORES_DISCURSOS: SenatorChildStrategy(),
+    DomainType.DISCURSOS_PLENARIO: TimeWindowStrategy(),
+    DomainType.DISCURSOS_TEXTO: ParentBatchedStrategy(
+        parent_key="entity_ids",
+        batch_size=25,
+        resolve_fn=_resolve_discurso_ids,
+        parent_col="codigo",
+    ),
+    DomainType.NOTAS_TAQUIGRAFIA_SESSAO: ParentBatchedStrategy(
+        parent_key="entity_ids",
+        batch_size=25,
+        resolve_fn=_resolve_sessao_ids,
+        parent_col="id_sessao",
+    ),
+    DomainType.NOTAS_TAQUIGRAFIA_REUNIAO: ParentBatchedStrategy(
+        parent_key="entity_ids",
+        batch_size=25,
+        resolve_fn=_resolve_reuniao_ids,
+        parent_col="id_reuniao",
+    ),
 }
 
 

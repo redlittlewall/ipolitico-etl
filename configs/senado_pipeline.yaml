@@ -39,3 +39,19 @@ domain_configs:
   vetos_detalhe:
     extractor: "ipolitico.extractors.senado.api.vetos.VetosDetalheExtractor"
     transformer: "ipolitico.transformers.senado.vetos_transformer.VetosDetalheTransformer"
+  # ── Discursos e Notas Taquigráficas (Issue 07) ──────────────────────────────
+  senadores_discursos:
+    extractor: "ipolitico.extractors.senado.api.discursos.DiscursosSenadorExtractor"
+    transformer: "ipolitico.transformers.senado.discursos_transformer.DiscursosSenadorTransformer"
+  discursos_plenario:
+    extractor: "ipolitico.extractors.senado.api.discursos.DiscursosPlenarioExtractor"
+    transformer: "ipolitico.transformers.senado.discursos_transformer.DiscursosPlenarioTransformer"
+  discursos_texto:
+    extractor: "ipolitico.extractors.senado.api.discursos.DiscursosTextoExtractor"
+    transformer: "ipolitico.transformers.senado.discursos_transformer.DiscursosTextoTransformer"
+  notas_taquigrafia_sessao:
+    extractor: "ipolitico.extractors.senado.api.discursos.NotasTaquigrafiaSessaoExtractor"
+    transformer: "ipolitico.transformers.senado.discursos_transformer.NotasTaquigrafiaSessaoTransformer"
+  notas_taquigrafia_reuniao:
+    extractor: "ipolitico.extractors.senado.api.discursos.NotasTaquigrafiaReuniaoExtractor"
+    transformer: "ipolitico.transformers.senado.discursos_transformer.NotasTaquigrafiaReuniaoTransformer"
