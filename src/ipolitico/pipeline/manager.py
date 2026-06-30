@@ -17,8 +17,8 @@ from ipolitico.pipeline.planners.camara_jobs import JobPlanner
 from ipolitico.pipeline.runner import PipelineRunner
 from ipolitico.pipeline.source_router import SourceRouter
 from ipolitico.pipeline.window_resolver import WindowResolver, resolve_effective_iso_window
-from ipolitico.sinks.base import BaseSink
 from ipolitico.storage.datalake_repository import DataLakeRepository
+from ipolitico.storage.state_store import StateStore
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class PipelineManager:
         builder: PipelineBuilder,
         runner: PipelineRunner,
         config: Dict[str, Any],
-        state_store: BaseSink,
+        state_store: StateStore,
         metadata_service,
         lake_repository: Optional[DataLakeRepository] = None,
     ):
