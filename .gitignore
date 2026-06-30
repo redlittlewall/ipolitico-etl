@@ -55,6 +55,5 @@ scripts/*.log
 
 # 🎭 Facehugger generated
 AGENT-SEED.md
-CONTEXT.md
 docs/agents/
 # 🎭 End Facehugger
