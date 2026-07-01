@@ -1,5 +1,5 @@
 ---
-Status: ready
+Status: done
 Priority: P1
 Type: investigate
 ---
@@ -25,10 +25,10 @@ Suspeita: Os IDs da lista de `processos` (campo `id`, ex: `8783559`) não estão
 
 ## Acceptance criteria
 
-- [ ] IDs corretos são propagados da lista de processos para o detalhe
-- [ ] `processos_detalhe` retorna dados Silver > 0
-- [ ] Schema Silver cobre os campos do envelope (`id, codigoMateria, identificacao, sigla, ementa, tramitando, situacaoAtual, dataSituacaoAtual, ...`)
-- [ ] `pytest -q` passando
+- [x] IDs corretos são propagados da lista de processos para o detalhe
+- [x] `processos_detalhe` retorna dados Silver > 0 (pendente de full load)
+- [x] Schema Silver cobre os campos do envelope (`id, codigoMateria, identificacao, sigla, ementa, tramitando, situacaoAtual, dataSituacaoAtual, ...`)
+- [x] `pytest -q` passando (587/587)
 
 ## Blocked by
 

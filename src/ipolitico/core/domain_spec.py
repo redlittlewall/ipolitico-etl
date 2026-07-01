@@ -436,7 +436,9 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         uk=("codigoParlamentar", "votacao_id"),
     ),
     DomainType.VOTACOES_COMISSAO: _spec(
-        DomainType.VOTACOES_COMISSAO, "dataSessao", frozenset({DomainType.PROCESSOS})
+        DomainType.VOTACOES_COMISSAO,
+        "dataSessao",
+        frozenset({DomainType.PROCESSOS, DomainType.COMISSOES_SENADO}),
     ),
     DomainType.ORCAMENTO_EMENDAS: _spec(DomainType.ORCAMENTO_EMENDAS, None),
     DomainType.ORCAMENTO_OFICIOS: _spec(DomainType.ORCAMENTO_OFICIOS, None),

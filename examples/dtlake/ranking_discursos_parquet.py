@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import polars as pl
+
 from ipolitico.core.logger import setup_logger
 
 logger = setup_logger(__name__)

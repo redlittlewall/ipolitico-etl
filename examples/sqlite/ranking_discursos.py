@@ -2,6 +2,7 @@
 import sqlite3
 
 from duckdb import pl
+
 from ipolitico.core.config import DB_PATH
 from ipolitico.core.logger import setup_logger
 

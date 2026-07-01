@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 import asyncio
 
 from ipolitico.core.client import CamaraClient
+
 from ipolitico.core.constants import DomainType
 from ipolitico.core.schemas import SILVER_SCHEMAS
 
