@@ -1,4 +1,9 @@
-"""Transformadores para os domínios de vetos presidenciais — mapeia campos flat da API."""
+"""Transformadores para os domínios de vetos presidenciais — mapeia campos flat do novo envelope.
+
+A API agora retorna objetos aninhados (Materia, MateriaVetada, Mensagem) que são
+aplainados em chaves ``_`` pelo extrator. O transformer renomeia para snake_case
+e aplica tipagem estrita conforme o contrato Silver.
+"""
 
 from __future__ import annotations
 
@@ -11,44 +16,118 @@ from ipolitico.core.schemas import SILVER_SCHEMAS
 from ipolitico.transformers.base import BaseTransformer
 
 # Mapeamento dos campos flat da API → colunas Silver para vetos_presidenciais
+# Inclui campos da raiz do Veto + campos aplainados de Materia, MateriaVetada
+# (incluindo NormaGerada), e Mensagem.
 _FIELD_MAP_PRESIDENCIAIS: dict[str, tuple[str, type]] = {
+    # ── Flat ──────────────────────────────────────────────────────────────────
     "Codigo": ("codigo", pl.Int64),
-    "Ano": ("ano", pl.Int64),
-    "Numero": ("numero", pl.String),
-    "Tipo": ("tipo", pl.String),
-    "CasaOrigem": ("casa_origem", pl.String),
-    "SiglaProposicao": ("sigla_proposicao", pl.String),
-    "Ementa": ("ementa", pl.String),
-    "Autor": ("autor", pl.String),
-    "DataApreciacao": ("data_apreciacao", pl.String),
-    "Resultado": ("resultado", pl.String),
+    "Total": ("total", pl.String),
+    "Assunto": ("assunto", pl.String),
+    "DataRecebimentoCongresso": ("data_recebimento_congresso", pl.String),
+    "DataPublicacao": ("data_publicacao", pl.String),
+    "DataSobrestacaoPauta": ("data_sobrestacao_pauta", pl.String),
+    "SobrestandoPauta": ("sobrestando_pauta", pl.String),
+    "QuantidadeDispositivos": ("quantidade_dispositivos", pl.Int64),
+    "UrlDispositivos": ("url_dispositivos", pl.String),
+    # ── Materia ────────────────────────────────────────────────────────────────
+    "Materia_Codigo": ("materia_codigo", pl.Int64),
+    "Materia_SiglaCasa": ("materia_sigla_casa", pl.String),
+    "Materia_NomeCasa": ("materia_nome_casa", pl.String),
+    "Materia_Sigla": ("materia_sigla", pl.String),
+    "Materia_Numero": ("materia_numero", pl.String),
+    "Materia_Ano": ("materia_ano", pl.Int64),
+    "Materia_EmTramitacao": ("materia_em_tramitacao", pl.String),
+    "Materia_Ementa": ("materia_ementa", pl.String),
+    "Materia_UrlMovimentacoes": ("materia_url_movimentacoes", pl.String),
+    # ── MateriaVetada ──────────────────────────────────────────────────────────
+    "MateriaVetada_Codigo": ("materia_vetada_codigo", pl.Int64),
+    "MateriaVetada_SiglaCasa": ("materia_vetada_sigla_casa", pl.String),
+    "MateriaVetada_NomeCasa": ("materia_vetada_nome_casa", pl.String),
+    "MateriaVetada_Sigla": ("materia_vetada_sigla", pl.String),
+    "MateriaVetada_Numero": ("materia_vetada_numero", pl.String),
+    "MateriaVetada_Ano": ("materia_vetada_ano", pl.Int64),
+    "MateriaVetada_DescricaoObjetivoProcesso": (
+        "materia_vetada_descricao_objetivo_processo",
+        pl.String,
+    ),
+    "MateriaVetada_EmTramitacao": ("materia_vetada_em_tramitacao", pl.String),
+    "MateriaVetada_Ementa": ("materia_vetada_ementa", pl.String),
+    "MateriaVetada_UrlMovimentacoes": ("materia_vetada_url_movimentacoes", pl.String),
+    "MateriaVetada_UrlRelatorias": ("materia_vetada_url_relatorias", pl.String),
+    # ── MateriaVetada > NormaGerada ────────────────────────────────────────────
+    "MateriaVetada_NormaGerada_NomeNorma": (
+        "materia_vetada_norma_gerada_nome_norma",
+        pl.String,
+    ),
+    "MateriaVetada_NormaGerada_UrlNorma": (
+        "materia_vetada_norma_gerada_url_norma",
+        pl.String,
+    ),
+    "MateriaVetada_NormaGerada_CodigoNorma": (
+        "materia_vetada_norma_gerada_codigo_norma",
+        pl.Int64,
+    ),
+    "MateriaVetada_NormaGerada_SiglaTipoNorma": (
+        "materia_vetada_norma_gerada_sigla_tipo_norma",
+        pl.String,
+    ),
+    "MateriaVetada_NormaGerada_DescricaoTipoNorma": (
+        "materia_vetada_norma_gerada_descricao_tipo_norma",
+        pl.String,
+    ),
+    "MateriaVetada_NormaGerada_NumeroNorma": (
+        "materia_vetada_norma_gerada_numero_norma",
+        pl.String,
+    ),
+    "MateriaVetada_NormaGerada_AnoNorma": (
+        "materia_vetada_norma_gerada_ano_norma",
+        pl.Int64,
+    ),
+    "MateriaVetada_NormaGerada_DataAssinatura": (
+        "materia_vetada_norma_gerada_data_assinatura",
+        pl.String,
+    ),
+    "MateriaVetada_NormaGerada_DataPublicacao": (
+        "materia_vetada_norma_gerada_data_publicacao",
+        pl.String,
+    ),
+    "MateriaVetada_NormaGerada_SiglaVeiculoPublicacao": (
+        "materia_vetada_norma_gerada_sigla_veiculo_publicacao",
+        pl.String,
+    ),
+    "MateriaVetada_NormaGerada_DescricaoVeiculoPublicacao": (
+        "materia_vetada_norma_gerada_descricao_veiculo_publicacao",
+        pl.String,
+    ),
+    # ── Mensagem ───────────────────────────────────────────────────────────────
+    "Mensagem_Sigla": ("mensagem_sigla", pl.String),
+    "Mensagem_Numero": ("mensagem_numero", pl.String),
+    "Mensagem_Ano": ("mensagem_ano", pl.Int64),
+    "Mensagem_UrlPlanalto": ("mensagem_url_planalto", pl.String),
 }
 
-# Mapeamento dos campos flat da API → colunas Silver para vetos_detalhe
+# Mapeamento dos campos flat da API → colunas Silver para vetos_detalhe.
+# Mesmo mapeamento que vetos_presidenciais + Dispositivos como JSON string.
 _FIELD_MAP_DETALHE: dict[str, tuple[str, type]] = {
-    "Codigo": ("codigo", pl.Int64),
-    "DataVotacao": ("data_votacao", pl.String),
-    "Resultado": ("resultado", pl.String),
-    "DescricaoResultado": ("descricao_resultado", pl.String),
-    "TotalParlamentares": ("total_parlamentares", pl.Int64),
-    "TotalSim": ("total_sim", pl.Int64),
-    "TotalNao": ("total_nao", pl.Int64),
-    "TotalAbstencao": ("total_abstencao", pl.Int64),
+    **_FIELD_MAP_PRESIDENCIAIS,
+    "Dispositivos": ("dispositivos", pl.String),
 }
 
 
 class VetosPresidenciaisTransformer(BaseTransformer):
     """Aplica contrato Silver ao DataFrame bruto de vetos presidenciais.
 
-    O DataFrame de entrada contém campos flat (sem envelopes XML).
-    O transformer renomeia para snake_case e aplica tipagem estrita.
+    O DataFrame de entrada contém campos flat (sem envelopes XML) com campos
+    aninhados já aplainados pelo extrator. O transformer renomeia para
+    snake_case e aplica tipagem estrita.
     """
 
     def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
         """Transforma o DataFrame bruto de vetos presidenciais para o contrato Silver.
 
         Args:
-            df: DataFrame bruto da API (colunas PascalCase).
+            df: DataFrame bruto da API (colunas PascalCase com prefixos ``_``
+                para campos aninhados aplainados).
             **kwargs: Parâmetros adicionais (ignorados).
 
         Returns:
@@ -78,15 +157,15 @@ class VetosPresidenciaisTransformer(BaseTransformer):
 class VetosDetalheTransformer(BaseTransformer):
     """Aplica contrato Silver ao DataFrame bruto de detalhes de veto.
 
-    O DataFrame de entrada contém campos flat (sem envelopes XML).
-    O transformer renomeia para snake_case e aplica tipagem estrita.
+    Mesmo mapeamento de campos que o transformer de presidenciais, mas com
+    coluna adicional ``dispositivos`` (JSON string) para os itens vetados.
     """
 
     def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
         """Transforma o DataFrame bruto de detalhes de veto para o contrato Silver.
 
         Args:
-            df: DataFrame bruto da API (colunas PascalCase).
+            df: DataFrame bruto da API (colunas PascalCase com prefixos).
             **kwargs: Parâmetros adicionais (ignorados).
 
         Returns:
