@@ -1728,6 +1728,11 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     DomainType.PLENARIO_AGENDA: DailyWindowStrategy(),
     DomainType.PLENARIO_RESULTADOS: DailyWindowStrategy(),
     DomainType.PLENARIO_SESSOES: DailyWindowStrategy(),
+    # ── Senado — Composição (Issue 08c) ────────────────────────────────────────────
+    DomainType.BLOCOS_SENADO: DefaultWindowStrategy(),
+    DomainType.LIDERANCAS_SENADO: DefaultWindowStrategy(),
+    DomainType.MESA_SENADO: DefaultWindowStrategy(),
+    DomainType.MESA_CONGRESSO: DefaultWindowStrategy(),
     # ── Senado — Mandatos e Filiações (Issue 16) ───────────────────────────────
     DomainType.SENADORES_MANDATOS: SenatorChildStrategy(include_date_range=False),
     DomainType.SENADORES_FILIACOES: SenatorChildStrategy(include_date_range=False),

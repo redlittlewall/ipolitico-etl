@@ -161,6 +161,8 @@ DOMAIN_UPSTREAM_REQUIREMENTS: dict[DomainType, frozenset[DomainType]] = {
     DomainType.COMISSOES_REUNIOES: frozenset({DomainType.COMISSOES_SENADO}),
     DomainType.COMISSOES_MEMBROS: frozenset({DomainType.COMISSOES_SENADO}),
     DomainType.ORIENTACAO_BANCADA: frozenset({DomainType.VOTACOES_SENADO}),
+    DomainType.SENADORES_MANDATOS: frozenset({DomainType.SENADORES}),
+    DomainType.SENADORES_FILIACOES: frozenset({DomainType.SENADORES}),
 }
 
 
