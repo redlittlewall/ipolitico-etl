@@ -110,6 +110,46 @@ Se o código editado **não tiver docstring** ou a docstring estiver **desatuali
    da camada Gold (`DataLakeOptimizer`), não da ingestão.
 6. **Mantenha este arquivo atualizado** conforme a arquitetura evolui.
 
+## Skills
+
+Skills são gerenciadas centralmente via **Facehugger** e linkadas como symlinks:
+
+- Origem: `/home/red_guy/Documentos/Facehugger/skills/skills/`
+- Atalhos: `.claude/skills/` (symlinks, não versionados)
+
+Para adicionar/atualizar uma skill, edite o Facehugger — não crie skills locais aqui.
+
+### Skills de engenharia disponíveis
+
+- `/tdd` — Desenvolvimento orientado a testes (red-green-refactor)
+- `/code-review` — Revisão de diff por correção e clareza
+- `/security-review` — Revisão de segurança de mudanças pendentes
+- `/simplify` — Refatoração de código para reduzir complexidade
+- `/verify` — Verificação manual de mudanças executando o app
+- `/diagnose` — Diagnóstico disciplinado de bugs e regressões
+- `/grill-with-docs` — Desafio de plano contra o modelo de domínio existente
+- `/improve-codebase-architecture` — Identificar oportunidades de melhoria arquitetural
+- `/prototype` — Prototipação rápida
+- `/triage` — Classificação de issues
+- `/zoom-out` — Visão geral arquitetural
+- `/to-issues` — Decompor planos em issues rastreáveis
+- `/to-prd` — Converter contexto em PRD
+
+### Skills de produtividade
+
+- `/grill-me` — Stress-test de planos e designs
+
+### Skills de suporte
+
+- `/review` — Revisão de PRs no GitHub
+- `/loop` — Execução recorrente de tarefas
+- `/deep-research` — Pesquisa multi-fontes com verificação adversarial
+
+### Skills legado (deprecated no Facehugger, mas disponíveis)
+
+- `/qa` — Verificações pré-commit (pytest, pre-commit, debug leftovers)
+- `/setup-pre-commit` — Configuração de pre-commit hooks
+
 ## Agent skills
 
 ### Issue tracker
@@ -127,4 +167,3 @@ See `docs/agents/triage-labels.md`.
 
 Single-context layout — one `CONTEXT.md` at the repo root.
 See `docs/agents/domain.md`.
-

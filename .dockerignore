@@ -1,0 +1,20 @@
+# iPolitico ETL — .dockerignore
+# Exclui diretórios e arquivos desnecessários da imagem Docker
+# NOTA: tests/ NÃO está aqui porque pytest roda dentro do container
+
+# Dados e cache
+data/
+**/__pycache__/
+**/.pytest_cache/
+**/htmlcov/
+**/.coverage
+
+# Versão e CI
+.git/
+.gitignore
+.scratch/
+.claude/
+
+# Documentação local
+docs/
+*.md
