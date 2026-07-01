@@ -405,9 +405,17 @@ class DeputyLegislatureStrategy(DomainJobStrategy):
 class SenatorChildStrategy(DomainJobStrategy):
     """Estratégia para domínios filhos de senadores (ex: senadores_discursos).
 
-    Para cada senador no lake, gera 1 job com ``codigo`` e janela temporal.
-    Análogo ao ``DeputyChildStrategy(include_date_range=True)`` mas para Senado.
+    Args:
+        include_date_range: Se True, inclui janela temporal nos jobs; se False,
+            gera apenas o ``codigo`` do senador (para domínios estáticos como
+            mandatos e filiações).
+
+    Para cada senador no lake, gera 1 job com ``codigo`` e opcionalmente
+    janela temporal. Análogo ao ``DeputyChildStrategy`` mas para Senado.
     """
+
+    def __init__(self, include_date_range: bool = True) -> None:
+        self.include_date_range = include_date_range
 
     def build(
         self,
@@ -449,24 +457,37 @@ class SenatorChildStrategy(DomainJobStrategy):
             )
             return [], lambda x: {}
 
-        jobs = [{"codigo": sid, "dataInicio": start, "dataFim": end} for sid in senador_ids]
+        if self.include_date_range:
+            jobs = [{"codigo": sid, "dataInicio": start, "dataFim": end} for sid in senador_ids]
+            logger.info(
+                "[%s] %s jobs (1/senador, janela %s a %s).",
+                domain.value.upper(),
+                len(jobs),
+                start,
+                end,
+            )
+
+            def senator_temporal_mapper(job: dict) -> dict:
+                return {
+                    "codigo": job["codigo"],
+                    "dataInicio": job["dataInicio"],
+                    "dataFim": job["dataFim"],
+                }
+
+            return jobs, senator_temporal_mapper
+
+        jobs = [{"codigo": sid} for sid in senador_ids]
 
         logger.info(
-            "[%s] %s jobs (1/senador, janela %s a %s).",
+            "[%s] %s jobs (1/senador, sem janela temporal).",
             domain.value.upper(),
             len(jobs),
-            start,
-            end,
         )
 
-        def senator_mapper(job: dict) -> dict:
-            return {
-                "codigo": job["codigo"],
-                "dataInicio": job["dataInicio"],
-                "dataFim": job["dataFim"],
-            }
+        def senator_static_mapper(job: dict) -> dict:
+            return {"codigo": job["codigo"]}
 
-        return jobs, senator_mapper
+        return jobs, senator_static_mapper
 
 
 class ComissaoChildStrategy(DomainJobStrategy):
@@ -1707,6 +1728,9 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     DomainType.PLENARIO_AGENDA: DailyWindowStrategy(),
     DomainType.PLENARIO_RESULTADOS: DailyWindowStrategy(),
     DomainType.PLENARIO_SESSOES: DailyWindowStrategy(),
+    # ── Senado — Mandatos e Filiações (Issue 16) ───────────────────────────────
+    DomainType.SENADORES_MANDATOS: SenatorChildStrategy(include_date_range=False),
+    DomainType.SENADORES_FILIACOES: SenatorChildStrategy(include_date_range=False),
 }
 
 

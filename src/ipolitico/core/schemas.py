@@ -1088,4 +1088,21 @@ SILVER_SCHEMAS = {
         "bancada": pl.String,
         "codigo_deputado_camara": pl.String,
     },
+    DomainType.SENADORES_MANDATOS.value: {
+        "codigo": pl.Int64,
+        "codigo_mandato": pl.Int64,
+        "uf": pl.String,
+        "descricao_participacao": pl.String,
+        "primeira_legislatura": pl.Int64,
+        "segunda_legislatura": pl.Int64,
+        "sigla_partido": pl.String,
+        "data_inicio": pl.String,
+        "data_fim": pl.String,
+    },
+    DomainType.SENADORES_FILIACOES.value: {
+        "codigo": pl.Int64,
+        "sigla_partido": pl.String,
+        "data_filiacao": pl.String,
+        "data_desfiliacao": pl.String,
+    },
 }

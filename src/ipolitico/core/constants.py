@@ -164,6 +164,8 @@ class DomainType(str, Enum):
     LIDERANCAS_SENADO = "liderancas_senado"
     MESA_SENADO = "mesa_senado"
     MESA_CONGRESSO = "mesa_congresso"
+    SENADORES_MANDATOS = "senadores_mandatos"
+    SENADORES_FILIACOES = "senadores_filiacoes"
 
 
 class MedallionLayer(str, Enum):
@@ -223,6 +225,8 @@ class EarliestDates:
     LIDERANCAS_SENADO = "1995-01-01"
     MESA_SENADO = "1995-01-01"
     MESA_CONGRESSO = "1995-01-01"
+    SENADORES_MANDATOS = "1949-01-01"
+    SENADORES_FILIACOES = "1949-01-01"
 
 
 # Facilita o acesso dinâmico: EarliestDateMap[DomainType.DESPESAS]
@@ -327,6 +331,8 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.LIDERANCAS_SENADO: EarliestDates.LIDERANCAS_SENADO,
     DomainType.MESA_SENADO: EarliestDates.MESA_SENADO,
     DomainType.MESA_CONGRESSO: EarliestDates.MESA_CONGRESSO,
+    DomainType.SENADORES_MANDATOS: EarliestDates.SENADORES_MANDATOS,
+    DomainType.SENADORES_FILIACOES: EarliestDates.SENADORES_FILIACOES,
 }
 
 
@@ -439,4 +445,6 @@ DOMAIN_LABELS: dict[DomainType, str] = {
     DomainType.LIDERANCAS_SENADO: "Liderancas no Senado",
     DomainType.MESA_SENADO: "Mesa diretora do Senado",
     DomainType.MESA_CONGRESSO: "Mesa diretora do Congresso Nacional",
+    DomainType.SENADORES_MANDATOS: "Histórico de mandatos dos senadores",
+    DomainType.SENADORES_FILIACOES: "Histórico de filiações partidárias dos senadores",
 }

@@ -476,6 +476,18 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
     DomainType.LIDERANCAS_SENADO: _spec(DomainType.LIDERANCAS_SENADO, None),
     DomainType.MESA_SENADO: _spec(DomainType.MESA_SENADO, None),
     DomainType.MESA_CONGRESSO: _spec(DomainType.MESA_CONGRESSO, None),
+    DomainType.SENADORES_MANDATOS: _spec(
+        DomainType.SENADORES_MANDATOS,
+        None,
+        frozenset({DomainType.SENADORES}),
+        uk=("codigo", "codigo_mandato"),
+    ),
+    DomainType.SENADORES_FILIACOES: _spec(
+        DomainType.SENADORES_FILIACOES,
+        None,
+        frozenset({DomainType.SENADORES}),
+        uk=("codigo", "data_filiacao"),
+    ),
 }
 
 

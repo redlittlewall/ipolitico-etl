@@ -6,6 +6,13 @@ domain_configs:
   senadores_detalhe:
     extractor: "ipolitico.extractors.senado.api.senadores_detalhe.SenadoSenadoresDetalheExtractor"
     transformer: "ipolitico.transformers.senado.senadores_detalhe_transformer.SenadoSenadoresDetalheTransformer"
+  # ── Mandatos e Filiações (Issue 16) ──────────────────────────────────────────
+  senadores_mandatos:
+    extractor: "ipolitico.extractors.senado.api.senadores.SenadoMandatosExtractor"
+    transformer: "ipolitico.transformers.senado.senadores_mandatos_transformer.SenadoMandatosTransformer"
+  senadores_filiacoes:
+    extractor: "ipolitico.extractors.senado.api.senadores.SenadoFiliacoesExtractor"
+    transformer: "ipolitico.transformers.senado.senadores_filiacoes_transformer.SenadoFiliacoesTransformer"
   processos:
     extractor: "ipolitico.extractors.senado.api.processos.SenadoProcessosExtractor"
     transformer: "ipolitico.transformers.senado.processos_transformer.SenadoProcessosTransformer"
