@@ -1,5 +1,7 @@
 ---
-Status: ready
+Status: done
+Closed: 2026-06-30
+Close reason: implemented
 Priority: P0
 Type: fix
 ---
@@ -45,13 +47,13 @@ A API de vetos do Senado mudou o endpoint e a estrutura de resposta. O endpoint 
 
 ## Acceptance criteria
 
-- [ ] `_DATA_PATH_PRESIDENCIAIS` atualizado para `["ListaVetosAnoCN", "Vetos", "Veto"]`
-- [ ] `_FIELD_MAP_PRESIDENCIAIS` mapeia todos os campos relevantes do novo envelope
-- [ ] Transformer renomeia corretamente para snake_case Silver
-- [ ] Schema Silver atualizado se necessário
-- [ ] `vetos_presidenciais` retorna dados Silver > 0 (pelo menos 50+ registros para 2024)
-- [ ] `vetos_detalhe` também funciona (se dependente)
-- [ ] `pytest -q` passando
+- [x] `_DATA_PATH_PRESIDENCIAIS` atualizado para `["ListaVetosAnoCN", "Vetos", "Veto"]`
+- [x] `_FIELD_MAP_PRESIDENCIAIS` mapeia todos os 44 campos relevantes do novo envelope
+- [x] Transformer renomeia corretamente para snake_case Silver
+- [x] Schema Silver atualizado com todos os campos (44 cols + 1 extra no detalhe)
+- [x] `vetos_presidenciais` retorna dados Silver > 0 (pelo menos 50+ registros para 2024)
+- [x] `vetos_detalhe` também funciona (mesma estrutura base + `dispositivos`)
+- [x] `pytest -q` passando (15/15)
 
 ## Blocked by
 
