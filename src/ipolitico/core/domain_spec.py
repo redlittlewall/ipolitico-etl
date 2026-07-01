@@ -488,6 +488,12 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         frozenset({DomainType.SENADORES}),
         uk=("codigo", "data_filiacao"),
     ),
+    DomainType.ORIENTACAO_BANCADA: _spec(
+        DomainType.ORIENTACAO_BANCADA,
+        "data_sessao",
+        frozenset({DomainType.VOTACOES_SENADO}),
+        uk=("codigo_votacao", "sigla_partido"),
+    ),
 }
 
 

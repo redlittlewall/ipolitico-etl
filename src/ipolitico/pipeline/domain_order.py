@@ -100,6 +100,9 @@ FULL_PIPELINE: tuple[DomainType, ...] = (
     DomainType.LIDERANCAS_SENADO,
     DomainType.MESA_SENADO,
     DomainType.MESA_CONGRESSO,
+    DomainType.SENADORES_MANDATOS,
+    DomainType.SENADORES_FILIACOES,
+    DomainType.ORIENTACAO_BANCADA,
 )
 
 # Dependências obrigatórias (silver/gold já populado antes do domínio)
@@ -157,6 +160,7 @@ DOMAIN_UPSTREAM_REQUIREMENTS: dict[DomainType, frozenset[DomainType]] = {
     DomainType.COMISSOES_DETALHE: frozenset({DomainType.COMISSOES_SENADO}),
     DomainType.COMISSOES_REUNIOES: frozenset({DomainType.COMISSOES_SENADO}),
     DomainType.COMISSOES_MEMBROS: frozenset({DomainType.COMISSOES_SENADO}),
+    DomainType.ORIENTACAO_BANCADA: frozenset({DomainType.VOTACOES_SENADO}),
 }
 
 

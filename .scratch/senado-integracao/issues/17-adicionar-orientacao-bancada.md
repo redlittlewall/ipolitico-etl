@@ -1,5 +1,5 @@
 ---
-Status: ready
+Status: completed
 Priority: P2
 Type: feature
 ---

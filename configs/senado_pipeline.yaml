@@ -98,3 +98,6 @@ domain_configs:
   mesa_congresso:
     extractor: "ipolitico.extractors.senado.api.composicao.MesaCongressoExtractor"
     transformer: "ipolitico.transformers.senado.institutional_transformer.MesaCongressoTransformer"
+  orientacao_bancada:
+    extractor: "ipolitico.extractors.senado.api.orientacao_bancada.SenadoOrientacaoBancadaExtractor"
+    transformer: "ipolitico.transformers.senado.orientacao_bancada_transformer.SenadoOrientacaoBancadaTransformer"

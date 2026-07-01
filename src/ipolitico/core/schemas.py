@@ -1105,4 +1105,11 @@ SILVER_SCHEMAS = {
         "data_filiacao": pl.String,
         "data_desfiliacao": pl.String,
     },
+    DomainType.ORIENTACAO_BANCADA.value: {
+        "codigo_votacao": pl.Int64,
+        "codigo_materia": pl.Int64,
+        "sigla_partido": pl.String,
+        "orientacao": pl.String,
+        "data_sessao": pl.String,
+    },
 }

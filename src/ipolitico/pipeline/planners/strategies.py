@@ -1731,6 +1731,8 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     # ── Senado — Mandatos e Filiações (Issue 16) ───────────────────────────────
     DomainType.SENADORES_MANDATOS: SenatorChildStrategy(include_date_range=False),
     DomainType.SENADORES_FILIACOES: SenatorChildStrategy(include_date_range=False),
+    # ── Senado — Orientação de Bancada (Issue 17) ─────────────────────────────
+    DomainType.ORIENTACAO_BANCADA: TimeWindowStrategy(),
 }
 
 
