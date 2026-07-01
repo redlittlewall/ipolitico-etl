@@ -182,8 +182,8 @@ class TestSenadoComissoesReunioesExtractor:
             ).respond(status_code=200, json=fake_data)
 
             df = await extractor.extract(
-                start_date="20250601",
-                end_date="20250630",
+                start_date="2025-06-01",
+                end_date="2025-06-30",
             )
 
             assert df.height == 1
@@ -199,8 +199,8 @@ class TestSenadoComissoesReunioesExtractor:
             ).respond(status_code=200, json={"AgendaReuniao": {"reunioes": {}}})
 
             df = await extractor.extract(
-                start_date="20250101",
-                end_date="20250131",
+                start_date="2025-01-01",
+                end_date="2025-01-31",
             )
             assert df.is_empty()
 
@@ -213,8 +213,8 @@ class TestSenadoComissoesReunioesExtractor:
             ).respond(status_code=404)
 
             df = await extractor.extract(
-                start_date="20990101",
-                end_date="20990131",
+                start_date="2099-01-01",
+                end_date="2099-01-31",
             )
             assert df.is_empty()
 

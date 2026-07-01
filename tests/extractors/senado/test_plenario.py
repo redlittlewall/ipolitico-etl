@@ -50,7 +50,7 @@ class TestPlenarioAgendaExtractor:
 
         with respx.mock:
             respx.get(
-                "https://legis.senado.leg.br/dadosabertos/plenario/agenda/dia/2026-06-10.json"
+                "https://legis.senado.leg.br/dadosabertos/plenario/agenda/dia/20260610.json"
             ).respond(status_code=200, json=fake_data)
 
             df = await extractor.extract(data="2026-06-10")
@@ -70,7 +70,7 @@ class TestPlenarioAgendaExtractor:
         """404 retorna DataFrame vazio."""
         with respx.mock:
             respx.get(
-                "https://legis.senado.leg.br/dadosabertos/plenario/agenda/dia/2099-01-01.json"
+                "https://legis.senado.leg.br/dadosabertos/plenario/agenda/dia/20990101.json"
             ).respond(status_code=404)
 
             df = await extractor.extract(data="2099-01-01")
@@ -134,7 +134,7 @@ class TestPlenarioResultadosExtractor:
 
         with respx.mock:
             respx.get(
-                "https://legis.senado.leg.br/dadosabertos/plenario/resultado/2026-06-10.json"
+                "https://legis.senado.leg.br/dadosabertos/plenario/resultado/20260610.json"
             ).respond(status_code=200, json=fake_data)
 
             df = await extractor.extract(data="2026-06-10")
@@ -155,7 +155,7 @@ class TestPlenarioResultadosExtractor:
         """404 retorna DataFrame vazio."""
         with respx.mock:
             respx.get(
-                "https://legis.senado.leg.br/dadosabertos/plenario/resultado/2099-01-01.json"
+                "https://legis.senado.leg.br/dadosabertos/plenario/resultado/20990101.json"
             ).respond(status_code=404)
 
             df = await extractor.extract(data="2099-01-01")
@@ -180,7 +180,7 @@ class TestPlenarioResultadosExtractor:
 
         with respx.mock:
             respx.get(
-                "https://legis.senado.leg.br/dadosabertos/plenario/resultado/2026-06-10.json"
+                "https://legis.senado.leg.br/dadosabertos/plenario/resultado/20260610.json"
             ).respond(status_code=200, json=fake_data)
 
             df = await extractor.extract(data="2026-06-10")
@@ -230,7 +230,7 @@ class TestPlenarioSessoesExtractor:
 
         with respx.mock:
             respx.get(
-                "https://legis.senado.leg.br/dadosabertos/plenario/legislatura/2026-06-10.json"
+                "https://legis.senado.leg.br/dadosabertos/plenario/legislatura/20260610.json"
             ).respond(status_code=200, json=fake_data)
 
             df = await extractor.extract(data="2026-06-10")
@@ -251,7 +251,7 @@ class TestPlenarioSessoesExtractor:
         """404 retorna DataFrame vazio."""
         with respx.mock:
             respx.get(
-                "https://legis.senado.leg.br/dadosabertos/plenario/legislatura/2099-01-01.json"
+                "https://legis.senado.leg.br/dadosabertos/plenario/legislatura/20990101.json"
             ).respond(status_code=404)
 
             df = await extractor.extract(data="2099-01-01")
@@ -275,7 +275,7 @@ class TestPlenarioSessoesExtractor:
 
         with respx.mock:
             respx.get(
-                "https://legis.senado.leg.br/dadosabertos/plenario/legislatura/2026-06-10.json"
+                "https://legis.senado.leg.br/dadosabertos/plenario/legislatura/20260610.json"
             ).respond(status_code=200, json=fake_data)
 
             df = await extractor.extract(data="2026-06-10")

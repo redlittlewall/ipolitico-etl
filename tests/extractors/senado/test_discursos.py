@@ -45,7 +45,7 @@ class TestDiscursosPlenarioExtractor:
 
         with respx.mock:
             respx.get(
-                "https://legis.senado.leg.br/dadosabertos/plenario/lista/discursos/2025-03-01/2025-03-31.json"
+                "https://legis.senado.leg.br/dadosabertos/plenario/lista/discursos/20250301/20250331.json"
             ).respond(status_code=200, json=api_response)
 
             df = await extractor.extract(start_date="2025-03-01", end_date="2025-03-31")
@@ -62,7 +62,7 @@ class TestDiscursosPlenarioExtractor:
 
         with respx.mock:
             respx.get(
-                "https://legis.senado.leg.br/dadosabertos/plenario/lista/discursos/2025-01-01/2025-01-31.json"
+                "https://legis.senado.leg.br/dadosabertos/plenario/lista/discursos/20250101/20250131.json"
             ).respond(status_code=200, json=[])
 
             df = await extractor.extract(start_date="2025-01-01", end_date="2025-01-31")
@@ -77,7 +77,7 @@ class TestDiscursosPlenarioExtractor:
 
         with respx.mock:
             respx.get(
-                "https://legis.senado.leg.br/dadosabertos/plenario/lista/discursos/2025-01-01/2025-01-31.json"
+                "https://legis.senado.leg.br/dadosabertos/plenario/lista/discursos/20250101/20250131.json"
             ).respond(status_code=200, json={"error": "not an array"})
 
             df = await extractor.extract(start_date="2025-01-01", end_date="2025-01-31")
@@ -92,7 +92,7 @@ class TestDiscursosPlenarioExtractor:
 
         with respx.mock:
             respx.get(
-                "https://legis.senado.leg.br/dadosabertos/plenario/lista/discursos/2099-01-01/2099-01-31.json"
+                "https://legis.senado.leg.br/dadosabertos/plenario/lista/discursos/20990101/20990131.json"
             ).respond(status_code=404)
 
             df = await extractor.extract(start_date="2099-01-01", end_date="2099-01-31")

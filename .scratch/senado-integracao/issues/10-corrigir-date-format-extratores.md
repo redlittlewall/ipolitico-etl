@@ -1,5 +1,5 @@
 ---
-Status: ready
+Status: completed
 Priority: P0
 Type: fix
 ---

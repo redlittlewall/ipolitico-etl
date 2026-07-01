@@ -6,6 +6,11 @@ Inclui:
 - ``DiscursosTextoExtractor`` — texto integral de um discurso
 - ``NotasTaquigrafiaSessaoExtractor`` — notas taquigráficas de uma sessão
 - ``NotasTaquigrafiaReuniaoExtractor`` — notas taquigráficas de uma reunião de comissão
+
+Nota: ``DiscursosPlenarioExtractor`` aceita datas ``YYYY-MM-DD`` (ISO) como
+entrada e converte internamente para ``YYYYMMDD`` no path da URL (exigência
+da API do Senado). Os demais extratores usam query params e aceitam
+``YYYY-MM-DD``.
 """
 
 import logging
@@ -36,6 +41,10 @@ class DiscursosPlenarioExtractor(SenadoBaseExtractor):
 
     Chama ``GET /plenario/lista/discursos/{inicio}/{fim}`` que retorna
     um array flat (sem envelope XML). 1 job por janela mensal.
+
+    Nota: Aceita datas no formato ``YYYY-MM-DD`` (ISO) e converte
+    internamente para ``YYYYMMDD`` no path da URL (exigência da API
+    do Senado).
     """
 
     async def extract(
@@ -61,7 +70,8 @@ class DiscursosPlenarioExtractor(SenadoBaseExtractor):
         if not di or not df:
             return pl.DataFrame()
 
-        endpoint = f"plenario/lista/discursos/{di}/{df}"
+        # API do Senado espera YYYYMMDD no path da URL (sem hífens)
+        endpoint = f"plenario/lista/discursos/{di.replace('-', '')}/{df.replace('-', '')}"
         raw = await self.fetch_flat(endpoint)
 
         if not raw or not isinstance(raw, list):

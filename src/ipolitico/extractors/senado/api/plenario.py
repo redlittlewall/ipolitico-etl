@@ -4,6 +4,10 @@ Endpoints:
 - ``/plenario/agenda/dia/{data}`` → PLENARIO_AGENDA
 - ``/plenario/resultado/{data}`` → PLENARIO_RESULTADOS
 - ``/plenario/legislatura/{data}`` → PLENARIO_SESSOES
+
+Nota: A API do Senado espera datas no formato ``YYYYMMDD`` (sem hífens)
+no path da URL. Cada extrator aceita ``YYYY-MM-DD`` (ISO) como entrada
+e converte internamente.
 """
 
 from __future__ import annotations
@@ -25,6 +29,9 @@ class PlenarioAgendaExtractor(SenadoBaseExtractor):
     Chama ``GET /plenario/agenda/dia/{data}`` e achata o envelope XML-heritage
     ``AgendaPlenario.Sessoes.Sessao``. Serializa structs aninhadas (Oradores,
     Evento) como JSON string.
+
+    Nota: Aceita data no formato ``YYYY-MM-DD`` (ISO) e converte internamente
+    para ``YYYYMMDD`` no path da URL (exigência da API do Senado).
     """
 
     async def extract(
@@ -47,7 +54,9 @@ class PlenarioAgendaExtractor(SenadoBaseExtractor):
         if dt is None:
             return pl.DataFrame()
 
-        raw = await self.fetch_flat(f"plenario/agenda/dia/{dt}")
+        # API do Senado espera YYYYMMDD no path da URL (sem hífens)
+        url_dt = dt.replace("-", "")
+        raw = await self.fetch_flat(f"plenario/agenda/dia/{url_dt}")
         records = self.flatten_response(raw, ["AgendaPlenario", "Sessoes", "Sessao"])
 
         if not records:
@@ -70,6 +79,9 @@ class PlenarioResultadosExtractor(SenadoBaseExtractor):
     ``ResultadoPlenario.Sessoes.Sessao``. Para cada sessão, mescla metadados
     da sessão (codigoSessao, dataSessao, siglaCasa) nos itens de pauta
     (``Itens.Item[]``).
+
+    Nota: Aceita data no formato ``YYYY-MM-DD`` (ISO) e converte internamente
+    para ``YYYYMMDD`` no path da URL (exigência da API do Senado).
     """
 
     async def extract(
@@ -92,7 +104,9 @@ class PlenarioResultadosExtractor(SenadoBaseExtractor):
         if dt is None:
             return pl.DataFrame()
 
-        raw = await self.fetch_flat(f"plenario/resultado/{dt}")
+        # API do Senado espera YYYYMMDD no path da URL (sem hífens)
+        url_dt = dt.replace("-", "")
+        raw = await self.fetch_flat(f"plenario/resultado/{url_dt}")
         sessoes = self.flatten_response(raw, ["ResultadoPlenario", "Sessoes", "Sessao"])
 
         if not sessoes:
@@ -126,6 +140,9 @@ class PlenarioSessoesExtractor(SenadoBaseExtractor):
     ``ListaLegislatura.Legislaturas.Legislatura``. Para cada legislatura, acessa
     ``SessoesLegislativas.SessaoLegislativa[]`` e mescla dados da legislatura
     (NumeroLegislatura, DataEleicao, DataInicio, DataFim) em cada sessão.
+
+    Nota: Aceita data no formato ``YYYY-MM-DD`` (ISO) e converte internamente
+    para ``YYYYMMDD`` no path da URL (exigência da API do Senado).
     """
 
     async def extract(
@@ -149,7 +166,9 @@ class PlenarioSessoesExtractor(SenadoBaseExtractor):
         if dt is None:
             return pl.DataFrame()
 
-        raw = await self.fetch_flat(f"plenario/legislatura/{dt}")
+        # API do Senado espera YYYYMMDD no path da URL (sem hífens)
+        url_dt = dt.replace("-", "")
+        raw = await self.fetch_flat(f"plenario/legislatura/{url_dt}")
         legislaturas = self.flatten_response(
             raw, ["ListaLegislatura", "Legislaturas", "Legislatura"]
         )

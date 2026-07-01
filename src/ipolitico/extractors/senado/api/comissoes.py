@@ -85,7 +85,8 @@ class SenadoComissoesReunioesExtractor(SenadoBaseExtractor):
     """Extrator da agenda de reuniões de comissões do Senado.
 
     Chama ``/comissao/agenda/{dataInicio}/{dataFim}`` e achata o envelope.
-    As datas devem estar no formato ``YYYYMMDD``.
+    Aceita datas no formato ``YYYY-MM-DD`` (ISO) e converte internamente para
+    ``YYYYMMDD`` no path da URL (exigência da API do Senado).
     """
 
     async def extract(
@@ -100,8 +101,10 @@ class SenadoComissoesReunioesExtractor(SenadoBaseExtractor):
         NomeColegiado) como colunas planas no DataFrame.
 
         Args:
-            start_date: Data inicial no formato ``YYYYMMDD`` (ex: ``20250601``).
-            end_date: Data final no formato ``YYYYMMDD`` (ex: ``20250630``).
+            start_date: Data inicial no formato ``YYYY-MM-DD`` (ISO,
+                        ex: ``2025-06-01``). Convertida para ``YYYYMMDD`` na URL.
+            end_date: Data final no formato ``YYYY-MM-DD`` (ISO,
+                      ex: ``2025-06-30``). Convertida para ``YYYYMMDD`` na URL.
             **kwargs: Parâmetros adicionais (aceita ``dataInicio``/``dataFim``
                       como fallback).
 
@@ -114,8 +117,9 @@ class SenadoComissoesReunioesExtractor(SenadoBaseExtractor):
         if not di or not df:
             return pl.DataFrame()
 
+        # API do Senado espera YYYYMMDD no path da URL (sem hífens)
         raw = await self.fetch_flat(
-            f"comissao/agenda/{di}/{df}",
+            f"comissao/agenda/{di.replace('-', '')}/{df.replace('-', '')}",
         )
         records = self.flatten_response(raw, ["AgendaReuniao", "reunioes", "reuniao"])
 
