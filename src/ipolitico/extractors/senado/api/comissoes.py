@@ -7,6 +7,7 @@ Endpoints:
 - ``/composicao/comissao/{codigo}`` → COMISSOES_MEMBROS
 """
 
+import json
 import logging
 from typing import Any
 
@@ -15,6 +16,27 @@ import polars as pl
 from ipolitico.extractors.senado.api.senado_base import SenadoBaseExtractor
 
 logger = logging.getLogger(__name__)
+
+
+def _serialize_structs(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Serializa todos os campos dict aninhados de uma lista de registros como JSON string.
+
+    A API do Senado retorna structs XML-heritage (Cargos, Requerimentos) que
+    podem ter formatos inconsistentes entre registros, causando erro de
+    ``supertype`` no Polars. Esta função serializa qualquer valor dict (ou
+    lista de dicts) para JSON string antes da construçãão do DataFrame.
+
+    Args:
+        records: Lista de registros com valores potencialmente aninhados.
+
+    Returns:
+        Mesma lista com valores dict/list serializados como JSON string.
+    """
+    for record in records:
+        for key, value in record.items():
+            if isinstance(value, (dict, list)):
+                record[key] = json.dumps(value, ensure_ascii=False)
+    return records
 
 
 class SenadoComissoesListaExtractor(SenadoBaseExtractor):
@@ -44,41 +66,54 @@ class SenadoComissoesListaExtractor(SenadoBaseExtractor):
 
 
 class SenadoComissoesDetalheExtractor(SenadoBaseExtractor):
-    """Extrator de detalhes de uma comissão do Senado.
+    """Extrator de detalhes de uma ou mais comissões do Senado.
 
-    Chama ``/comissao/{codigo}`` e achata o envelope para obter o
-    array de colegiado (tipicamente 1 elemento).
+    Chama ``/comissao/{codigo}`` para cada código e achata o envelope
+    ``ComissoesCongressoNacional.Colegiados.Colegiado[]``.
     """
 
     async def extract(
         self,
-        codigo_comissao: int | None = None,
+        entity_ids: list[int] | None = None,
         **kwargs: Any,
     ) -> pl.DataFrame:
-        """Extrai detalhes de uma comissão pelo código.
+        """Extrai detalhes de uma ou mais comissões pelo código.
+
+        Aceita ``entity_ids`` (lista de códigos, padrão DetailStrategy)
+        ou ``codigo_comissao`` (código único, fallback).
 
         Args:
-            codigo_comissao: Código numérico da comissão (ex: 38 para CAE).
-            **kwargs: Parâmetros adicionais (ignorados).
+            entity_ids: Lista de códigos de comissão (ex: [38, 1, 2]).
+            **kwargs: Parâmetros adicionais (aceita ``codigo_comissao`` como fallback).
 
         Returns:
-            DataFrame com os dados brutos da comissão (CodigoColegiado,
-            NomeColegiado, Cargos struct, etc.) ou DataFrame vazio se o
-            código não for informado ou a comissão não existir.
+            DataFrame com os dados brutos das comissões (CodigoColegiado,
+            NomeColegiado, Cargos struct, etc.) ou DataFrame vazio se
+            nenhum código for informado.
         """
-        codigo = codigo_comissao or kwargs.get("codigo_comissao")
-        if codigo is None:
+        ids = entity_ids
+        if not ids:
+            single = kwargs.get("codigo_comissao")
+            ids = [single] if single is not None else None
+
+        if not ids:
             return pl.DataFrame()
 
-        raw = await self.fetch_flat(f"comissao/{codigo}")
-        records = self.flatten_response(
-            raw, ["ComissoesCongressoNacional", "Colegiados", "Colegiado"]
-        )
+        all_records: list[dict[str, Any]] = []
+        for codigo in ids:
+            raw = await self.fetch_flat(f"comissao/{codigo}")
+            records = self.flatten_response(
+                raw, ["ComissoesCongressoNacional", "Colegiados", "Colegiado"]
+            )
+            all_records.extend(records)
 
-        if not records:
+        if not all_records:
             return pl.DataFrame()
 
-        return pl.DataFrame(records, infer_schema_length=None)
+        # Serializa structs inconsistentes (Cargos, Requerimentos, etc.) como JSON
+        _serialize_structs(all_records)
+
+        return pl.DataFrame(all_records, infer_schema_length=None)
 
 
 class SenadoComissoesReunioesExtractor(SenadoBaseExtractor):
@@ -133,61 +168,78 @@ class SenadoComissoesReunioesExtractor(SenadoBaseExtractor):
             record["SiglaColegiado"] = cc.get("sigla")
             record["NomeColegiado"] = cc.get("nome")
 
+        # Serializa structs inconsistentes restantes como JSON
+        _serialize_structs(records)
+
         return pl.DataFrame(records, infer_schema_length=None)
 
 
 class SenadoComissoesMembrosExtractor(SenadoBaseExtractor):
     """Extrator da composição de membros de comissões do Senado.
 
-    Chama ``/composicao/comissao/{codigo}?ativas=S`` e combina os dados
-    de ``IdentificacaoComissao`` com cada ``Membro``.
+    Chama ``/composicao/comissao/{codigo}?ativas=S`` para cada comissão
+    e combina os dados de ``IdentificacaoComissao`` com cada ``Membro``.
     """
 
     async def extract(
         self,
-        codigo_comissao: int | None = None,
+        entity_ids: list[int] | None = None,
         **kwargs: Any,
     ) -> pl.DataFrame:
-        """Extrai membros ativos de uma comissão.
+        """Extrai membros ativos de uma ou mais comissões.
 
-        Combina ``IdentificacaoComissao[0]`` com cada membro da lista,
-        produzindo registros com dados da comissão + membro.
+        Aceita ``entity_ids`` (lista de códigos, padrão DetailStrategy)
+        ou ``codigo_comissao`` (código único, fallback).
+
+        Para cada comissão, combina ``IdentificacaoComissao[0]`` com
+        cada membro da lista, produzindo registros mesclados.
 
         Args:
-            codigo_comissao: Código numérico da comissão (ex: 38 para CAE).
-            **kwargs: Parâmetros adicionais (ignorados).
+            entity_ids: Lista de códigos de comissão (ex: [38, 1, 2]).
+            **kwargs: Parâmetros adicionais (aceita ``codigo_comissao`` como fallback).
 
         Returns:
             DataFrame com dados da comissão + membros, ou DataFrame vazio
-            se o código não for informado ou a comissão não existir.
+            se nenhum código for informado.
         """
-        codigo = codigo_comissao or kwargs.get("codigo_comissao")
-        if codigo is None:
+        ids = entity_ids
+        if not ids:
+            single = kwargs.get("codigo_comissao")
+            ids = [single] if single is not None else None
+
+        if not ids:
             return pl.DataFrame()
 
-        raw = await self.fetch_flat(
-            f"composicao/comissao/{codigo}",
-            params={"ativas": "S"},
-        )
+        all_records: list[dict[str, Any]] = []
+        for codigo in ids:
+            raw = await self.fetch_flat(
+                f"composicao/comissao/{codigo}",
+                params={"ativas": "S"},
+            )
 
-        if not isinstance(raw, dict):
+            if not isinstance(raw, dict):
+                continue
+
+            composicao = raw.get("ComposicaoAtivaComissaoSf", {}).get("ComposicaoComissao", {})
+
+            identificacao_list = composicao.get("IdentificacaoComissao", [])
+            if not identificacao_list:
+                continue
+
+            identificacao = self._ensure_list(identificacao_list)[0]
+            membros = composicao.get("Membros", {}).get("Membro", [])
+            if not membros:
+                continue
+
+            # Adiciona dados da comissão a cada membro
+            for m in membros:
+                m["CodigoComissao"] = identificacao.get("CodigoComissao")
+                m["SiglaComissao"] = identificacao.get("SiglaComissao")
+                m["NomeComissao"] = identificacao.get("NomeComissao")
+
+            all_records.extend(membros)
+
+        if not all_records:
             return pl.DataFrame()
 
-        composicao = raw.get("ComposicaoAtivaComissaoSf", {}).get("ComposicaoComissao", {})
-
-        identificacao_list = composicao.get("IdentificacaoComissao", [])
-        if not identificacao_list:
-            return pl.DataFrame()
-
-        identificacao = self._ensure_list(identificacao_list)[0]
-        membros = composicao.get("Membros", {}).get("Membro", [])
-        if not membros:
-            return pl.DataFrame()
-
-        # Adiciona dados da comissão a cada membro
-        for m in membros:
-            m["CodigoComissao"] = identificacao.get("CodigoComissao")
-            m["SiglaComissao"] = identificacao.get("SiglaComissao")
-            m["NomeComissao"] = identificacao.get("NomeComissao")
-
-        return pl.DataFrame(membros, infer_schema_length=None)
+        return pl.DataFrame(all_records, infer_schema_length=None)

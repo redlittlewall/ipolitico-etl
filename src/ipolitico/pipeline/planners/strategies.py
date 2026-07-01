@@ -987,6 +987,26 @@ class DetailStrategy(DomainJobStrategy):
                 return ids, DomainType.PROCESSOS.value
             return [], DomainType.PROCESSOS.value
 
+        if domain_val == DomainType.COMISSOES_DETALHE.value:
+            if lake:
+                ids = lake.list_ids(
+                    table_name=DomainType.COMISSOES_SENADO.value,
+                    layer=MedallionLayer.SILVER.value,
+                    column="codigo",
+                )
+                return ids, DomainType.COMISSOES_SENADO.value
+            return [], DomainType.COMISSOES_SENADO.value
+
+        if domain_val == DomainType.COMISSOES_MEMBROS.value:
+            if lake:
+                ids = lake.list_ids(
+                    table_name=DomainType.COMISSOES_SENADO.value,
+                    layer=MedallionLayer.SILVER.value,
+                    column="codigo",
+                )
+                return ids, DomainType.COMISSOES_SENADO.value
+            return [], DomainType.COMISSOES_SENADO.value
+
         return [], ""
 
 
@@ -1651,6 +1671,11 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     DomainType.VOTACOES_SENADO: TimeWindowStrategy(),
     DomainType.VOTOS_SENADO: TimeWindowStrategy(),
     DomainType.VOTACOES_COMISSAO: ComissaoChildStrategy(),
+    # ── Senado — Comissões Detalhe/Membros/Reuniões (Issue 08a) ──────────────
+    DomainType.COMISSOES_SENADO: DefaultWindowStrategy(),
+    DomainType.COMISSOES_DETALHE: DetailStrategy(),
+    DomainType.COMISSOES_MEMBROS: DetailStrategy(),
+    DomainType.COMISSOES_REUNIOES: DefaultWindowStrategy(),
     # ── Senado — Orçamento (Issue 05) ─────────────────────────────────────────
     DomainType.ORCAMENTO_EMENDAS: AnnualWindowStrategy(),
     DomainType.ORCAMENTO_OFICIOS: AnnualWindowStrategy(),

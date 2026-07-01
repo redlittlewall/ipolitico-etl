@@ -1,5 +1,5 @@
 ---
-Status: ready
+Status: done
 Priority: P1
 Type: investigate
 ---
