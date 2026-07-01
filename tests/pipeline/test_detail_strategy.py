@@ -1,4 +1,5 @@
-"""Tests for DetailStrategy resolution of BLOCOS_DETALHE and PROPOSICOES_DETALHE."""
+"""Tests for DetailStrategy resolution of BLOCOS_DETALHE, PROPOSICOES_DETALHE
+and PROCESSOS_DETALHE."""
 
 from unittest.mock import MagicMock
 
@@ -15,6 +16,11 @@ class TestDetailStrategyRegistration:
     def test_proposicoes_detalhe_registrado(self):
         """STRATEGY_REGISTRY deve ter DetailStrategy para PROPOSICOES_DETALHE."""
         strategy = strategy_for(DomainType.PROPOSICOES_DETALHE)
+        assert isinstance(strategy, DetailStrategy)
+
+    def test_processos_detalhe_registrado(self):
+        """STRATEGY_REGISTRY deve ter DetailStrategy para PROCESSOS_DETALHE."""
+        strategy = strategy_for(DomainType.PROCESSOS_DETALHE)
         assert isinstance(strategy, DetailStrategy)
 
 
@@ -88,3 +94,41 @@ class TestDetailStrategyEntityResolution:
 
         assert ids == []
         assert upstream == DomainType.PROPOSICOES.value
+
+    def test_processos_detalhe_resolve_ids_com_lake(self):
+        """_resolve_detail_entity_ids deve retornar processo_ids quando lake existe."""
+        lake = MagicMock()
+        lake.list_ids.return_value = [8783559, 8294609, 2904181]
+
+        ids, upstream = DetailStrategy._resolve_detail_entity_ids(
+            domain_val=DomainType.PROCESSOS_DETALHE.value,
+            start="1949-01-01",
+            end="2026-07-01",
+            current_leg=57,
+            anchor_year=2023,
+            lake=lake,
+            state_store=None,
+        )
+
+        assert ids == [8783559, 8294609, 2904181]
+        assert upstream == DomainType.PROCESSOS.value
+        lake.list_ids.assert_called_once_with(
+            table_name=DomainType.PROCESSOS.value,
+            layer="silver",
+            column="id",
+        )
+
+    def test_processos_detalhe_sem_lake_retorna_vazio(self):
+        """_resolve_detail_entity_ids sem lake deve retornar [], upstream."""
+        ids, upstream = DetailStrategy._resolve_detail_entity_ids(
+            domain_val=DomainType.PROCESSOS_DETALHE.value,
+            start="1949-01-01",
+            end="2026-07-01",
+            current_leg=57,
+            anchor_year=2023,
+            lake=None,
+            state_store=None,
+        )
+
+        assert ids == []
+        assert upstream == DomainType.PROCESSOS.value

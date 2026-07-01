@@ -469,6 +469,74 @@ class SenatorChildStrategy(DomainJobStrategy):
         return jobs, senator_mapper
 
 
+class ComissaoChildStrategy(DomainJobStrategy):
+    """Estratégia para domínios filhos de comissões do Senado (votacoes_comissao).
+
+    Lê as siglas de ``comissoes_senado`` (coluna ``sigla``) do lake e gera
+    1 job por sigla com janela temporal. Análogo ao ``SenatorChildStrategy``
+    mas para comissões em vez de senadores.
+    """
+
+    def build(
+        self,
+        domain: DomainType,
+        spec: DomainSpec,
+        start: str,
+        end: str,
+        current_leg: int,
+        anchor_year: int,
+        extraction_plan: ExtractionPlan,
+        state_store: StateStore,
+        lake: DataLakeRepository | None,
+    ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
+        if extraction_plan.source_type == SourceType.BULK:
+            jobs: list[dict[str, Any]] = [{}]
+
+            def snapshot_mapper(job: dict) -> dict:
+                return {}
+
+            return jobs, snapshot_mapper
+
+        if lake is None:
+            logger.error(
+                "[%s] Abortando: DataLakeRepository necessário para resolver siglas de comissão.",
+                domain.value.upper(),
+            )
+            return [], lambda x: {}
+
+        siglas = lake.list_ids(
+            table_name=DomainType.COMISSOES_SENADO.value,
+            layer=MedallionLayer.SILVER.value,
+            column="sigla",
+        )
+        if not siglas:
+            logger.error(
+                "[%s] Abortando: nenhuma comissão no lake. Rode '%s' antes.",
+                domain.value.upper(),
+                DomainType.COMISSOES_SENADO.value,
+            )
+            return [], lambda x: {}
+
+        jobs = [{"sigla_comissao": s, "start_date": start, "end_date": end} for s in siglas]
+
+        logger.info(
+            "[%s] %s jobs (1/sigla de comissão, janela %s a %s).",
+            domain.value.upper(),
+            len(jobs),
+            start,
+            end,
+        )
+
+        def comissao_mapper(job: dict) -> dict:
+            return {
+                "sigla_comissao": job["sigla_comissao"],
+                "start_date": job["start_date"],
+                "end_date": job["end_date"],
+            }
+
+        return jobs, comissao_mapper
+
+
 class VotosStrategy(DomainJobStrategy):
     """Estratégia para o domínio votos (batch de votacao_ids)."""
 
@@ -908,6 +976,16 @@ class DetailStrategy(DomainJobStrategy):
                 )
                 return ids, DomainType.VETOS_PRESIDENCIAIS.value
             return [], DomainType.VETOS_PRESIDENCIAIS.value
+
+        if domain_val == DomainType.PROCESSOS_DETALHE.value:
+            if lake:
+                ids = lake.list_ids(
+                    table_name=DomainType.PROCESSOS.value,
+                    layer=MedallionLayer.SILVER.value,
+                    column="id",
+                )
+                return ids, DomainType.PROCESSOS.value
+            return [], DomainType.PROCESSOS.value
 
         return [], ""
 
@@ -1567,10 +1645,12 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     DomainType.SENADORES: LegislaturaScopeStrategy(),
     DomainType.SENADORES_DETALHE: DetailStrategy(),
     DomainType.PROCESSOS: DefaultWindowStrategy(),
+    DomainType.PROCESSOS_DETALHE: DetailStrategy(),
     DomainType.PROCESSOS_EMENDAS: BoundedWindowStrategy(max_window_days=365),
     DomainType.PROCESSOS_DOCUMENTOS: BoundedWindowStrategy(max_window_days=180),
     DomainType.VOTACOES_SENADO: TimeWindowStrategy(),
     DomainType.VOTOS_SENADO: TimeWindowStrategy(),
+    DomainType.VOTACOES_COMISSAO: ComissaoChildStrategy(),
     # ── Senado — Orçamento (Issue 05) ─────────────────────────────────────────
     DomainType.ORCAMENTO_EMENDAS: AnnualWindowStrategy(),
     DomainType.ORCAMENTO_OFICIOS: AnnualWindowStrategy(),
