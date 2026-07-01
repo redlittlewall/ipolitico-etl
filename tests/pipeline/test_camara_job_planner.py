@@ -207,3 +207,139 @@ def test_referencias_planner_single_job():
     )
     assert len(jobs) == 1
     assert len(mapper(jobs[0])["routes"]) >= 10
+
+
+# ─── BoundedWindowStrategy (Senado emendas/documentos) ─────────────────────
+
+
+def _chunk_count_approx(total_days: int, chunk_size: int) -> int:
+    """Quantos chunks M × chunk_size dias cobrem total_days."""
+    import math
+
+    return math.ceil(total_days / chunk_size)
+
+
+def test_bounded_full_historical_emendas():
+    """Janela 1949→2026 com max_window_days=365 produz chunks ≤ 365d."""
+    from datetime import date
+
+    store = MagicMock()
+    planner = JobPlanner(store, None)
+    plan = ExtractionPlan(source_type=SourceType.API)
+    jobs, mapper = planner.build(
+        DomainType.PROCESSOS_EMENDAS,
+        "1949-01-01",
+        "2026-06-30",
+        current_leg=57,
+        anchor_year=2023,
+        extraction_plan=plan,
+    )
+    # ~77 anos × 365 = ~28300 dias → ~78 chunks de 365d
+    assert 70 <= len(jobs) <= 90, f"Esperado ~78 chunks, obtido {len(jobs)}"
+
+    for job in jobs:
+        start = date.fromisoformat(job["dataInicio"])
+        end = date.fromisoformat(job["dataFim"])
+        delta = (end - start).days + 1
+        assert delta <= 365, f"Chunk {job} tem {delta} dias (> 365)"
+
+    # Verifica cobertura sem gaps
+    assert mapper(jobs[0])["start_date"] == "1949-01-01"
+    last_end = mapper(jobs[-1])["end_date"]
+    assert last_end == "2026-06-30", f"Último chunk termina em {last_end}"
+
+    from datetime import timedelta
+
+    # Verifica sequência — cada chunk começa 1 dia após o anterior
+    for i in range(1, len(jobs)):
+        prev_end = date.fromisoformat(jobs[i - 1]["dataFim"])
+        cur_start = date.fromisoformat(jobs[i]["dataInicio"])
+        expected_start = prev_end + timedelta(days=1)
+        assert cur_start == expected_start, (
+            f"Gap entre chunk {i - 1} (ends {prev_end}) e chunk {i} (starts {cur_start}); "
+            f"expected {expected_start}"
+        )
+
+
+def test_bounded_full_historical_documentos():
+    """Janela 1949→2026 com max_window_days=180 produz chunks ≤ 180d."""
+    from datetime import date
+
+    store = MagicMock()
+    planner = JobPlanner(store, None)
+    plan = ExtractionPlan(source_type=SourceType.API)
+    jobs, mapper = planner.build(
+        DomainType.PROCESSOS_DOCUMENTOS,
+        "1949-01-01",
+        "2026-06-30",
+        current_leg=57,
+        anchor_year=2023,
+        extraction_plan=plan,
+    )
+    # ~28300 dias → ~158 chunks de 180d
+    assert 140 <= len(jobs) <= 170, f"Esperado ~158 chunks, obtido {len(jobs)}"
+
+    for job in jobs:
+        start = date.fromisoformat(job["dataInicio"])
+        end = date.fromisoformat(job["dataFim"])
+        delta = (end - start).days + 1
+        assert delta <= 180, f"Chunk {job} tem {delta} dias (> 180)"
+
+
+def test_bounded_window_smaller_than_limit():
+    """Janela menor que o limite gera 1 chunk."""
+    store = MagicMock()
+    planner = JobPlanner(store, None)
+    plan = ExtractionPlan(source_type=SourceType.API)
+    jobs, mapper = planner.build(
+        DomainType.PROCESSOS_EMENDAS,
+        "2025-01-01",
+        "2025-06-30",
+        current_leg=57,
+        anchor_year=2023,
+        extraction_plan=plan,
+    )
+    assert len(jobs) == 1
+    assert mapper(jobs[0]) == {"start_date": "2025-01-01", "end_date": "2025-06-30"}
+
+
+def test_bounded_window_single_day():
+    """Janela de 1 dia gera 1 chunk."""
+    store = MagicMock()
+    planner = JobPlanner(store, None)
+    plan = ExtractionPlan(source_type=SourceType.API)
+    jobs, mapper = planner.build(
+        DomainType.PROCESSOS_EMENDAS,
+        "2025-06-15",
+        "2025-06-15",
+        current_leg=57,
+        anchor_year=2023,
+        extraction_plan=plan,
+    )
+    assert len(jobs) == 1
+    assert mapper(jobs[0]) == {"start_date": "2025-06-15", "end_date": "2025-06-15"}
+
+
+def test_bounded_mapper_output():
+    """Mapper retorna start_date/end_date para compatibilidade com extractor.
+
+    Usa PROCESSOS_DOCUMENTOS (max_window_days=180) com janela de 90 dias
+    para garantir um único chunk.
+    """
+    store = MagicMock()
+    planner = JobPlanner(store, None)
+    plan = ExtractionPlan(source_type=SourceType.API)
+    jobs, mapper = planner.build(
+        DomainType.PROCESSOS_DOCUMENTOS,
+        "2025-04-01",
+        "2025-06-30",
+        current_leg=57,
+        anchor_year=2023,
+        extraction_plan=plan,
+    )
+    assert len(jobs) == 1, f"Esperado 1 chunk, obtido {len(jobs)}"
+    mapped = mapper(jobs[0])
+    assert "start_date" in mapped
+    assert "end_date" in mapped
+    assert mapped["start_date"] == "2025-04-01"
+    assert mapped["end_date"] == "2025-06-30"

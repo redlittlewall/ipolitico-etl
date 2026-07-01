@@ -991,6 +991,70 @@ class DefaultWindowStrategy(DomainJobStrategy):
         return jobs, default_mapper
 
 
+class BoundedWindowStrategy(DomainJobStrategy):
+    """Divide a janela temporal em blocos de N dias.
+
+    Domínios cuja API rejeita janelas longas (ex: processo/emenda com
+    limite de 1 ano) são segmentados em chunks de no máximo
+    ``max_window_days`` dias. Cada chunk vira um job independente.
+
+    Args:
+        max_window_days: Número máximo de dias por bloco (padrão 365).
+    """
+
+    def __init__(self, max_window_days: int = 365) -> None:
+        self.max_window_days = max_window_days
+
+    def build(
+        self,
+        domain: DomainType,
+        spec: DomainSpec,
+        start: str,
+        end: str,
+        current_leg: int,
+        anchor_year: int,
+        extraction_plan: ExtractionPlan,
+        state_store: StateStore,
+        lake: DataLakeRepository | None,
+    ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
+        from datetime import date, timedelta
+
+        start_date = date.fromisoformat(start)
+        end_date = date.fromisoformat(end)
+
+        jobs: list[dict[str, Any]] = []
+        current = start_date
+        while current <= end_date:
+            chunk_end = min(
+                current + timedelta(days=self.max_window_days - 1),
+                end_date,
+            )
+            jobs.append(
+                {
+                    "dataInicio": current.isoformat(),
+                    "dataFim": chunk_end.isoformat(),
+                }
+            )
+            current = chunk_end + timedelta(days=1)
+
+        logger.info(
+            "[%s] Janela %s a %s segmentada em %s blocos de ≤%sd.",
+            domain.value.upper(),
+            start,
+            end,
+            len(jobs),
+            self.max_window_days,
+        )
+
+        def bounded_mapper(job: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "start_date": job["dataInicio"],
+                "end_date": job["dataFim"],
+            }
+
+        return jobs, bounded_mapper
+
+
 class DailyWindowStrategy(DomainJobStrategy):
     """Estratégia para domínios com 1 job por dia (ex: plenário).
 
@@ -1503,6 +1567,8 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     DomainType.SENADORES: LegislaturaScopeStrategy(),
     DomainType.SENADORES_DETALHE: DetailStrategy(),
     DomainType.PROCESSOS: DefaultWindowStrategy(),
+    DomainType.PROCESSOS_EMENDAS: BoundedWindowStrategy(max_window_days=365),
+    DomainType.PROCESSOS_DOCUMENTOS: BoundedWindowStrategy(max_window_days=180),
     DomainType.VOTACOES_SENADO: TimeWindowStrategy(),
     DomainType.VOTOS_SENADO: TimeWindowStrategy(),
     # ── Senado — Orçamento (Issue 05) ─────────────────────────────────────────
