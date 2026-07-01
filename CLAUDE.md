@@ -128,16 +128,3 @@ See `docs/agents/triage-labels.md`.
 Single-context layout — one `CONTEXT.md` at the repo root.
 See `docs/agents/domain.md`.
 
-### QA gate
-
-After `/tdd` and before `/commit`, use `/qa` to run automated quality checks
-(pytest, pre-commit, docstring scan, debug leftovers, imports), triage findings
-(fix small inline, document big as `.scratch/qa-*/` issues), and optionally
-delegate to `/code-review`, `/verify`, or `/security-review`.
-See `.claude/skills/qa/SKILL.md`.
-
-### Commit flow
-
-After any `/tdd` → `/qa` cycle, use `/commit` to automate staging, tests,
-pre-commit, conventional commit message, push, and optional PR.
-See `.claude/skills/commit/SKILL.md`.
