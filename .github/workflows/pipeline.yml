@@ -47,6 +47,8 @@ jobs:
       - name: Baixar dados Gold da release anterior
         id: download
         continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p data/datalake/gold /tmp/gold_download
           gh release download latest --pattern "gold*" --dir /tmp/gold_download 2>&1 || echo "Nenhuma release anterior encontrada."
