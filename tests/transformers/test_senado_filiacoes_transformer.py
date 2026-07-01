@@ -13,14 +13,19 @@ def _raw_filiacao_row(
     codigo: str = "5672",
     partido: str = "PP",
     data_filiacao: str = "2020-03-10",
-    data_desfiliacao: str = "",
+    data_desfiliacao: str | None = None,
 ) -> dict:
-    """Helper para criar uma linha bruta de filiação (como sai da API)."""
+    """Helper para criar uma linha bruta de filiação (como sai da API real).
+
+    A API retorna ``Partido`` como struct aninhada.
+    """
     return {
-        "CodigoParlamentar": codigo,
-        "SiglaPartido": partido,
-        "DataFiliacao": data_filiacao,
-        "DataDesfiliacao": data_desfiliacao,
+        "CodigoParlamentar": int(codigo),
+        "Partido": {
+            "SiglaPartido": partido,
+            "DataFiliacao": data_filiacao,
+            "DataDesfiliacao": data_desfiliacao,
+        },
     }
 
 
@@ -37,7 +42,7 @@ class TestSenadoFiliacoesTransformer:
         assert out["codigo"][0] == 5672
         assert out["sigla_partido"][0] == "PP"
         assert out["data_filiacao"][0] == "2020-03-10"
-        assert out["data_desfiliacao"][0] == ""
+        assert out["data_desfiliacao"][0] is None
 
     def test_empty_df(self):
         """DataFrame vazio retorna vazio."""

@@ -67,32 +67,57 @@ class _SenadorChildMixin:
 
     Injeta o ``CodigoParlamentar`` do senador em cada registro filho, pois
     a API do Senado retorna a identificação do senador no envelope externo
-    (``MembroParlamentar.IdentificacaoParlamentar``) e não em cada registro.
+    e não em cada registro.
+
+    Nota: O envelope varia por endpoint. ``_attach_codigo`` usa o caminho
+    do envelope fornecido pela subclasse (``_codigo_envelope_path``) para
+    extrair o código do senador.
     """
 
-    @staticmethod
+    _codigo_envelope_path: list[str] = ["MembroParlamentar", "IdentificacaoParlamentar"]
+
+    @classmethod
     def _attach_codigo(
-        records: list[dict[str, Any]], raw: dict[str, Any], api_name: str
+        cls,
+        records: list[dict[str, Any]],
+        raw: dict[str, Any],
+        column_name: str,
     ) -> list[dict[str, Any]]:
         """Anexa o codigo do senador a cada registro filho.
 
+        Procura o código no envelope seguindo o caminho definido por
+        ``_codigo_envelope_path``, tentando os campos ``CodigoParlamentar``
+        e ``Codigo`` (fallback para envelopes mais recentes da API).
+
         Args:
             records: Lista de registros extraídos do envelope aninhado.
-            raw: Resposta bruta da API (contém IdentificacaoParlamentar).
-            api_name: Nome do campo no envelope externo (ex: ``"CodigoParlamentar"``).
+            raw: Resposta bruta da API (contém identificação do senador).
+            column_name: Nome da coluna a injetar nos registros
+                         (ex: ``"CodigoParlamentar"``).
 
         Returns:
-            Lista de registros com ``CodigoParlamentar`` injetado.
+            Lista de registros com ``column_name`` injetado.
         """
         if not records or not isinstance(raw, dict):
             return records
 
-        identificacao = raw.get("MembroParlamentar", {}).get("IdentificacaoParlamentar", {})
-        codigo = identificacao.get(api_name)
+        codigo = _deep_get(raw, cls._codigo_envelope_path + ["CodigoParlamentar"])
+        if codigo is None:
+            codigo = _deep_get(raw, cls._codigo_envelope_path + ["Codigo"])
         if codigo is not None:
             for record in records:
-                record[api_name] = codigo
+                record[column_name] = codigo
         return records
+
+
+def _deep_get(d: dict[str, Any], path: list[str]) -> Any:
+    """Navega por um dicionário seguindo o caminho de chaves."""
+    current: Any = d
+    for key in path:
+        if not isinstance(current, dict) or key not in current:
+            return None
+        current = current[key]
+    return current
 
 
 class SenadoMandatosExtractor(SenadoBaseExtractor, _SenadorChildMixin):
@@ -104,15 +129,18 @@ class SenadoMandatosExtractor(SenadoBaseExtractor, _SenadorChildMixin):
 
     A resposta tem a estrutura::
 
-        { "MembroParlamentar": {
-            "IdentificacaoParlamentar": { ... },
-            "Mandatos": {
-                "Mandato": [...]   ← array alvo
+        { "MandatoParlamentar": {
+            "Parlamentar": {
+                "Codigo": ...,
+                "Mandatos": {
+                    "Mandato": [...]   ← array alvo
+                }
             }
         }}
     """
 
-    _DATA_PATH_MANDATOS = ["MembroParlamentar", "Mandatos", "Mandato"]
+    _DATA_PATH_MANDATOS = ["MandatoParlamentar", "Parlamentar", "Mandatos", "Mandato"]
+    _codigo_envelope_path = ["MandatoParlamentar", "Parlamentar"]
 
     async def extract(
         self,
@@ -140,6 +168,15 @@ class SenadoMandatosExtractor(SenadoBaseExtractor, _SenadorChildMixin):
         if not records:
             return pl.DataFrame()
 
+        # Normaliza Partidos.Partido: XML-heritage retorna struct (1 item) ou
+        # list (2+). Garante que seja sempre lista para consistência.
+        for record in records:
+            partidos = record.get("Partidos")
+            if isinstance(partidos, dict):
+                partido = partidos.get("Partido")
+                if isinstance(partido, dict):
+                    partidos["Partido"] = [partido]
+
         return pl.DataFrame(records, infer_schema_length=None)
 
 
@@ -152,15 +189,22 @@ class SenadoFiliacoesExtractor(SenadoBaseExtractor, _SenadorChildMixin):
 
     A resposta tem a estrutura::
 
-        { "MembroParlamentar": {
-            "IdentificacaoParlamentar": { ... },
-            "Filiacoes": {
-                "Filiacao": [...]   ← array alvo
+        { "FiliacaoParlamentar": {
+            "Parlamentar": {
+                "Codigo": ...,
+                "Filiacoes": {
+                    "Filiacao": [...]   ← array alvo
+                }
             }
         }}
+
+    Nota: Cada ``Filiacao`` contém um objeto ``Partido`` aninhado com
+    ``SiglaPartido``, ``DataFiliacao`` e opcionalmente ``DataDesfiliacao``.
+    O achatamento destes campos é feito no transformer.
     """
 
-    _DATA_PATH_FILIACOES = ["MembroParlamentar", "Filiacoes", "Filiacao"]
+    _DATA_PATH_FILIACOES = ["FiliacaoParlamentar", "Parlamentar", "Filiacoes", "Filiacao"]
+    _codigo_envelope_path = ["FiliacaoParlamentar", "Parlamentar"]
 
     async def extract(
         self,

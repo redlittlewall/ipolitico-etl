@@ -10,28 +10,22 @@ from ipolitico.core.constants import DomainType
 from ipolitico.core.schemas import SILVER_SCHEMAS
 from ipolitico.transformers.base import BaseTransformer
 
-# Mapeamento API → Silver para filiações
-_FIELD_MAP: list[tuple[str, str, type[pl.DataType]]] = [
-    ("CodigoParlamentar", "codigo", pl.Int64),
-    ("SiglaPartido", "sigla_partido", pl.String),
-    ("DataFiliacao", "data_filiacao", pl.String),
-    ("DataDesfiliacao", "data_desfiliacao", pl.String),
-]
-
 
 class SenadoFiliacoesTransformer(BaseTransformer):
     """Aplica contrato Silver ao DataFrame bruto de filiações partidárias.
 
-    O DataFrame de entrada contém colunas no formato camelCase da API
-    (ex: ``SiglaPartido``, ``DataFiliacao``). O transformer renomeia para
-    snake_case e aplica a tipagem estrita do contrato Silver.
+    O DataFrame de entrada contém uma coluna struct ``Partido`` aninhada
+    (com ``SiglaPartido``, ``DataFiliacao``, ``DataDesfiliacao``) além
+    de ``CodigoParlamentar`` flat. O transformer desaninha o struct e
+    aplica a tipagem estrita do contrato Silver.
     """
 
     def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
         """Transforma dados brutos de filiações para o formato Silver.
 
         Args:
-            df: DataFrame com colunas no formato camelCase da API.
+            df: DataFrame com colunas no formato camelCase da API
+                (``CodigoParlamentar`` + struct ``Partido``).
             **kwargs: Parâmetros adicionais (ignorados).
 
         Returns:
@@ -43,8 +37,19 @@ class SenadoFiliacoesTransformer(BaseTransformer):
 
         contract = SILVER_SCHEMAS[DomainType.SENADORES_FILIACOES.value]
 
-        # Renomeia campos do mapeamento
-        for api_name, silver_col, dtype in _FIELD_MAP:
+        # 1. Desaninha struct Partido para obter SiglaPartido, DataFiliacao, DataDesfiliacao
+        if "Partido" in df.columns and isinstance(df.schema["Partido"], pl.Struct):
+            df = df.unnest("Partido")
+
+        # 2. Mapeamento flat API → Silver
+        mappings: list[tuple[str, str, type[pl.DataType]]] = [
+            ("CodigoParlamentar", "codigo", pl.Int64),
+            ("SiglaPartido", "sigla_partido", pl.String),
+            ("DataFiliacao", "data_filiacao", pl.String),
+            ("DataDesfiliacao", "data_desfiliacao", pl.String),
+        ]
+
+        for api_name, silver_col, dtype in mappings:
             if silver_col not in contract:
                 continue
             if api_name in df.columns:
@@ -55,7 +60,7 @@ class SenadoFiliacoesTransformer(BaseTransformer):
             else:
                 df = df.with_columns(pl.lit(None).alias(silver_col))
 
-        # Preenche colunas faltantes no contrato
+        # 3. Preenche colunas faltantes no contrato
         for col in contract:
             if col not in df.columns:
                 df = df.with_columns(pl.lit(None).alias(col))

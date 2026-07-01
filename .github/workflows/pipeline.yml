@@ -97,10 +97,10 @@ jobs:
           **Estratégia:** ${{ steps.pipeline.outputs.strategy || 'incremental' }}
           **Duração:** ${{ steps.pipeline.outputs.duration || 'N/A' }}s
 
-          ### Domínios incluídos (64/64)
-          - Dados completos da Câmara dos Deputados (API Dados Abertos)
-          - 64 domínios | ~7,3 milhões registros Gold
-          - Formato: Parquet (colunar, compressão snappy)
+          ### Domínios incluídos (96/96)
+          - Câmara dos Deputados (API Dados Abertos) — 64 domínios
+          - Senado Federal (API Dados Abertos) — 32 domínios
+          - 96 domínios | ~12 milhões registros Gold | Formato: Parquet (colunar, compressão snappy)
 
           ### Próximos passos
           \`\`\`bash

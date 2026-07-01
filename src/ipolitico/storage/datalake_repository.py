@@ -127,7 +127,12 @@ class DataLakeRepository(StateStore):
         gold_file = layer_dir / f"{table_name}.parquet"
         if gold_file.exists():
             try:
-                series = pl.scan_parquet(gold_file).select(column).unique().collect()[column]
+                series = (
+                    pl.scan_parquet(gold_file, extra_columns="ignore")
+                    .select(column)
+                    .unique()
+                    .collect()[column]
+                )
                 return [v for v in series.drop_nulls().to_list() if v is not None and v != ""]
             except Exception as e:
                 logger.error(
@@ -143,7 +148,10 @@ class DataLakeRepository(StateStore):
 
         try:
             series = (
-                pl.scan_parquet(layer_dir / "*.parquet").select(column).unique().collect()[column]
+                pl.scan_parquet(layer_dir / "*.parquet", extra_columns="ignore")
+                .select(column)
+                .unique()
+                .collect()[column]
             )
             return [v for v in series.drop_nulls().to_list() if v is not None and v != ""]
         except Exception as e:
@@ -494,11 +502,25 @@ class DataLakeRepository(StateStore):
         )
 
     def list_entity_ids_with_child_materialized(
-        self, table_name: str, parent_id_column: str
+        self, table_name: str, parent_id_column: str = "id"
     ) -> set[Any]:
-        return set(self.list_ids(table_name, "silver", parent_id_column)) | set(
-            self.list_ids(table_name, "gold", parent_id_column)
-        )
+        """Return set of parent IDs whose child records already exist in Silver or Gold.
+
+        Tries the provided column first; if the column does not exist (e.g. Senado
+        tables use ``codigo`` instead of ``id``), falls back to ``codigo``.
+        """
+
+        def _try_col(col: str) -> set[Any]:
+            return set(self.list_ids(table_name, "silver", col)) | set(
+                self.list_ids(table_name, "gold", col)
+            )
+
+        result = _try_col(parent_id_column)
+        if not result:
+            fallback = _try_col("codigo")
+            if fallback:
+                return fallback
+        return result
 
     def list_evento_ids_silver_or_gold(
         self,

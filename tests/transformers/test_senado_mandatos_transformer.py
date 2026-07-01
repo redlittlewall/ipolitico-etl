@@ -20,18 +20,31 @@ def _raw_mandato_row(
     data_inicio: str = "2023-02-01",
     data_fim: str = "2027-01-31",
 ) -> dict:
-    """Helper para criar uma linha bruta de mandato (como sai da API)."""
-    return {
-        "CodigoParlamentar": codigo,
+    """Helper para criar uma linha bruta de mandato (como sai da API real).
+
+    A API retorna structs aninhadas para legislatura e partido.
+    """
+    row: dict = {
+        "CodigoParlamentar": int(codigo),
         "CodigoMandato": codigo_mandato,
-        "Uf": uf,
+        "UfParlamentar": uf,
         "DescricaoParticipacao": descricao,
-        "PrimeiraLegislatura": primeira_leg,
-        "SegundaLegislatura": segunda_leg,
-        "SiglaPartido": partido,
-        "DataInicio": data_inicio,
-        "DataFim": data_fim,
+        "PrimeiraLegislaturaDoMandato": {
+            "NumeroLegislatura": primeira_leg,
+            "DataInicio": data_inicio,
+            "DataFim": data_fim,
+        },
+        "SegundaLegislaturaDoMandato": {
+            "NumeroLegislatura": segunda_leg,
+            "DataInicio": data_inicio,
+            "DataFim": data_fim,
+        },
     }
+    if partido:
+        row["Partidos"] = {
+            "Partido": [{"Sigla": partido, "DataFiliacao": data_inicio}],
+        }
+    return row
 
 
 class TestSenadoMandatosTransformer:
@@ -72,8 +85,8 @@ class TestSenadoMandatosTransformer:
         assert out.schema["uf"] == pl.String
         assert out.schema["sigla_partido"] == pl.String
 
-    def test_extra_columns_dropped(self):
-        """Colunas extras no input são descartadas."""
+    def test_extra_structured_columns_dropped(self):
+        """Colunas extras no input (ex: ``Titular``) são descartadas."""
         tr = SenadoMandatosTransformer()
         row = _raw_mandato_row()
         row["coluna_extra"] = "deve sumir"

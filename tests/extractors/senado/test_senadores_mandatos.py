@@ -10,45 +10,54 @@ from ipolitico.extractors.senado.api.senadores import SenadoMandatosExtractor
 @pytest.mark.asyncio
 async def test_extract_with_codigo_returns_dataframe():
     """
-    extract(codigo=5672) chama o endpoint correto, achata o envelope XML-heritage,
-    injeta CodigoParlamentar e retorna um DataFrame com os mandatos do senador.
+    extract(codigo=5672) chama o endpoint correto, achata o envelope real
+    (``MandatoParlamentar.Parlamentar.Mandatos.Mandato``), injeta
+    ``CodigoParlamentar`` e retorna um DataFrame com os mandatos do senador.
     """
     client = SenadoClient()
     extractor = SenadoMandatosExtractor(client)
 
-    fake_mandatos = [
-        {
-            "CodigoMandato": "1001",
-            "Uf": "AC",
-            "DescricaoParticipacao": "Titular",
-            "PrimeiraLegislatura": "57",
-            "SegundaLegislatura": "57",
-            "SiglaPartido": "PP",
-            "DataInicio": "2023-02-01",
-            "DataFim": "2027-01-31",
-        },
-        {
-            "CodigoMandato": "1002",
-            "Uf": "AC",
-            "DescricaoParticipacao": "Suplente",
-            "PrimeiraLegislatura": "56",
-            "SegundaLegislatura": "56",
-            "SiglaPartido": "PP",
-            "DataInicio": "2019-02-01",
-            "DataFim": "2023-01-31",
-        },
-    ]
-
     api_response = {
-        "MembroParlamentar": {
-            "IdentificacaoParlamentar": {
-                "CodigoParlamentar": "5672",
-                "NomeParlamentar": "Alan Rick",
+        "MandatoParlamentar": {
+            "Parlamentar": {
+                "Codigo": "5672",
+                "Nome": "Alan Rick",
+                "Mandatos": {
+                    "Mandato": [
+                        {
+                            "CodigoMandato": "1001",
+                            "UfParlamentar": "AC",
+                            "PrimeiraLegislaturaDoMandato": {
+                                "NumeroLegislatura": "57",
+                                "DataInicio": "2023-02-01",
+                                "DataFim": "2027-01-31",
+                            },
+                            "SegundaLegislaturaDoMandato": {
+                                "NumeroLegislatura": "57",
+                                "DataInicio": "2023-02-01",
+                                "DataFim": "2027-01-31",
+                            },
+                            "DescricaoParticipacao": "Titular",
+                        },
+                        {
+                            "CodigoMandato": "1002",
+                            "UfParlamentar": "AC",
+                            "PrimeiraLegislaturaDoMandato": {
+                                "NumeroLegislatura": "56",
+                                "DataInicio": "2019-02-01",
+                                "DataFim": "2023-01-31",
+                            },
+                            "SegundaLegislaturaDoMandato": {
+                                "NumeroLegislatura": "56",
+                                "DataInicio": "2019-02-01",
+                                "DataFim": "2023-01-31",
+                            },
+                            "DescricaoParticipacao": "Suplente",
+                        },
+                    ],
+                },
             },
-            "Mandatos": {
-                "Mandato": fake_mandatos,
-            },
-        }
+        },
     }
 
     with respx.mock:
@@ -64,6 +73,7 @@ async def test_extract_with_codigo_returns_dataframe():
         assert "CodigoParlamentar" in df.columns
         assert df["CodigoMandato"].to_list() == ["1001", "1002"]
         assert df["CodigoParlamentar"].to_list() == ["5672", "5672"]
+        assert "PrimeiraLegislaturaDoMandato" in df.columns
 
 
 @pytest.mark.asyncio

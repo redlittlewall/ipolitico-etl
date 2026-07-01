@@ -1,0 +1,29 @@
+# Normalizacao de line endings
+* text=auto eol=lf
+
+# Binary files — nunca converter
+*.parquet binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.zip binary
+*.tar.gz binary
+*.db binary
+*.sqlite binary
+*.pkl binary
+*.pyc binary
+
+# Linguagens e formatos textuais
+*.py text diff=python
+*.md text diff=markdown
+*.yml text
+*.yaml text
+*.toml text
+*.cfg text
+*.ini text
+*.json text
+*.sh text eol=lf
+*.bash text eol=lf
+*.gitignore text

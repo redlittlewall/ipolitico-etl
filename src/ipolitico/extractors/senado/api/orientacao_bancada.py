@@ -1,7 +1,9 @@
 """Extrator para o domínio ORIENTACAO_BANCADA (orientação de bancada em votações do Senado).
 
 Endpoint: ``GET /plenario/votacao/orientacaoBancada/{inicio}/{fim}``
-Retorna como cada líder partidário orientou sua bancada em cada votação nominal.
+Retorna um envelope ``{"votacoes": [...]}`` — o extrator desenvelopa e retorna
+o array bruto de votações, cada uma com o campo ``orientacoesLideranca``
+(explodido no transformer para 1 registro por (votação, partido)).
 """
 
 import logging
@@ -18,9 +20,11 @@ class SenadoOrientacaoBancadaExtractor(SenadoBaseExtractor):
     """Extrator de orientação de bancada em votações do plenário do Senado.
 
     Chama ``GET /plenario/votacao/orientacaoBancada/{inicio}/{fim}``
-    que retorna um array flat. Aceita datas no formato ``YYYY-MM-DD`` (ISO)
-    e converte internamente para ``YYYYMMDD`` no path da URL (exigência
-    da API do Senado).
+    que retorna ``{"votacoes": [...]}``. O extrator desenvelopa a chave
+    ``votacoes`` e retorna o array como DataFrame.
+
+    Aceita datas no formato ``YYYY-MM-DD`` (ISO) e converte internamente
+    para ``YYYYMMDD`` no path da URL (exigência da API do Senado).
     """
 
     async def extract(
@@ -38,7 +42,8 @@ class SenadoOrientacaoBancadaExtractor(SenadoBaseExtractor):
                       como fallback para compatibilidade).
 
         Returns:
-            DataFrame com os dados brutos das orientações.
+            DataFrame com os dados brutos das votações (cada linha é uma
+            votação, com o campo ``orientacoesLideranca`` como array de structs).
             Retorna DataFrame vazio se a API não retornar dados.
         """
         di = start_date or kwargs.get("dataInicio")
@@ -50,7 +55,11 @@ class SenadoOrientacaoBancadaExtractor(SenadoBaseExtractor):
         endpoint = f"plenario/votacao/orientacaoBancada/{di.replace('-', '')}/{df.replace('-', '')}"
         raw = await self.fetch_flat(endpoint)
 
-        if not raw or not isinstance(raw, list):
+        # A API retorna {"votacoes": [...]} — extrai o array
+        if not isinstance(raw, dict):
+            return pl.DataFrame()
+        records = raw.get("votacoes", [])
+        if not isinstance(records, list) or not records:
             return pl.DataFrame()
 
-        return pl.DataFrame(raw, infer_schema_length=None)
+        return pl.DataFrame(records, infer_schema_length=None)

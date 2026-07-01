@@ -11,33 +11,28 @@ class TestSenadoOrientacaoBancadaTransformer:
     """Testes do contrato SILVER para orientacao_bancada."""
 
     def test_happy_path(self):
-        """Campos completos produzem saída tipada."""
+        """Campos completos (com ``orientacoesLideranca``) produzem saída tipada."""
         tr = SenadoOrientacaoBancadaTransformer()
         raw = pl.DataFrame(
             [
                 {
-                    "dataSessao": "2025-01-15",
-                    "codigoMateria": 167447,
-                    "siglaPartido": "PT",
-                    "orientacao": "Sim",
-                    "codigoVotacao": 6954,
-                },
-                {
-                    "dataSessao": "2025-01-15",
-                    "codigoMateria": 167447,
-                    "siglaPartido": "PL",
-                    "orientacao": "Não",
-                    "codigoVotacao": 6954,
+                    "codigoVotacaoSve": 10848,
+                    "dataInicioVotacao": "2025-01-15T14:00:00",
+                    "orientacoesLideranca": [
+                        {"dataHora": "2025-01-15T14:10:00", "partido": "PT", "voto": "Sim"},
+                        {"dataHora": "2025-01-15T14:10:05", "partido": "PL", "voto": "Não"},
+                    ],
                 },
             ]
         )
         out = tr.transform(raw)
 
+        # Deve ter 2 linhas (1 por partido dentro da votação)
         assert out.height == 2
         assert out["sigla_partido"][0] == "PT"
         assert out["orientacao"][0] == "Sim"
         assert out["sigla_partido"][1] == "PL"
-        assert out["codigo_votacao"][0] == 6954
+        assert out["codigo_votacao"][0] == 10848
 
     def test_empty_df(self):
         """DataFrame vazio retorna vazio."""
@@ -50,12 +45,14 @@ class TestSenadoOrientacaoBancadaTransformer:
         raw = pl.DataFrame(
             [
                 {
-                    "codigoVotacao": "6954",
-                    "codigoMateria": "167447",
-                }
+                    "codigoVotacaoSve": "10848",
+                    "dataInicioVotacao": "2025-01-15T14:00:00",
+                    "orientacoesLideranca": [
+                        {"partido": "PT", "voto": "Sim"},
+                    ],
+                },
             ]
         )
         out = tr.transform(raw)
 
         assert out.schema["codigo_votacao"] == pl.Int64
-        assert out.schema["codigo_materia"] == pl.Int64
