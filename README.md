@@ -87,6 +87,106 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
+## 🐳 Docker (sem instalar Python)
+
+Tudo que você precisa é o Docker. A imagem já vem com todas as dependências.
+
+```bash
+# Build local da imagem
+docker build -t ipolitico-etl .
+
+# Quickstart: lista os domínios disponíveis
+docker run --rm ipolitico-etl --list-domains | head -10
+
+# Baixa os dados incrementais (monta volume para persistir)
+docker run --rm -v $(pwd)/data:/app/data ipolitico-etl --strategy incremental --optimize
+
+# Ajuda completa
+docker run --rm ipolitico-etl --help
+```
+
+> Futuramente: `docker pull ghcr.io/redlittlewall/ipolitico-etl:latest` quando a imagem for publicada automaticamente via CI.
+
+### Comandos úteis
+
+| Comando | O que faz |
+|---|---|
+| `docker run --rm ipolitico-etl --list-domains` | Lista todos os domínios disponíveis |
+| `docker run --rm -v $(pwd)/data:/app/data ipolitico-etl --strategy full_load --optimize` | Baixa tudo do zero |
+| `docker run --rm ipolitico-etl download-data --dry-run` | Mostra a URL da última release Gold sem baixar |
+| `docker run --rm -v $(pwd)/data:/app/data ipolitico-etl download-data` | Baixa dados Gold prontos da última release |
+| `docker run --rm ipolitico-etl python -c "import polars; print('OK')"` | Verifica dependências |
+| `docker run --rm -v $(pwd)/data:/app/data ipolitico-etl python examples/dtlake/coesao_partidaria.py` | Roda uma análise específica |
+
+### Perfil Analysis (Jupyter + matplotlib)
+
+A imagem com perfil `analysis` inclui Jupyter Lab, matplotlib e seaborn para exploração interativa.
+
+```bash
+# Build com perfil analysis
+docker build --build-arg PROFILE=analysis -t ipolitico-etl:analysis .
+
+# Sobe Jupyter Lab
+docker run --rm -p 8888:8888 -v $(pwd)/data:/app/data ipolitico-etl:analysis
+```
+
+### Docker Compose
+
+O `docker-compose.yml` fornece conveniência para os dois perfis:
+
+```bash
+# Executa o ETL
+docker compose run --rm etl --strategy incremental --optimize
+
+# Sobe Jupyter Lab (porta 8888)
+docker compose up -d analysis
+# Acesse: http://localhost:8888
+
+# Comandos avulsos (Python, scripts)
+docker compose run --rm etl python examples/dtlake/coesao_partidaria.py
+
+# Derruba tudo
+docker compose down
+
+# Derruba tudo inclusive volumes de dados
+docker compose down --volumes
+```
+
+### Build local
+
+```bash
+# Perfil base (padrão, ~200MB)
+docker build -t ipolitico-etl .
+
+# Perfil analysis (~350MB)
+docker build --build-arg PROFILE=analysis -t ipolitico-etl:analysis .
+```
+
+### Volumes
+
+Monte `$(pwd)/data:/app/data` para persistir dados entre execuções:
+
+```bash
+# Linux/Mac
+docker run --rm -v $(pwd)/data:/app/data ipolitico-etl --strategy incremental --optimize
+
+# Windows (PowerShell)
+docker run --rm -v ${PWD}/data:/app/data ipolitico-etl --strategy incremental --optimize
+
+# Windows (CMD)
+docker run --rm -v %cd%/data:/app/data ipolitico-etl --strategy incremental --optimize
+```
+
+### Workshop — comando único para começar
+
+```bash
+docker run --rm -v $(pwd)/data:/app/data ipolitico-etl --strategy full_load --optimize
+```
+
+Isso baixa e processa todos os 96 domínios (~12 milhões de registros). A primeira execução leva alguns minutos; execuções subsequentes (incremental) são segundos.
+
+> **Nota**: O comando `download-data` depende de uma release Gold publicada. Até a primeira release completa, use `--source-dir` para testar com dados locais: `docker run --rm -v $(pwd)/gold:/app/gold ipolitico-etl download-data --source-dir /app/gold`.
+
 ## Como usar
 
 ```bash
