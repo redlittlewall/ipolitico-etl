@@ -27,6 +27,7 @@ class CamaraBaseExtractor(BaseExtractor):
             client (CamaraClient): Cliente HTTP configurado para requisições na Câmara.
         """
         self.client = client
+        self.base_url = client.BASE_URL
 
     def build_params(self, raw_params: Dict[Any, Any]) -> Dict[str, Any]:
         """

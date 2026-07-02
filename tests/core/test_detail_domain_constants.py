@@ -51,6 +51,30 @@ class TestDomainSpecEntries:
         assert DomainType.PROPOSICOES in spec.depends_on
 
 
+class TestDomainSpecSourceUrlFormat:
+    def test_default_source_url_format_is_none(self):
+        """DomainSpec padrao deve ter source_url_format=None."""
+        spec = spec_for(DomainType.DEPUTADOS)
+        assert spec is not None
+        assert spec.source_url_format is None
+
+    def test_domain_spec_can_set_source_url_format(self):
+        """DomainSpec deve aceitar source_url_format via parametro."""
+        from ipolitico.core.domain_spec import DomainSpec
+
+        spec = DomainSpec(
+            domain=DomainType.DEPUTADOS,
+            watermark_column=None,
+            earliest_iso="1826-04-29",
+            depends_on=frozenset(),
+            source_url_format="https://dadosabertos.camara.leg.br/api/v2/deputados/{resource_id}",
+        )
+        assert (
+            spec.source_url_format
+            == "https://dadosabertos.camara.leg.br/api/v2/deputados/{resource_id}"
+        )
+
+
 class TestSilverSchemaEntries:
     def test_blocos_detalhe_schema(self):
         """SILVER_SCHEMAS deve ter entry para blocos_detalhe com campos corretos."""
@@ -84,3 +108,24 @@ class TestSilverSchemaEntries:
         assert schema["descricaoTipo"] == pl.String
         assert schema["keywords"] == pl.String
         assert schema["urlInteiroTeor"] == pl.String
+
+
+class TestSourceUrlInSchemas:
+    """Contract test: _source_url deve existir em todos os SILVER_SCHEMAS."""
+
+    def test_all_silver_schemas_have_source_url(self):
+        """Todo schema em SILVER_SCHEMAS deve conter o campo _source_url."""
+        missing = []
+        for domain_key, schema in SILVER_SCHEMAS.items():
+            if "_source_url" not in schema:
+                missing.append(domain_key)
+        assert not missing, f"Schemas sem _source_url: {missing}"
+
+    def test_source_url_is_first_field_in_all_schemas(self):
+        """_source_url deve ser o primeiro campo em todos os schemas."""
+        violations = []
+        for domain_key, schema in SILVER_SCHEMAS.items():
+            fields = list(schema.keys())
+            if not fields or fields[0] != "_source_url":
+                violations.append(domain_key)
+        assert not violations, f"Schemas onde _source_url nao e o primeiro campo: {violations}"

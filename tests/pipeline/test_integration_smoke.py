@@ -54,6 +54,7 @@ async def test_manager_run_domain_proposicoes_mocked():
             "ementa": ["teste"],
             "dataApresentacao": ["2024-03-15T00:00:00"],
             "uriOrgaoNumerador": [None],
+            "_source_url": [""],
         }
     )
 

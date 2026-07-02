@@ -20,6 +20,7 @@ def test_votacoes_transformer_datetime_from_bulk_strings():
             "proposicaoObjeto": [""],
             "descricao": [""],
             "aprovacao": [1],
+            "_source_url": [""],
         }
     )
 
@@ -57,6 +58,7 @@ def test_votos_transformer_bulk_id_deputado_rename():
             "partido": ["X"],
             "uf": ["SP"],
             "votacao_id": ["v1"],
+            "_source_url": [""],
         }
     )
 

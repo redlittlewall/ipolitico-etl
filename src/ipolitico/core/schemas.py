@@ -18,6 +18,7 @@ def despesas_optimizer_partition_sql() -> str:
 
 SILVER_SCHEMAS = {
     DomainType.DEPUTADOS.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "nome": pl.String,
         "partido": pl.String,
@@ -27,6 +28,7 @@ SILVER_SCHEMAS = {
         "email": pl.String,
     },
     DomainType.DESPESAS.value: {
+        "_source_url": pl.String,
         "id_deputado": pl.Int64,
         "ano": pl.Int64,
         "mes": pl.Int64,
@@ -44,6 +46,7 @@ SILVER_SCHEMAS = {
         "urlDocumento": pl.String,
     },
     DomainType.PROPOSICOES.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "uri": pl.String,
         "siglaTipo": pl.String,
@@ -54,6 +57,7 @@ SILVER_SCHEMAS = {
         "uriOrgaoNumerador": pl.String,
     },
     DomainType.VOTACOES.value: {
+        "_source_url": pl.String,
         "id": pl.String,
         "uri": pl.String,
         "data": pl.Datetime,
@@ -66,6 +70,7 @@ SILVER_SCHEMAS = {
         "aprovacao": pl.Int64,
     },
     DomainType.VOTOS.value: {
+        "_source_url": pl.String,
         "tipoVoto": pl.String,
         "dataRegistroVoto": pl.String,
         ApiParams.DEPUTADO_ID.value: pl.Int64,
@@ -74,6 +79,7 @@ SILVER_SCHEMAS = {
         "votacao_id": pl.String,
     },
     DomainType.PROFISSÕES.value: {
+        "_source_url": pl.String,
         "id_deputado": pl.Int64,
         "titulo": pl.String,
         "entidade": pl.String,
@@ -81,6 +87,7 @@ SILVER_SCHEMAS = {
         "anoFim": pl.Int64,
     },
     DomainType.OCUPACOES.value: {
+        "_source_url": pl.String,
         "id_deputado": pl.Int64,
         "titulo": pl.String,
         "entidade": pl.String,
@@ -88,6 +95,7 @@ SILVER_SCHEMAS = {
         "anoFim": pl.Int64,
     },
     DomainType.ORGAOS.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "uri": pl.String,
         "sigla": pl.String,
@@ -97,12 +105,14 @@ SILVER_SCHEMAS = {
         "apelido": pl.String,
     },
     DomainType.PARTIDOS.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "uri": pl.String,
         "sigla": pl.String,
         "nome": pl.String,
     },
     DomainType.EVENTOS.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "uri": pl.String,
         "descricao": pl.String,
@@ -113,6 +123,7 @@ SILVER_SCHEMAS = {
         "orgaos": pl.String,
     },
     DomainType.BLOCOS.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "idLegislatura": pl.Int64,
         "nome": pl.String,
@@ -120,12 +131,14 @@ SILVER_SCHEMAS = {
         "federacao": pl.Boolean,
     },
     DomainType.FRENTES.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "idLegislatura": pl.Int64,
         "titulo": pl.String,
         "uri": pl.String,
     },
     DomainType.GRUPOS.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "nome": pl.String,
         "uri": pl.String,
@@ -134,12 +147,14 @@ SILVER_SCHEMAS = {
         "ultimoStatus": pl.String,
     },
     DomainType.LEGISLATURAS.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "uri": pl.String,
         "dataInicio": pl.String,
         "dataFim": pl.String,
     },
     DomainType.DISCURSOS.value: {
+        "_source_url": pl.String,
         "id_deputado": pl.Int64,
         "dataHoraInicio": pl.Datetime,
         "dataHoraFim": pl.Datetime,
@@ -150,6 +165,7 @@ SILVER_SCHEMAS = {
         "faseEvento": pl.String,
     },
     DomainType.TRAMITACOES.value: {
+        "_source_url": pl.String,
         "id_proposicao": pl.Int64,
         "sequencia": pl.Int64,
         "dataHora": pl.Datetime,
@@ -160,6 +176,7 @@ SILVER_SCHEMAS = {
         "uriOrgao": pl.String,
     },
     DomainType.AUTORES.value: {
+        "_source_url": pl.String,
         "id_proposicao": pl.Int64,
         "codTipo": pl.Int64,
         "nome": pl.String,
@@ -169,6 +186,7 @@ SILVER_SCHEMAS = {
         "proponente": pl.Int64,
     },
     DomainType.ORIENTACOES.value: {
+        "_source_url": pl.String,
         "votacao_id": pl.String,
         "codPartidoBloco": pl.Int64,
         "codTipoLideranca": pl.String,
@@ -177,6 +195,7 @@ SILVER_SCHEMAS = {
         "uriPartidoBloco": pl.String,
     },
     DomainType.ORGAOS_MEMBROS.value: {
+        "_source_url": pl.String,
         "id_orgao": pl.Int64,
         "id": pl.Int64,
         "codTitulo": pl.Int64,
@@ -189,6 +208,7 @@ SILVER_SCHEMAS = {
         "idLegislatura": pl.Int64,
     },
     DomainType.FRENTES_MEMBROS.value: {
+        "_source_url": pl.String,
         "id_frente": pl.Int64,
         "id": pl.Int64,
         "codTitulo": pl.Int64,
@@ -201,6 +221,7 @@ SILVER_SCHEMAS = {
         "idLegislatura": pl.Int64,
     },
     DomainType.RELACIONADAS.value: {
+        "_source_url": pl.String,
         "id_proposicao": pl.Int64,
         "id": pl.Int64,
         "uri": pl.String,
@@ -211,10 +232,12 @@ SILVER_SCHEMAS = {
         "ementa": pl.String,
     },
     DomainType.TEMAS.value: {
+        "_source_url": pl.String,
         "id_proposicao": pl.Int64,
         "tema": pl.String,
     },
     DomainType.DEPUTADOS_FRENTES.value: {
+        "_source_url": pl.String,
         "id_deputado": pl.Int64,
         "id": pl.Int64,
         "titulo": pl.String,
@@ -222,6 +245,7 @@ SILVER_SCHEMAS = {
         "idLegislatura": pl.Int64,
     },
     DomainType.DEPUTADOS_ORGAOS.value: {
+        "_source_url": pl.String,
         "id_deputado": pl.Int64,
         "id": pl.Int64,
         "sigla": pl.String,
@@ -231,6 +255,7 @@ SILVER_SCHEMAS = {
         "dataFim": pl.String,
     },
     DomainType.DEPUTADOS_EVENTOS.value: {
+        "_source_url": pl.String,
         "id_deputado": pl.Int64,
         "id": pl.Int64,
         "uri": pl.String,
@@ -239,6 +264,7 @@ SILVER_SCHEMAS = {
         "descricao": pl.String,
     },
     DomainType.DEPUTADOS_HISTORICO.value: {
+        "_source_url": pl.String,
         "id_deputado": pl.Int64,
         "dataStatus": pl.String,
         "idLegislatura": pl.String,
@@ -247,6 +273,7 @@ SILVER_SCHEMAS = {
         "presidente": pl.String,
     },
     DomainType.MANDATOS_EXTERNOS.value: {
+        "_source_url": pl.String,
         "id_deputado": pl.Int64,
         "anoFim": pl.Int64,
         "anoInicio": pl.Int64,
@@ -256,6 +283,7 @@ SILVER_SCHEMAS = {
         "siglaUf": pl.String,
     },
     DomainType.EVENTOS_DEPUTADOS.value: {
+        "_source_url": pl.String,
         "id_evento": pl.Int64,
         "id": pl.Int64,
         "nome": pl.String,
@@ -264,6 +292,7 @@ SILVER_SCHEMAS = {
         "uri": pl.String,
     },
     DomainType.EVENTOS_VOTACOES.value: {
+        "_source_url": pl.String,
         "id_evento": pl.Int64,
         "id": pl.String,
         "uri": pl.String,
@@ -271,6 +300,7 @@ SILVER_SCHEMAS = {
         "descricao": pl.String,
     },
     DomainType.EVENTOS_PAUTA.value: {
+        "_source_url": pl.String,
         "id_evento": pl.Int64,
         "ordem": pl.Int64,
         "titulo": pl.String,
@@ -280,6 +310,7 @@ SILVER_SCHEMAS = {
         "relator": pl.String,
     },
     DomainType.PARTIDOS_MEMBROS.value: {
+        "_source_url": pl.String,
         "id_partido": pl.Int64,
         "id": pl.Int64,
         "nome": pl.String,
@@ -288,6 +319,7 @@ SILVER_SCHEMAS = {
         "uri": pl.String,
     },
     DomainType.PARTIDOS_LIDERES.value: {
+        "_source_url": pl.String,
         "id_partido": pl.Int64,
         "id": pl.Int64,
         "nome": pl.String,
@@ -296,6 +328,7 @@ SILVER_SCHEMAS = {
         "dataFim": pl.String,
     },
     DomainType.PROPOSICOES_VOTACOES.value: {
+        "_source_url": pl.String,
         "id_proposicao": pl.Int64,
         "id": pl.String,
         "uri": pl.String,
@@ -303,6 +336,7 @@ SILVER_SCHEMAS = {
         "descricao": pl.String,
     },
     DomainType.BLOCOS_PARTIDOS.value: {
+        "_source_url": pl.String,
         "id_bloco": pl.Int64,
         "id": pl.Int64,
         "sigla": pl.String,
@@ -310,6 +344,7 @@ SILVER_SCHEMAS = {
         "uri": pl.String,
     },
     DomainType.REFERENCIAS.value: {
+        "_source_url": pl.String,
         "referencia": pl.String,
         "cod": pl.String,
         "sigla": pl.String,
@@ -317,6 +352,7 @@ SILVER_SCHEMAS = {
         "descricao": pl.String,
     },
     DomainType.DEPUTADOS_DETALHE.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "cpf": pl.String,
         "dataNascimento": pl.String,
@@ -332,6 +368,7 @@ SILVER_SCHEMAS = {
         "redeSocial": pl.String,
     },
     DomainType.ORGAOS_DETALHE.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "uri": pl.String,
         "sigla": pl.String,
@@ -343,6 +380,7 @@ SILVER_SCHEMAS = {
         "urlWebsite": pl.String,
     },
     DomainType.EVENTOS_DETALHE.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "uri": pl.String,
         "descricao": pl.String,
@@ -353,6 +391,7 @@ SILVER_SCHEMAS = {
         "uriDeputados": pl.String,
     },
     DomainType.VOTACOES_DETALHE.value: {
+        "_source_url": pl.String,
         "id": pl.String,
         "uri": pl.String,
         "data": pl.Datetime,
@@ -364,6 +403,7 @@ SILVER_SCHEMAS = {
         "proposicoesAfetadas": pl.String,
     },
     DomainType.FRENTES_DETALHE.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "titulo": pl.String,
         "email": pl.String,
@@ -373,6 +413,7 @@ SILVER_SCHEMAS = {
         "coordenador": pl.String,
     },
     DomainType.PARTIDOS_DETALHE.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "nome": pl.String,
         "sigla": pl.String,
@@ -382,6 +423,7 @@ SILVER_SCHEMAS = {
         "status": pl.String,
     },
     DomainType.GRUPOS_DETALHE.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "nome": pl.String,
         "uri": pl.String,
@@ -389,12 +431,14 @@ SILVER_SCHEMAS = {
         "ultimoStatus": pl.String,
     },
     DomainType.LEGISLATURAS_DETALHE.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "uri": pl.String,
         "dataInicio": pl.String,
         "dataFim": pl.String,
     },
     DomainType.BLOCOS_DETALHE.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "idLegislatura": pl.Int64,
         "nome": pl.String,
@@ -402,6 +446,7 @@ SILVER_SCHEMAS = {
         "federacao": pl.Boolean,
     },
     DomainType.PROPOSICOES_DETALHE.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "uri": pl.String,
         "siglaTipo": pl.String,
@@ -419,6 +464,7 @@ SILVER_SCHEMAS = {
         "urlInteiroTeor": pl.String,
     },
     DomainType.EVENTOS_ORGAOS.value: {
+        "_source_url": pl.String,
         "id_evento": pl.Int64,
         "id": pl.Int64,
         "uri": pl.String,
@@ -429,6 +475,7 @@ SILVER_SCHEMAS = {
         "apelido": pl.String,
     },
     DomainType.ORGAOS_EVENTOS.value: {
+        "_source_url": pl.String,
         "id_orgao": pl.Int64,
         "id": pl.Int64,
         "uri": pl.String,
@@ -436,6 +483,7 @@ SILVER_SCHEMAS = {
         "dataHoraInicio": pl.Datetime,
     },
     DomainType.ORGAOS_VOTACOES.value: {
+        "_source_url": pl.String,
         "id_orgao": pl.Int64,
         "id": pl.String,
         "uri": pl.String,
@@ -443,6 +491,7 @@ SILVER_SCHEMAS = {
         "descricao": pl.String,
     },
     DomainType.GRUPOS_MEMBROS.value: {
+        "_source_url": pl.String,
         "id_grupo": pl.Int64,
         "id": pl.Int64,
         "nome": pl.String,
@@ -451,12 +500,14 @@ SILVER_SCHEMAS = {
         "titulo": pl.String,
     },
     DomainType.GRUPOS_HISTORICO.value: {
+        "_source_url": pl.String,
         "id_grupo": pl.Int64,
         "data": pl.String,
         "descricao": pl.String,
         "uri": pl.String,
     },
     DomainType.LEGISLATURAS_LIDERES.value: {
+        "_source_url": pl.String,
         "id_legislatura": pl.Int64,
         "id": pl.Int64,
         "nome": pl.String,
@@ -466,6 +517,7 @@ SILVER_SCHEMAS = {
         "dataFim": pl.String,
     },
     DomainType.LEGISLATURAS_MESA.value: {
+        "_source_url": pl.String,
         "id_legislatura": pl.Int64,
         "id": pl.Int64,
         "nome": pl.String,
@@ -476,6 +528,7 @@ SILVER_SCHEMAS = {
     },
     # ── Domínios bulk-only (Fase 3) ─────────────────────────────────────────
     DomainType.FUNCIONARIOS.value: {
+        "_source_url": pl.String,
         "ponto": pl.String,
         "codGrupo": pl.Int64,
         "grupo": pl.String,
@@ -490,12 +543,14 @@ SILVER_SCHEMAS = {
         "uriLotacao": pl.String,
     },
     DomainType.TECAD_CATEGORIAS.value: {
+        "_source_url": pl.String,
         "codCategoria": pl.Int64,
         "categoria": pl.String,
         "codSubCategoria": pl.Int64,
         "subCategoria": pl.String,
     },
     DomainType.TECAD_TERMOS.value: {
+        "_source_url": pl.String,
         "codTermo": pl.Int64,
         "termo": pl.String,
         "categorias": pl.String,
@@ -512,6 +567,7 @@ SILVER_SCHEMAS = {
     },
     # ── Domínios bulk-only de licitações (Fase 3) ──────────────────────────────
     DomainType.LICITACOES.value: {
+        "_source_url": pl.String,
         "idLicitacao": pl.Int64,
         "numero": pl.Int64,
         "ano": pl.Int64,
@@ -533,6 +589,7 @@ SILVER_SCHEMAS = {
         "numContratos": pl.Int64,
     },
     DomainType.LICITACOES_CONTRATOS.value: {
+        "_source_url": pl.String,
         "ano": pl.Int64,
         "idLicitacao": pl.Int64,
         "numContrato": pl.Int64,
@@ -556,6 +613,7 @@ SILVER_SCHEMAS = {
         "txtNomeArquivo": pl.String,
     },
     DomainType.LICITACOES_ITENS.value: {
+        "_source_url": pl.String,
         "ano": pl.Int64,
         "idLicitacao": pl.Int64,
         "numItem": pl.Int64,
@@ -581,6 +639,7 @@ SILVER_SCHEMAS = {
         "codPTRES": pl.String,
     },
     DomainType.LICITACOES_PEDIDOS.value: {
+        "_source_url": pl.String,
         "ano": pl.Int64,
         "idLicitacao": pl.Int64,
         "tipoRegistro": pl.String,
@@ -593,6 +652,7 @@ SILVER_SCHEMAS = {
         "observacoes": pl.String,
     },
     DomainType.LICITACOES_PROPOSTAS.value: {
+        "_source_url": pl.String,
         "ano": pl.Int64,
         "idLicitacao": pl.Int64,
         "numItem": pl.Int64,
@@ -613,6 +673,7 @@ SILVER_SCHEMAS = {
     },
     # ── Senado ─────────────────────────────────────────────────────────────────
     DomainType.SENADORES.value: {
+        "_source_url": pl.String,
         "codigo": pl.Int64,
         "nome": pl.String,
         "nome_completo": pl.String,
@@ -624,6 +685,7 @@ SILVER_SCHEMAS = {
         "segunda_legislatura": pl.Int64,
     },
     DomainType.SENADORES_DETALHE.value: {
+        "_source_url": pl.String,
         "codigo": pl.Int64,
         "nome": pl.String,
         "nome_completo": pl.String,
@@ -636,6 +698,7 @@ SILVER_SCHEMAS = {
         "email": pl.String,
     },
     DomainType.PROCESSOS.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "codigo_materia": pl.Int64,
         "identificacao": pl.String,
@@ -649,6 +712,7 @@ SILVER_SCHEMAS = {
         "tramitando": pl.String,
     },
     DomainType.PROCESSOS_DETALHE.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "codigo_materia": pl.Int64,
         "identificacao": pl.String,
@@ -663,6 +727,7 @@ SILVER_SCHEMAS = {
         "ementa": pl.String,
     },
     DomainType.PROCESSOS_EMENDAS.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "id_processo": pl.Int64,
         "identificacao": pl.String,
@@ -678,6 +743,7 @@ SILVER_SCHEMAS = {
         "decisoes": pl.String,
     },
     DomainType.PROCESSOS_DOCUMENTOS.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "identificacao": pl.String,
         "autoria": pl.String,
@@ -695,6 +761,7 @@ SILVER_SCHEMAS = {
         "apresentado_processo_identificacao": pl.String,
     },
     DomainType.VOTACOES_SENADO.value: {
+        "_source_url": pl.String,
         "votacao_id": pl.Int64,
         "codigo_materia": pl.Int64,
         "id_processo": pl.Int64,
@@ -706,6 +773,7 @@ SILVER_SCHEMAS = {
         "resultado": pl.String,
     },
     DomainType.VOTOS_SENADO.value: {
+        "_source_url": pl.String,
         "votacao_id": pl.Int64,
         "codigo_parlamentar": pl.Int64,
         "nome_parlamentar": pl.String,
@@ -714,6 +782,7 @@ SILVER_SCHEMAS = {
         "voto": pl.String,
     },
     DomainType.VOTACOES_COMISSAO.value: {
+        "_source_url": pl.String,
         "votacao_id": pl.Int64,
         "codigo_materia": pl.Int64,
         "id_processo": pl.Int64,
@@ -727,6 +796,7 @@ SILVER_SCHEMAS = {
     },
     # ── Domínios bulk-only de eventos/votações (Fase 3) ────────────────────────
     DomainType.EVENTOS_PRESENCA_DEPUTADOS.value: {
+        "_source_url": pl.String,
         "idEvento": pl.Int64,
         "uriEvento": pl.String,
         "dataHoraInicio": pl.String,
@@ -734,12 +804,14 @@ SILVER_SCHEMAS = {
         "uriDeputado": pl.String,
     },
     DomainType.EVENTOS_REQUERIMENTOS.value: {
+        "_source_url": pl.String,
         "idEvento": pl.Int64,
         "uriEvento": pl.String,
         "tituloRequerimento": pl.String,
         "uriRequerimento": pl.String,
     },
     DomainType.VOTACOES_OBJETOS.value: {
+        "_source_url": pl.String,
         "idVotacao": pl.String,
         "uriVotacao": pl.String,
         "data": pl.String,
@@ -754,6 +826,7 @@ SILVER_SCHEMAS = {
         "proposicao_titulo": pl.String,
     },
     DomainType.VOTACOES_PROPOSICOES.value: {
+        "_source_url": pl.String,
         "idVotacao": pl.String,
         "uriVotacao": pl.String,
         "data": pl.String,
@@ -769,6 +842,7 @@ SILVER_SCHEMAS = {
     },
     # ── Senado — Orçamento (Issue 05) ──────────────────────────────────────────
     DomainType.ORCAMENTO_EMENDAS.value: {
+        "_source_url": pl.String,
         "nome_autor_orcamento": pl.String,
         "indicador_ativo": pl.String,
         "email_autor_orcamento": pl.String,
@@ -782,6 +856,7 @@ SILVER_SCHEMAS = {
         "descricao_tipo_pl_orcamento": pl.String,
     },
     DomainType.ORCAMENTO_OFICIOS.value: {
+        "_source_url": pl.String,
         "id": pl.Int64,
         "tratamento": pl.String,
         "nome": pl.String,
@@ -791,6 +866,7 @@ SILVER_SCHEMAS = {
     },
     # ── Senado — Vetos Presidenciais (Issue 11) ──────────────────────────────
     DomainType.VETOS_PRESIDENCIAIS.value: {
+        "_source_url": pl.String,
         # Flat
         "codigo": pl.Int64,
         "total": pl.String,
@@ -842,6 +918,7 @@ SILVER_SCHEMAS = {
         "mensagem_url_planalto": pl.String,
     },
     DomainType.VETOS_DETALHE.value: {
+        "_source_url": pl.String,
         "codigo": pl.Int64,
         "total": pl.String,
         "assunto": pl.String,
@@ -891,6 +968,7 @@ SILVER_SCHEMAS = {
     },
     # ── Senado — Discursos e Notas Taquigráficas (Issue 07) ──────────────────────
     DomainType.SENADORES_DISCURSOS.value: {
+        "_source_url": pl.String,
         "codigo": pl.Int64,
         "codigo_parlamentar": pl.Int64,
         "nome_parlamentar": pl.String,
@@ -903,6 +981,7 @@ SILVER_SCHEMAS = {
         "texto": pl.String,
     },
     DomainType.DISCURSOS_PLENARIO.value: {
+        "_source_url": pl.String,
         "codigo": pl.Int64,
         "data": pl.String,
         "tipo_discurso": pl.String,
@@ -913,19 +992,23 @@ SILVER_SCHEMAS = {
         "uf": pl.String,
     },
     DomainType.DISCURSOS_TEXTO.value: {
+        "_source_url": pl.String,
         "codigo": pl.Int64,
         "texto": pl.String,
     },
     DomainType.NOTAS_TAQUIGRAFIA_SESSAO.value: {
+        "_source_url": pl.String,
         "id_sessao": pl.Int64,
         "texto": pl.String,
     },
     DomainType.NOTAS_TAQUIGRAFIA_REUNIAO.value: {
+        "_source_url": pl.String,
         "id_reuniao": pl.Int64,
         "texto": pl.String,
     },
     # ── Senado — Comissões (Issue 08a) ──────────────────────────────────────────
     DomainType.COMISSOES_SENADO.value: {
+        "_source_url": pl.String,
         "codigo": pl.Int64,
         "sigla": pl.String,
         "nome": pl.String,
@@ -938,6 +1021,7 @@ SILVER_SCHEMAS = {
         "finalidade": pl.String,
     },
     DomainType.COMISSOES_DETALHE.value: {
+        "_source_url": pl.String,
         "codigo": pl.Int64,
         "nome": pl.String,
         "sigla": pl.String,
@@ -947,6 +1031,7 @@ SILVER_SCHEMAS = {
         "quantidades_membros": pl.String,
     },
     DomainType.COMISSOES_REUNIOES.value: {
+        "_source_url": pl.String,
         "codigo": pl.Int64,
         "versao": pl.String,
         "descricao": pl.String,
@@ -969,6 +1054,7 @@ SILVER_SCHEMAS = {
         "url_ultimo_resultado": pl.String,
     },
     DomainType.COMISSOES_MEMBROS.value: {
+        "_source_url": pl.String,
         "codigo_comissao": pl.Int64,
         "sigla_comissao": pl.String,
         "nome_comissao": pl.String,
@@ -980,6 +1066,7 @@ SILVER_SCHEMAS = {
     },
     # ── Senado — Plenário (Issue 08b) ────────────────────────────────────────────
     DomainType.PLENARIO_AGENDA.value: {
+        "_source_url": pl.String,
         "codigo_sessao": pl.Int64,
         "data": pl.String,
         "dia_semana": pl.String,
@@ -1000,6 +1087,7 @@ SILVER_SCHEMAS = {
         "oradores": pl.String,
     },
     DomainType.PLENARIO_RESULTADOS.value: {
+        "_source_url": pl.String,
         "codigo_sessao": pl.String,
         "codigo_item": pl.String,
         "codigo_materia": pl.String,
@@ -1026,6 +1114,7 @@ SILVER_SCHEMAS = {
         "sigla_casa": pl.String,
     },
     DomainType.PLENARIO_SESSOES.value: {
+        "_source_url": pl.String,
         "numero_legislatura": pl.Int64,
         "numero_sessao_legislativa": pl.Int64,
         "tipo_sessao_legislativa": pl.String,
@@ -1037,6 +1126,7 @@ SILVER_SCHEMAS = {
     },
     # ── Senado — Composição (Issue 08c) ────────────────────────────────────────────
     DomainType.BLOCOS_SENADO.value: {
+        "_source_url": pl.String,
         "codigo": pl.Int64,
         "nome": pl.String,
         "nome_apelido": pl.String,
@@ -1044,6 +1134,7 @@ SILVER_SCHEMAS = {
         "membros": pl.String,
     },
     DomainType.LIDERANCAS_SENADO.value: {
+        "_source_url": pl.String,
         "codigo": pl.Int64,
         "casa": pl.String,
         "id_tipo_unidade_lideranca": pl.Int64,
@@ -1067,6 +1158,7 @@ SILVER_SCHEMAS = {
         "nome_partido_filiacao": pl.String,
     },
     DomainType.MESA_SENADO.value: {
+        "_source_url": pl.String,
         "codigo_colegiado": pl.Int64,
         "nome_colegiado": pl.String,
         "sigla_colegiado": pl.String,
@@ -1078,6 +1170,7 @@ SILVER_SCHEMAS = {
         "origem": pl.String,
     },
     DomainType.MESA_CONGRESSO.value: {
+        "_source_url": pl.String,
         "codigo_colegiado": pl.Int64,
         "nome_colegiado": pl.String,
         "sigla_colegiado": pl.String,
@@ -1089,6 +1182,7 @@ SILVER_SCHEMAS = {
         "codigo_deputado_camara": pl.String,
     },
     DomainType.SENADORES_MANDATOS.value: {
+        "_source_url": pl.String,
         "codigo": pl.Int64,
         "codigo_mandato": pl.Int64,
         "uf": pl.String,
@@ -1100,12 +1194,14 @@ SILVER_SCHEMAS = {
         "data_fim": pl.String,
     },
     DomainType.SENADORES_FILIACOES.value: {
+        "_source_url": pl.String,
         "codigo": pl.Int64,
         "sigla_partido": pl.String,
         "data_filiacao": pl.String,
         "data_desfiliacao": pl.String,
     },
     DomainType.ORIENTACAO_BANCADA.value: {
+        "_source_url": pl.String,
         "codigo_votacao": pl.Int64,
         "codigo_materia": pl.Int64,
         "sigla_partido": pl.String,

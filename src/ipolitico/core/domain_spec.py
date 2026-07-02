@@ -19,6 +19,7 @@ class DomainSpec:
     sub_domain: str | None = None
     bulk_granularity: str | None = None
     stable: bool = False
+    source_url_format: str | None = None
 
 
 def _spec(
@@ -28,6 +29,7 @@ def _spec(
     uk: tuple[str, ...] = ("id",),
     sub: str | None = None,
     stable: bool = False,
+    source_url_format: str | None = None,
 ) -> DomainSpec:
     meta = BULK_REGISTRY.get(domain.value, {})
     return DomainSpec(
@@ -39,6 +41,7 @@ def _spec(
         sub_domain=sub,
         bulk_granularity=meta.get("bulk_granularity"),
         stable=stable,
+        source_url_format=source_url_format,
     )
 
 

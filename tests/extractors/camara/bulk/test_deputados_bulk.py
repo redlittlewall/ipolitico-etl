@@ -18,6 +18,7 @@ def test_deputados_transformer_extracts_id_from_uri():
             pl.lit("SP").alias("siglaUf"),
             pl.lit(57).alias("idLegislatura"),
             pl.lit("http://foto").alias("urlFoto"),
+            pl.lit("").alias("_source_url"),
         ]
     )
 
@@ -38,6 +39,7 @@ def test_deputados_transformer_renames_capitalized_id():
             "siglaPartido": ["P"],
             "siglaUf": ["RJ"],
             "urlFoto": ["u"],
+            "_source_url": [""],
         }
     )
 
