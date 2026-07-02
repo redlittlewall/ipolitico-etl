@@ -7,6 +7,7 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
 COPY configs/ ./configs/
+COPY scripts/ ./scripts/
 
 # Instala o pacote com dependências dev (inclui pytest para testes)
 RUN pip install --no-cache-dir -e ".[dev]"
@@ -21,4 +22,4 @@ FROM ${PROFILE} AS final
 COPY --from=base /app /app
 # Copia testes para execução dentro do container
 COPY tests/ ./tests/
-ENTRYPOINT ["ipolitico"]
+ENTRYPOINT ["scripts/docker-entrypoint.sh"]
