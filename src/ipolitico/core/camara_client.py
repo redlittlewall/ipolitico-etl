@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import socket
 import sqlite3
 import urllib
 from datetime import time
@@ -80,11 +81,49 @@ class CamaraClient:
         except Exception:
             pass  # Nunca deixamos a telemetria quebrar o negócio principal
 
+    async def _resolve_host_with_retries(self, hostname: str, max_retries: int = 3) -> str | None:
+        """
+        Pré-resolve o hostname da API de forma assíncrona antes de tentar a requisição HTTP.
+
+        Isola falhas de DNS (nome não resolve) das falhas de rede (conexão caiu),
+        permitindo retry específico no DNS sem contaminar a lógica de backoff HTTP.
+
+        Args:
+            hostname: Nome do host a resolver.
+            max_retries: Número máximo de tentativas de DNS.
+
+        Returns:
+            IP resolvido como string, ou None se esgotaram as tentativas.
+        """
+        for attempt in range(1, max_retries + 1):
+            try:
+                result = await asyncio.to_thread(socket.getaddrinfo, hostname, 443, socket.AF_INET)
+                return result[0][4][0]
+            except socket.gaierror:
+                if attempt < max_retries:
+                    logger.warning(
+                        "[DNS] Falha ao resolver %s (tentativa %d/%d). Retentando em 2s...",
+                        hostname,
+                        attempt,
+                        max_retries,
+                    )
+                    await asyncio.sleep(2)
+                else:
+                    logger.error(
+                        "[DNS] Falha catastrófica ao resolver %s após %d tentativas.",
+                        hostname,
+                        max_retries,
+                    )
+        return None
+
     async def fetch(
         self, endpoint: str, params: dict[str, Any] | None = None
     ) -> list[Any] | dict[str, Any]:
         """
         Executa requisições GET à API com lógica de retentativa e backoff.
+
+        Inclui pré-resolução de DNS com retry dedicado para isolar falhas de
+        resolução de nome (comuns em runners cloud) das falhas de rede.
 
         Args:
             endpoint (str): O caminho da API (ex: '/deputados').
@@ -97,6 +136,13 @@ class CamaraClient:
             CamaraAPIError: Se esgotar as tentativas de conexão ou receber erros de servidor.
         """
         url = f"{self.BASE_URL}/{endpoint.lstrip('/')}"
+
+        # Pré-resolve DNS para isolar falhas de resolução de nome
+        from urllib.parse import urlparse
+
+        hostname = urlparse(url).hostname
+        if hostname:
+            await self._resolve_host_with_retries(hostname)
         async with self._semaphore:
             async with httpx.AsyncClient(timeout=30.0, headers=self.headers) as client:
                 for attempt in range(1, self.max_retries + 1):
