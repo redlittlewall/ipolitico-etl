@@ -1,0 +1,33 @@
+# iPolitico ETL — docker-compose.yml
+# Orquestração para execução do pipeline ETL e análise de dados
+#
+# Uso:
+#   docker compose run --rm etl --source all     # Executa ETL completo
+#   docker compose run --rm etl --help           # Ajuda do CLI
+#   docker compose up -d analysis                # Sobe Jupyter Lab
+#   docker compose down                          # Derruba serviços
+
+services:
+  # Perfil base: execução do ETL (sem dependências de análise)
+  etl:
+    build:
+      context: .
+      args:
+        PROFILE: base
+    image: ipolitico-etl:latest
+    volumes:
+      - ./data:/app/data
+
+  # Perfil analysis: Jupyter Lab com matplotlib/seaborn
+  analysis:
+    build:
+      context: .
+      args:
+        PROFILE: analysis
+    image: ipolitico-etl:analysis
+    entrypoint: ["jupyter", "lab", "--ip=0.0.0.0", "--allow-root", "--no-browser"]
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./data:/app/data
+      - ./examples:/app/examples
