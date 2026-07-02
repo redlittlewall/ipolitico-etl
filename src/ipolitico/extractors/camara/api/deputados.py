@@ -49,6 +49,8 @@ class DeputadosExtractor(CamaraBaseExtractor):
         data = await self.fetch_paginated(ApiRoutes.DEPUTADOS.value, self.build_params(raw_params))
 
         df = pl.DataFrame(data, infer_schema_length=None) if data else pl.DataFrame()
+        if df.is_empty():
+            return df
         return self._inject_source_url(df, "deputados", resource_id_col="id")
 
     async def extract_detalhes(self, deputado_id: int) -> pl.DataFrame:

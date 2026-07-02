@@ -54,5 +54,10 @@ class DespesasExtractor(CamaraBaseExtractor):
 
         if not df.is_empty():
             df = df.with_columns(pl.lit(deputado_id).alias(ApiParams.DEPUTADO_ID.value))
+            url_params = {"ano": year}
+            if month:
+                url_params["mes"] = month
+            endpoint = f"deputados/{deputado_id}/despesas"
+            df = self._inject_source_url(df, endpoint, params=url_params)
 
         return df

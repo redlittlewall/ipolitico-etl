@@ -26,7 +26,9 @@ class DeputadoChildRouteExtractor(DeputadosExtractor):
         df = await self.extract_child_route(int(deputado_id), self.route_suffix)
         if df.is_empty():
             return df
-        return df.with_columns(pl.lit(int(deputado_id)).alias("id_deputado"))
+        df = df.with_columns(pl.lit(int(deputado_id)).alias("id_deputado"))
+        endpoint = f"deputados/{int(deputado_id)}/{self.route_suffix}"
+        return self._inject_source_url(df, endpoint)
 
 
 class ProfissoesExtractor(DeputadoChildRouteExtractor):
@@ -99,7 +101,10 @@ class DeputadoTemporalChildExtractor(DeputadosExtractor):
             return pl.DataFrame()
 
         result = pl.concat(frames)
-        return result.with_columns(pl.lit(int(deputado_id)).alias("id_deputado"))
+        result = result.with_columns(pl.lit(int(deputado_id)).alias("id_deputado"))
+        endpoint = f"deputados/{int(deputado_id)}/{self.route_suffix}"
+        params = {"dataInicio": start_date, "dataFim": end_date}
+        return self._inject_source_url(result, endpoint, params=params)
 
 
 class DiscursosExtractor(DeputadoTemporalChildExtractor):

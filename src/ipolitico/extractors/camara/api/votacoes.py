@@ -53,7 +53,9 @@ class VotacoesExtractor(CamaraBaseExtractor):
             return pl.DataFrame()
 
         logger.info("API votações: %s registros brutos no período.", len(data))
-        df = pl.DataFrame(data, infer_schema_length=None)
+        df = pl.DataFrame(data, infer_schema_length=None) if data else pl.DataFrame()
+        if df.is_empty():
+            return df
         return self._inject_source_url(df, "votacoes", resource_id_col="id")
 
     async def extract_votos(self, votacao_id: str) -> pl.DataFrame:

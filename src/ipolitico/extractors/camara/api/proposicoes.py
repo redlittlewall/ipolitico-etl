@@ -53,4 +53,6 @@ class ProposicoesExtractor(CamaraBaseExtractor):
         )
 
         df = pl.DataFrame(data) if data else pl.DataFrame()
+        if df.is_empty():
+            return df
         return self._inject_source_url(df, "proposicoes", resource_id_col="id")

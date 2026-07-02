@@ -49,12 +49,16 @@ class ReferenciasExtractor(CamaraBaseExtractor):
         rows: list[dict] = []
 
         for path in paths:
+            url = self.build_source_url(path)
             try:
                 data = await self.fetch_unpaginated(path, {})
                 for item in data:
                     if isinstance(item, dict):
-                        rows.append({**item, "referencia": path})
+                        rows.append({**item, "referencia": path, "_source_url": url})
             except Exception as e:
                 logger.warning("Erro em referência %s: %s", path, e)
 
-        return pl.DataFrame(rows, infer_schema_length=None) if rows else pl.DataFrame()
+        if not rows:
+            return pl.DataFrame()
+        df = pl.DataFrame(rows, infer_schema_length=None)
+        return df.select(["_source_url"] + [c for c in df.columns if c != "_source_url"])
