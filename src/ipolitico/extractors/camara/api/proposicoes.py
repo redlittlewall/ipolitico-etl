@@ -17,6 +17,8 @@ class ProposicoesExtractor(CamaraBaseExtractor):
     A orquestração de chamadas particionadas por ano fica a cargo do PipelineRunner.
     """
 
+    source_url_format: str = "https://dadosabertos.camara.leg.br/api/v2/proposicoes/{resource_id}"
+
     async def extract(
         self,
         start_date: Optional[str] = None,
@@ -34,7 +36,8 @@ class ProposicoesExtractor(CamaraBaseExtractor):
             **kwargs: Parâmetros extras.
 
         Returns:
-            pl.DataFrame: DataFrame contendo os dados brutos de proposições.
+            pl.DataFrame: DataFrame contendo os dados brutos de proposições
+                          com coluna ``_source_url`` de auditoria.
         """
         raw_params = {
             ApiParams.ANO: year,
@@ -49,4 +52,5 @@ class ProposicoesExtractor(CamaraBaseExtractor):
             ApiRoutes.PROPOSICOES.value, self.build_params(raw_params)
         )
 
-        return pl.DataFrame(data) if data else pl.DataFrame()
+        df = pl.DataFrame(data) if data else pl.DataFrame()
+        return self._inject_source_url(df, "proposicoes", resource_id_col="id")

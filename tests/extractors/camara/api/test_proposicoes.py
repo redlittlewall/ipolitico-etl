@@ -35,3 +35,19 @@ async def test_extract_empty_returns_empty(extractor: ProposicoesExtractor):
     df = await extractor.extract(start_date="2026-01-01", end_date="2026-01-31", year=2026)
 
     assert df.is_empty()
+
+
+@pytest.mark.asyncio
+async def test_extract_injects_source_url(extractor: ProposicoesExtractor):
+    """Cada registro deve ter _source_url apontando para /proposicoes/{id}."""
+    extractor.fetch_paginated.return_value = [
+        {"id": 100, "siglaTipo": "PL", "numero": 123},
+        {"id": 200, "siglaTipo": "PEC", "numero": 45},
+    ]
+
+    df = await extractor.extract(start_date="2026-01-01", end_date="2026-12-31")
+
+    assert df["_source_url"].to_list() == [
+        "https://dadosabertos.camara.leg.br/api/v2/proposicoes/100",
+        "https://dadosabertos.camara.leg.br/api/v2/proposicoes/200",
+    ]

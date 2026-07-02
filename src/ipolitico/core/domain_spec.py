@@ -8,6 +8,32 @@ from typing import FrozenSet
 from ipolitico.core.constants import EARLIEST_DATE_MAP, DomainType
 from ipolitico.extractors.camara.bulk.registry import BULK_REGISTRY
 
+# URLs de auditoria para recursos com ID único na API da Câmara.
+_SOURCE_URL_FORMATS: dict[DomainType, str] = {
+    DomainType.DEPUTADOS: "https://dadosabertos.camara.leg.br/api/v2/deputados/{resource_id}",
+    DomainType.PROPOSICOES: "https://dadosabertos.camara.leg.br/api/v2/proposicoes/{resource_id}",
+    DomainType.VOTACOES: "https://dadosabertos.camara.leg.br/api/v2/votacoes/{resource_id}",
+    DomainType.ORGAOS: "https://dadosabertos.camara.leg.br/api/v2/orgaos/{resource_id}",
+    DomainType.PARTIDOS: "https://dadosabertos.camara.leg.br/api/v2/partidos/{resource_id}",
+    DomainType.EVENTOS: "https://dadosabertos.camara.leg.br/api/v2/eventos/{resource_id}",
+    DomainType.BLOCOS: "https://dadosabertos.camara.leg.br/api/v2/blocos/{resource_id}",
+    DomainType.FRENTES: "https://dadosabertos.camara.leg.br/api/v2/frentes/{resource_id}",
+    DomainType.GRUPOS: "https://dadosabertos.camara.leg.br/api/v2/grupos/{resource_id}",
+    DomainType.LEGISLATURAS: "https://dadosabertos.camara.leg.br/api/v2/legislaturas/{resource_id}",
+    DomainType.DEPUTADOS_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/deputados/{resource_id}",
+    DomainType.PROPOSICOES_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/proposicoes/{resource_id}",
+    DomainType.VOTACOES_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/votacoes/{resource_id}",
+    DomainType.ORGAOS_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/orgaos/{resource_id}",
+    DomainType.PARTIDOS_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/partidos/{resource_id}",
+    DomainType.EVENTOS_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/eventos/{resource_id}",
+    DomainType.FRENTES_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/frentes/{resource_id}",
+    DomainType.GRUPOS_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/grupos/{resource_id}",
+    DomainType.LEGISLATURAS_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/legislaturas/{resource_id}",
+    DomainType.BLOCOS_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/blocos/{resource_id}",
+    DomainType.VOTOS: "https://dadosabertos.camara.leg.br/api/v2/votacoes/{resource_id}/votos",
+    DomainType.ORIENTACOES: "https://dadosabertos.camara.leg.br/api/v2/votacoes/{resource_id}/orientacoes",
+}
+
 
 @dataclass(frozen=True)
 class DomainSpec:
@@ -41,7 +67,7 @@ def _spec(
         sub_domain=sub,
         bulk_granularity=meta.get("bulk_granularity"),
         stable=stable,
-        source_url_format=source_url_format,
+        source_url_format=source_url_format or _SOURCE_URL_FORMATS.get(domain),
     )
 
 

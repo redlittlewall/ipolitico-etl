@@ -17,6 +17,8 @@ class DeputadosExtractor(CamaraBaseExtractor):
     individuais sem deter estado ou gerenciar filas de execução.
     """
 
+    source_url_format: str = "https://dadosabertos.camara.leg.br/api/v2/deputados/{resource_id}"
+
     async def extract(
         self,
         start_date: Optional[str] = None,
@@ -34,7 +36,8 @@ class DeputadosExtractor(CamaraBaseExtractor):
             **kwargs: Parâmetros adicionais.
 
         Returns:
-            pl.DataFrame: DataFrame contendo os dados brutos da lista de deputados.
+            pl.DataFrame: DataFrame contendo os dados brutos da lista de deputados
+                          com coluna ``_source_url`` de auditoria.
         """
         raw_params = {
             ApiParams.DATA_INICIO.value: start_date,
@@ -45,7 +48,8 @@ class DeputadosExtractor(CamaraBaseExtractor):
         logger.debug(f"Fetching deputados from API with params: {raw_params}")
         data = await self.fetch_paginated(ApiRoutes.DEPUTADOS.value, self.build_params(raw_params))
 
-        return pl.DataFrame(data, infer_schema_length=None) if data else pl.DataFrame()
+        df = pl.DataFrame(data, infer_schema_length=None) if data else pl.DataFrame()
+        return self._inject_source_url(df, "deputados", resource_id_col="id")
 
     async def extract_detalhes(self, deputado_id: int) -> pl.DataFrame:
         """

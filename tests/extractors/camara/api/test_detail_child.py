@@ -56,6 +56,10 @@ class TestExtractBehavior:
         assert mock_client.fetch.call_count == 2
         mock_client.fetch.assert_any_call("blocos/1")
         mock_client.fetch.assert_any_call("blocos/2")
+        assert result["_source_url"].to_list() == [
+            "https://dadosabertos.camara.leg.br/api/v2/blocos/1",
+            "https://dadosabertos.camara.leg.br/api/v2/blocos/2",
+        ]
 
     @pytest.mark.asyncio
     async def test_proposicoes_detalhe_chama_endpoint_correto(self, mock_client):
@@ -72,6 +76,10 @@ class TestExtractBehavior:
         assert isinstance(result, pl.DataFrame)
         assert len(result) == 1
         mock_client.fetch.assert_called_once_with("proposicoes/257161")
+        assert (
+            result["_source_url"][0]
+            == "https://dadosabertos.camara.leg.br/api/v2/proposicoes/257161"
+        )
 
     @pytest.mark.asyncio
     async def test_extract_sem_ids_retorna_vazio(self, mock_client):
