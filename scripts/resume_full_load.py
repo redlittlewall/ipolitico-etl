@@ -19,6 +19,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from ipolitico.core.client import CamaraClient  # noqa: E402
+
 from ipolitico.core.constants import DomainType, LoadStrategy, SinkType  # noqa: E402
 from ipolitico.pipeline.builder import PipelineBuilder  # noqa: E402
 from ipolitico.pipeline.federation import FederationOrchestrator  # noqa: E402

@@ -2,7 +2,7 @@ import pytest
 import respx
 from httpx import Response
 
-from ipolitico.core.client import CamaraClient
+from ipolitico.core.camara_client import CamaraClient
 from ipolitico.extractors.camara.api.blocos import BlocosExtractor
 from ipolitico.extractors.camara.api.eventos import EventosExtractor
 from ipolitico.extractors.camara.api.frentes import FrentesExtractor

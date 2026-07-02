@@ -13,13 +13,12 @@ from ipolitico.core.constants import (
 from ipolitico.core.domain_spec import spec_for
 from ipolitico.core.legislature import legislature_anchor_year_from_iso
 from ipolitico.pipeline.builder import PipelineBuilder
-from ipolitico.pipeline.planners.camara_jobs import CamaraJobPlanner
+from ipolitico.pipeline.planners.camara_jobs import JobPlanner
 from ipolitico.pipeline.runner import PipelineRunner
 from ipolitico.pipeline.source_router import SourceRouter
 from ipolitico.pipeline.window_resolver import WindowResolver, resolve_effective_iso_window
-from ipolitico.services.metadata import CamaraMetadataService
-from ipolitico.sinks.base import BaseSink
 from ipolitico.storage.datalake_repository import DataLakeRepository
+from ipolitico.storage.state_store import StateStore
 
 logger = logging.getLogger(__name__)
 
@@ -43,15 +42,15 @@ class PipelineManager:
         builder: PipelineBuilder,
         runner: PipelineRunner,
         config: Dict[str, Any],
-        state_store: BaseSink,
-        metadata_service: Optional[CamaraMetadataService] = None,
+        state_store: StateStore,
+        metadata_service,
         lake_repository: Optional[DataLakeRepository] = None,
     ):
         self.builder = builder
         self.runner = runner
         self.config = config
         self.state_store = state_store
-        self._metadata = metadata_service or CamaraMetadataService(builder.client)
+        self._metadata = metadata_service
 
         self._lake: Optional[DataLakeRepository] = lake_repository
         if self._lake is None and hasattr(state_store, "base_dir"):
@@ -61,7 +60,7 @@ class PipelineManager:
 
             self._lake = DataLakeRepository(DATA_DIR / "datalake")
 
-        self._job_planner = CamaraJobPlanner(state_store=self._lake, lake_repository=self._lake)
+        self._job_planner = JobPlanner(state_store=self._lake, lake_repository=self._lake)
         self._window_resolver = WindowResolver(state_store=self._lake)
 
         # Rastreamento de domínios que produziram dados nesta execução.

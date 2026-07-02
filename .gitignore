@@ -10,6 +10,9 @@ venv/
 .installed.cfg
 .eggs/
 
+# Scaffolds temporários (_*.py na raiz)
+/_*.py
+
 # Configurações
 .env
 

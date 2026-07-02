@@ -21,15 +21,19 @@ async def test_main_invokes_federation_and_closes_client():
         inst_client.close = AsyncMock()
         mock_client_cls.return_value = inst_client
 
+        mock_builder = MagicMock()
+        mock_builder.client = inst_client
+
         mock_mgr = MagicMock()
         mock_mgr.run_domain = AsyncMock()
+        mock_mgr.builder = mock_builder
         mock_mgr_cls.return_value = mock_mgr
 
         mock_fed = MagicMock()
         mock_fed.run_all = AsyncMock()
         mock_fed_cls.return_value = mock_fed
 
-        with patch("sys.argv", ["ipolitico.main", "--domains", "deputados"]):
+        with patch("sys.argv", ["ipolitico.main", "--source", "camara", "--domains", "deputados"]):
             await main()
 
         mock_fed.run_all.assert_awaited_once()

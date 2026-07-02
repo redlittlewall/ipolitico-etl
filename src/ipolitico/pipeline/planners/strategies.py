@@ -402,6 +402,162 @@ class DeputyLegislatureStrategy(DomainJobStrategy):
         return jobs, leg_temporal_mapper
 
 
+class SenatorChildStrategy(DomainJobStrategy):
+    """Estratégia para domínios filhos de senadores (ex: senadores_discursos).
+
+    Args:
+        include_date_range: Se True, inclui janela temporal nos jobs; se False,
+            gera apenas o ``codigo`` do senador (para domínios estáticos como
+            mandatos e filiações).
+
+    Para cada senador no lake, gera 1 job com ``codigo`` e opcionalmente
+    janela temporal. Análogo ao ``DeputyChildStrategy`` mas para Senado.
+    """
+
+    def __init__(self, include_date_range: bool = True) -> None:
+        self.include_date_range = include_date_range
+
+    def build(
+        self,
+        domain: DomainType,
+        spec: DomainSpec,
+        start: str,
+        end: str,
+        current_leg: int,
+        anchor_year: int,
+        extraction_plan: ExtractionPlan,
+        state_store: StateStore,
+        lake: DataLakeRepository | None,
+    ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
+        if extraction_plan.source_type == SourceType.BULK:
+            jobs: list[dict[str, Any]] = [{}]
+
+            def snapshot_mapper(job: dict) -> dict:
+                return {}
+
+            return jobs, snapshot_mapper
+
+        if lake is None:
+            logger.error(
+                "[%s] Abortando: DataLakeRepository necessário para resolver senadores.",
+                domain.value.upper(),
+            )
+            return [], lambda x: {}
+
+        senador_ids = lake.list_ids(
+            table_name=DomainType.SENADORES.value,
+            layer=MedallionLayer.SILVER.value,
+            column="codigo",
+        )
+        if not senador_ids:
+            logger.error(
+                "[%s] Abortando: nenhum senador no lake. Rode '%s' antes.",
+                domain.value.upper(),
+                DomainType.SENADORES.value,
+            )
+            return [], lambda x: {}
+
+        if self.include_date_range:
+            jobs = [{"codigo": sid, "dataInicio": start, "dataFim": end} for sid in senador_ids]
+            logger.info(
+                "[%s] %s jobs (1/senador, janela %s a %s).",
+                domain.value.upper(),
+                len(jobs),
+                start,
+                end,
+            )
+
+            def senator_temporal_mapper(job: dict) -> dict:
+                return {
+                    "codigo": job["codigo"],
+                    "dataInicio": job["dataInicio"],
+                    "dataFim": job["dataFim"],
+                }
+
+            return jobs, senator_temporal_mapper
+
+        jobs = [{"codigo": sid} for sid in senador_ids]
+
+        logger.info(
+            "[%s] %s jobs (1/senador, sem janela temporal).",
+            domain.value.upper(),
+            len(jobs),
+        )
+
+        def senator_static_mapper(job: dict) -> dict:
+            return {"codigo": job["codigo"]}
+
+        return jobs, senator_static_mapper
+
+
+class ComissaoChildStrategy(DomainJobStrategy):
+    """Estratégia para domínios filhos de comissões do Senado (votacoes_comissao).
+
+    Lê as siglas de ``comissoes_senado`` (coluna ``sigla``) do lake e gera
+    1 job por sigla com janela temporal. Análogo ao ``SenatorChildStrategy``
+    mas para comissões em vez de senadores.
+    """
+
+    def build(
+        self,
+        domain: DomainType,
+        spec: DomainSpec,
+        start: str,
+        end: str,
+        current_leg: int,
+        anchor_year: int,
+        extraction_plan: ExtractionPlan,
+        state_store: StateStore,
+        lake: DataLakeRepository | None,
+    ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
+        if extraction_plan.source_type == SourceType.BULK:
+            jobs: list[dict[str, Any]] = [{}]
+
+            def snapshot_mapper(job: dict) -> dict:
+                return {}
+
+            return jobs, snapshot_mapper
+
+        if lake is None:
+            logger.error(
+                "[%s] Abortando: DataLakeRepository necessário para resolver siglas de comissão.",
+                domain.value.upper(),
+            )
+            return [], lambda x: {}
+
+        siglas = lake.list_ids(
+            table_name=DomainType.COMISSOES_SENADO.value,
+            layer=MedallionLayer.SILVER.value,
+            column="sigla",
+        )
+        if not siglas:
+            logger.error(
+                "[%s] Abortando: nenhuma comissão no lake. Rode '%s' antes.",
+                domain.value.upper(),
+                DomainType.COMISSOES_SENADO.value,
+            )
+            return [], lambda x: {}
+
+        jobs = [{"sigla_comissao": s, "start_date": start, "end_date": end} for s in siglas]
+
+        logger.info(
+            "[%s] %s jobs (1/sigla de comissão, janela %s a %s).",
+            domain.value.upper(),
+            len(jobs),
+            start,
+            end,
+        )
+
+        def comissao_mapper(job: dict) -> dict:
+            return {
+                "sigla_comissao": job["sigla_comissao"],
+                "start_date": job["start_date"],
+                "end_date": job["end_date"],
+            }
+
+        return jobs, comissao_mapper
+
+
 class VotosStrategy(DomainJobStrategy):
     """Estratégia para o domínio votos (batch de votacao_ids)."""
 
@@ -823,6 +979,55 @@ class DetailStrategy(DomainJobStrategy):
                 )
             return [], DomainType.PROPOSICOES.value
 
+        if domain_val == DomainType.SENADORES_DETALHE.value:
+            if lake:
+                return lake.list_ids(
+                    table_name=DomainType.SENADORES.value,
+                    layer=MedallionLayer.SILVER.value,
+                    column="codigo",
+                ), DomainType.SENADORES.value
+            return [], DomainType.SENADORES.value
+
+        if domain_val == DomainType.VETOS_DETALHE.value:
+            if lake:
+                ids = lake.list_ids(
+                    table_name=DomainType.VETOS_PRESIDENCIAIS.value,
+                    layer=MedallionLayer.SILVER.value,
+                    column="codigo",
+                )
+                return ids, DomainType.VETOS_PRESIDENCIAIS.value
+            return [], DomainType.VETOS_PRESIDENCIAIS.value
+
+        if domain_val == DomainType.PROCESSOS_DETALHE.value:
+            if lake:
+                ids = lake.list_ids(
+                    table_name=DomainType.PROCESSOS.value,
+                    layer=MedallionLayer.SILVER.value,
+                    column="id",
+                )
+                return ids, DomainType.PROCESSOS.value
+            return [], DomainType.PROCESSOS.value
+
+        if domain_val == DomainType.COMISSOES_DETALHE.value:
+            if lake:
+                ids = lake.list_ids(
+                    table_name=DomainType.COMISSOES_SENADO.value,
+                    layer=MedallionLayer.SILVER.value,
+                    column="codigo",
+                )
+                return ids, DomainType.COMISSOES_SENADO.value
+            return [], DomainType.COMISSOES_SENADO.value
+
+        if domain_val == DomainType.COMISSOES_MEMBROS.value:
+            if lake:
+                ids = lake.list_ids(
+                    table_name=DomainType.COMISSOES_SENADO.value,
+                    layer=MedallionLayer.SILVER.value,
+                    column="codigo",
+                )
+                return ids, DomainType.COMISSOES_SENADO.value
+            return [], DomainType.COMISSOES_SENADO.value
+
         return [], ""
 
 
@@ -903,6 +1108,155 @@ class DefaultWindowStrategy(DomainJobStrategy):
             return {"start_date": job["start_date"], "end_date": job["end_date"]}
 
         return jobs, default_mapper
+
+
+class BoundedWindowStrategy(DomainJobStrategy):
+    """Divide a janela temporal em blocos de N dias.
+
+    Domínios cuja API rejeita janelas longas (ex: processo/emenda com
+    limite de 1 ano) são segmentados em chunks de no máximo
+    ``max_window_days`` dias. Cada chunk vira um job independente.
+
+    Args:
+        max_window_days: Número máximo de dias por bloco (padrão 365).
+    """
+
+    def __init__(self, max_window_days: int = 365) -> None:
+        self.max_window_days = max_window_days
+
+    def build(
+        self,
+        domain: DomainType,
+        spec: DomainSpec,
+        start: str,
+        end: str,
+        current_leg: int,
+        anchor_year: int,
+        extraction_plan: ExtractionPlan,
+        state_store: StateStore,
+        lake: DataLakeRepository | None,
+    ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
+        from datetime import date, timedelta
+
+        start_date = date.fromisoformat(start)
+        end_date = date.fromisoformat(end)
+
+        jobs: list[dict[str, Any]] = []
+        current = start_date
+        while current <= end_date:
+            chunk_end = min(
+                current + timedelta(days=self.max_window_days - 1),
+                end_date,
+            )
+            jobs.append(
+                {
+                    "dataInicio": current.isoformat(),
+                    "dataFim": chunk_end.isoformat(),
+                }
+            )
+            current = chunk_end + timedelta(days=1)
+
+        logger.info(
+            "[%s] Janela %s a %s segmentada em %s blocos de ≤%sd.",
+            domain.value.upper(),
+            start,
+            end,
+            len(jobs),
+            self.max_window_days,
+        )
+
+        def bounded_mapper(job: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "start_date": job["dataInicio"],
+                "end_date": job["dataFim"],
+            }
+
+        return jobs, bounded_mapper
+
+
+class DailyWindowStrategy(DomainJobStrategy):
+    """Estratégia para domínios com 1 job por dia (ex: plenário).
+
+    Endpoints diários (ex: ``/plenario/agenda/dia/{data}``) recebem
+    uma data no lugar de janela mensal. Gera 1 job por dia dentro
+    da janela temporal, cada um com o parâmetro ``data`` no formato
+    ``YYYY-MM-DD``.
+    """
+
+    def build(
+        self,
+        domain: DomainType,
+        spec: DomainSpec,
+        start: str,
+        end: str,
+        current_leg: int,
+        anchor_year: int,
+        extraction_plan: ExtractionPlan,
+        state_store: StateStore,
+        lake: DataLakeRepository | None,
+    ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
+        from datetime import date, timedelta
+
+        start_date = date.fromisoformat(start)
+        end_date = date.fromisoformat(end)
+
+        jobs: list[dict[str, Any]] = []
+        current = start_date
+        while current <= end_date:
+            jobs.append({"data": current.isoformat()})
+            current += timedelta(days=1)
+
+        logger.info(
+            "[%s] Jobs diários: %s (%s a %s).",
+            domain.value.upper(),
+            len(jobs),
+            start,
+            end,
+        )
+
+        def daily_mapper(job: dict) -> dict:
+            return {"data": job["data"]}
+
+        return jobs, daily_mapper
+
+
+class AnnualWindowStrategy(DomainJobStrategy):
+    """Estratégia para domínios com 1 job por ano.
+
+    Domínios anuais (orçamento, vetos) usam endpoints com filtro ``ano``
+    em vez de janela mensal. Esta estratégia gera 1 job por ano civil
+    dentro da janela temporal, cada um com o parâmetro ``ano``.
+    """
+
+    def build(
+        self,
+        domain: DomainType,
+        spec: DomainSpec,
+        start: str,
+        end: str,
+        current_leg: int,
+        anchor_year: int,
+        extraction_plan: ExtractionPlan,
+        state_store: StateStore,
+        lake: DataLakeRepository | None,
+    ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
+        start_year = int(start.split("-")[0])
+        end_year = int(end.split("-")[0])
+
+        jobs = [{"ano": y} for y in range(start_year, end_year + 1)]
+
+        logger.info(
+            "[%s] Jobs anuais: %s (%s-%s).",
+            domain.value.upper(),
+            len(jobs),
+            start_year,
+            end_year,
+        )
+
+        def annual_mapper(job: dict) -> dict:
+            return {"ano": job["ano"]}
+
+        return jobs, annual_mapper
 
 
 # ─── Helpers de resolução para ParentBatchedStrategy ────────────────────────
@@ -1046,6 +1400,84 @@ def _resolve_legislatura_ids(
     if start == EARLIEST_DATE_MAP[DomainType.LEGISLATURAS]:
         return list(range(1, current_leg + 1))
     return [current_leg]
+
+
+def _resolve_senador_ids(
+    lake: DataLakeRepository | None,
+    state_store: StateStore,
+    **kwargs: Any,
+) -> list[Any]:
+    if lake:
+        return lake.list_ids(
+            table_name=DomainType.SENADORES.value,
+            layer=MedallionLayer.SILVER.value,
+            column="codigo",
+        )
+    return state_store.get_existing_ids(
+        table_name=DomainType.SENADORES.value,
+        layer=MedallionLayer.SILVER.value,
+        column="codigo",
+    )
+
+
+def _resolve_discurso_ids(
+    lake: DataLakeRepository | None,
+    state_store: StateStore,
+    start: str,
+    end: str,
+    **kwargs: Any,
+) -> list[Any]:
+    if lake:
+        return lake.list_ids(
+            table_name=DomainType.DISCURSOS_PLENARIO.value,
+            layer=MedallionLayer.SILVER.value,
+            column="codigo",
+        )
+    return state_store.get_existing_ids(
+        table_name=DomainType.DISCURSOS_PLENARIO.value,
+        layer=MedallionLayer.SILVER.value,
+        column="codigo",
+    )
+
+
+def _resolve_sessao_ids(
+    lake: DataLakeRepository | None,
+    state_store: StateStore,
+    start: str,
+    end: str,
+    **kwargs: Any,
+) -> list[Any]:
+    if lake:
+        return lake.list_ids(
+            table_name=DomainType.PLENARIO_SESSOES.value,
+            layer=MedallionLayer.SILVER.value,
+            column="codigo",
+        )
+    return state_store.get_existing_ids(
+        table_name=DomainType.PLENARIO_SESSOES.value,
+        layer=MedallionLayer.SILVER.value,
+        column="codigo",
+    )
+
+
+def _resolve_reuniao_ids(
+    lake: DataLakeRepository | None,
+    state_store: StateStore,
+    start: str,
+    end: str,
+    **kwargs: Any,
+) -> list[Any]:
+    if lake:
+        return lake.list_ids(
+            table_name=DomainType.COMISSOES_REUNIOES.value,
+            layer=MedallionLayer.SILVER.value,
+            column="codigo",
+        )
+    return state_store.get_existing_ids(
+        table_name=DomainType.COMISSOES_REUNIOES.value,
+        layer=MedallionLayer.SILVER.value,
+        column="codigo",
+    )
 
 
 # ─── Registry ────────────────────────────────────────────────────────────────
@@ -1250,6 +1682,62 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     DomainType.LICITACOES_ITENS: TimeWindowStrategy(),
     DomainType.LICITACOES_PEDIDOS: TimeWindowStrategy(),
     DomainType.LICITACOES_PROPOSTAS: TimeWindowStrategy(),
+    # ── Senado ──────────────────────────────────────────────────────────────
+    DomainType.SENADORES: LegislaturaScopeStrategy(),
+    DomainType.SENADORES_DETALHE: DetailStrategy(),
+    DomainType.PROCESSOS: DefaultWindowStrategy(),
+    DomainType.PROCESSOS_DETALHE: DetailStrategy(),
+    DomainType.PROCESSOS_EMENDAS: BoundedWindowStrategy(max_window_days=365),
+    DomainType.PROCESSOS_DOCUMENTOS: BoundedWindowStrategy(max_window_days=180),
+    DomainType.VOTACOES_SENADO: TimeWindowStrategy(),
+    DomainType.VOTOS_SENADO: TimeWindowStrategy(),
+    DomainType.VOTACOES_COMISSAO: ComissaoChildStrategy(),
+    # ── Senado — Comissões Detalhe/Membros/Reuniões (Issue 08a) ──────────────
+    DomainType.COMISSOES_SENADO: DefaultWindowStrategy(),
+    DomainType.COMISSOES_DETALHE: DetailStrategy(),
+    DomainType.COMISSOES_MEMBROS: DetailStrategy(),
+    DomainType.COMISSOES_REUNIOES: DefaultWindowStrategy(),
+    # ── Senado — Orçamento (Issue 05) ─────────────────────────────────────────
+    DomainType.ORCAMENTO_EMENDAS: AnnualWindowStrategy(),
+    DomainType.ORCAMENTO_OFICIOS: AnnualWindowStrategy(),
+    # ── Senado — Vetos Presidenciais (Issue 06) ────────────────────────────────
+    DomainType.VETOS_PRESIDENCIAIS: AnnualWindowStrategy(),
+    DomainType.VETOS_DETALHE: DetailStrategy(),
+    # ── Senado — Discursos e Notas Taquigráficas (Issue 07) ──────────────────────
+    DomainType.SENADORES_DISCURSOS: SenatorChildStrategy(),
+    DomainType.DISCURSOS_PLENARIO: TimeWindowStrategy(),
+    DomainType.DISCURSOS_TEXTO: ParentBatchedStrategy(
+        parent_key="entity_ids",
+        batch_size=25,
+        resolve_fn=_resolve_discurso_ids,
+        parent_col="codigo",
+    ),
+    DomainType.NOTAS_TAQUIGRAFIA_SESSAO: ParentBatchedStrategy(
+        parent_key="entity_ids",
+        batch_size=25,
+        resolve_fn=_resolve_sessao_ids,
+        parent_col="id_sessao",
+    ),
+    DomainType.NOTAS_TAQUIGRAFIA_REUNIAO: ParentBatchedStrategy(
+        parent_key="entity_ids",
+        batch_size=25,
+        resolve_fn=_resolve_reuniao_ids,
+        parent_col="id_reuniao",
+    ),
+    # ── Senado — Plenário (Issue 08b) ────────────────────────────────────────────
+    DomainType.PLENARIO_AGENDA: DailyWindowStrategy(),
+    DomainType.PLENARIO_RESULTADOS: DailyWindowStrategy(),
+    DomainType.PLENARIO_SESSOES: DailyWindowStrategy(),
+    # ── Senado — Composição (Issue 08c) ────────────────────────────────────────────
+    DomainType.BLOCOS_SENADO: DefaultWindowStrategy(),
+    DomainType.LIDERANCAS_SENADO: DefaultWindowStrategy(),
+    DomainType.MESA_SENADO: DefaultWindowStrategy(),
+    DomainType.MESA_CONGRESSO: DefaultWindowStrategy(),
+    # ── Senado — Mandatos e Filiações (Issue 16) ───────────────────────────────
+    DomainType.SENADORES_MANDATOS: SenatorChildStrategy(include_date_range=False),
+    DomainType.SENADORES_FILIACOES: SenatorChildStrategy(include_date_range=False),
+    # ── Senado — Orientação de Bancada (Issue 17) ─────────────────────────────
+    DomainType.ORIENTACAO_BANCADA: TimeWindowStrategy(),
 }
 
 

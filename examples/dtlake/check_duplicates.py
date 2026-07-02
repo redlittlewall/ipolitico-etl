@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import duckdb
+
 from ipolitico.core.constants import ApiParams, DomainType, MedallionLayer
 
 # Apontando para a base correta da Arquitetura Medallion

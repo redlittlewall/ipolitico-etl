@@ -1,3 +1,3 @@
-from ipolitico.pipeline.planners.camara_jobs import CamaraJobPlanner
+from ipolitico.pipeline.planners.camara_jobs import JobPlanner
 
-__all__ = ["CamaraJobPlanner"]
+__all__ = ["JobPlanner"]

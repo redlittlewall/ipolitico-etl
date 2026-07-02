@@ -3,7 +3,8 @@ import logging
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from ipolitico.core.config import MAX_CONCURRENT_REQUESTS
-from ipolitico.core.constants import MedallionLayer
+from ipolitico.core.constants import DomainType, MedallionLayer
+from ipolitico.core.source_urls import add_source_url_column
 from ipolitico.pipeline.builder import PipelineComponents
 
 logger = logging.getLogger(__name__)
@@ -90,6 +91,12 @@ class PipelineRunner:
                                 raw_df.height,
                             )
                             return None
+                        # Adiciona URL de referência para auditabilidade
+                        try:
+                            domain = DomainType(table_name)
+                            clean_df = add_source_url_column(clean_df, domain)
+                        except ValueError:
+                            pass  # domínio desconhecido — segue sem _source_url
                         return clean_df
                     return None
                 except Exception as e:

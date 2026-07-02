@@ -1,0 +1,103 @@
+# Mapeamento dinâmico de dependências para a API do Senado Federal
+domain_configs:
+  senadores:
+    extractor: "ipolitico.extractors.senado.api.senadores.SenadoSenadoresExtractor"
+    transformer: "ipolitico.transformers.senado.senadores_transformer.SenadoSenadoresTransformer"
+  senadores_detalhe:
+    extractor: "ipolitico.extractors.senado.api.senadores_detalhe.SenadoSenadoresDetalheExtractor"
+    transformer: "ipolitico.transformers.senado.senadores_detalhe_transformer.SenadoSenadoresDetalheTransformer"
+  # ── Mandatos e Filiações (Issue 16) ──────────────────────────────────────────
+  senadores_mandatos:
+    extractor: "ipolitico.extractors.senado.api.senadores.SenadoMandatosExtractor"
+    transformer: "ipolitico.transformers.senado.senadores_mandatos_transformer.SenadoMandatosTransformer"
+  senadores_filiacoes:
+    extractor: "ipolitico.extractors.senado.api.senadores.SenadoFiliacoesExtractor"
+    transformer: "ipolitico.transformers.senado.senadores_filiacoes_transformer.SenadoFiliacoesTransformer"
+  processos:
+    extractor: "ipolitico.extractors.senado.api.processos.SenadoProcessosExtractor"
+    transformer: "ipolitico.transformers.senado.processos_transformer.SenadoProcessosTransformer"
+  processos_detalhe:
+    extractor: "ipolitico.extractors.senado.api.processos.SenadoProcessosDetalheExtractor"
+    transformer: "ipolitico.transformers.senado.processos_transformer.SenadoProcessosDetalheTransformer"
+  processos_emendas:
+    extractor: "ipolitico.extractors.senado.api.processos.SenadoProcessosEmendasExtractor"
+    transformer: "ipolitico.transformers.senado.processos_transformer.SenadoProcessosEmendasTransformer"
+  processos_documentos:
+    extractor: "ipolitico.extractors.senado.api.processos.SenadoProcessosDocumentosExtractor"
+    transformer: "ipolitico.transformers.senado.processos_transformer.SenadoProcessosDocumentosTransformer"
+  votacoes_senado:
+    extractor: "ipolitico.extractors.senado.api.votacoes_senado.SenadoVotacoesExtractor"
+    transformer: "ipolitico.transformers.senado.votacoes_senado_transformer.SenadoVotacoesTransformer"
+  votos_senado:
+    extractor: "ipolitico.extractors.senado.api.votos_senado.SenadoVotosExtractor"
+    transformer: "ipolitico.transformers.senado.votos_senado_transformer.SenadoVotosTransformer"
+  votacoes_comissao:
+    extractor: "ipolitico.extractors.senado.api.votacoes_comissao.SenadoVotacoesComissaoExtractor"
+    transformer: "ipolitico.transformers.senado.votacoes_comissao_transformer.SenadoVotacoesComissaoTransformer"
+  orcamento_emendas:
+    extractor: "ipolitico.extractors.senado.api.orcamento.OrcamentoEmendasExtractor"
+    transformer: "ipolitico.transformers.senado.orcamento_transformer.OrcamentoEmendasTransformer"
+  orcamento_oficios:
+    extractor: "ipolitico.extractors.senado.api.orcamento.OrcamentoOficiosExtractor"
+    transformer: "ipolitico.transformers.senado.orcamento_transformer.OrcamentoOficiosTransformer"
+  vetos_presidenciais:
+    extractor: "ipolitico.extractors.senado.api.vetos.VetosPresidenciaisExtractor"
+    transformer: "ipolitico.transformers.senado.vetos_transformer.VetosPresidenciaisTransformer"
+  vetos_detalhe:
+    extractor: "ipolitico.extractors.senado.api.vetos.VetosDetalheExtractor"
+    transformer: "ipolitico.transformers.senado.vetos_transformer.VetosDetalheTransformer"
+  # ── Discursos e Notas Taquigráficas (Issue 07) ──────────────────────────────
+  senadores_discursos:
+    extractor: "ipolitico.extractors.senado.api.discursos.DiscursosSenadorExtractor"
+    transformer: "ipolitico.transformers.senado.discursos_transformer.DiscursosSenadorTransformer"
+  discursos_plenario:
+    extractor: "ipolitico.extractors.senado.api.discursos.DiscursosPlenarioExtractor"
+    transformer: "ipolitico.transformers.senado.discursos_transformer.DiscursosPlenarioTransformer"
+  discursos_texto:
+    extractor: "ipolitico.extractors.senado.api.discursos.DiscursosTextoExtractor"
+    transformer: "ipolitico.transformers.senado.discursos_transformer.DiscursosTextoTransformer"
+  notas_taquigrafia_sessao:
+    extractor: "ipolitico.extractors.senado.api.discursos.NotasTaquigrafiaSessaoExtractor"
+    transformer: "ipolitico.transformers.senado.discursos_transformer.NotasTaquigrafiaSessaoTransformer"
+  notas_taquigrafia_reuniao:
+    extractor: "ipolitico.extractors.senado.api.discursos.NotasTaquigrafiaReuniaoExtractor"
+    transformer: "ipolitico.transformers.senado.discursos_transformer.NotasTaquigrafiaReuniaoTransformer"
+  # ── Comissões (Issue 08a) ────────────────────────────────────────────────────
+  comissoes_senado:
+    extractor: "ipolitico.extractors.senado.api.comissoes.SenadoComissoesListaExtractor"
+    transformer: "ipolitico.transformers.senado.institutional_transformer.SenadoComissoesListaTransformer"
+  comissoes_detalhe:
+    extractor: "ipolitico.extractors.senado.api.comissoes.SenadoComissoesDetalheExtractor"
+    transformer: "ipolitico.transformers.senado.institutional_transformer.SenadoComissoesDetalheTransformer"
+  comissoes_reunioes:
+    extractor: "ipolitico.extractors.senado.api.comissoes.SenadoComissoesReunioesExtractor"
+    transformer: "ipolitico.transformers.senado.institutional_transformer.SenadoComissoesReunioesTransformer"
+  comissoes_membros:
+    extractor: "ipolitico.extractors.senado.api.comissoes.SenadoComissoesMembrosExtractor"
+    transformer: "ipolitico.transformers.senado.institutional_transformer.SenadoComissoesMembrosTransformer"
+  # ── Plenário (Issue 08b) ────────────────────────────────────────────────────
+  plenario_agenda:
+    extractor: "ipolitico.extractors.senado.api.plenario.PlenarioAgendaExtractor"
+    transformer: "ipolitico.transformers.senado.institutional_transformer.PlenarioAgendaTransformer"
+  plenario_resultados:
+    extractor: "ipolitico.extractors.senado.api.plenario.PlenarioResultadosExtractor"
+    transformer: "ipolitico.transformers.senado.institutional_transformer.PlenarioResultadosTransformer"
+  plenario_sessoes:
+    extractor: "ipolitico.extractors.senado.api.plenario.PlenarioSessoesExtractor"
+    transformer: "ipolitico.transformers.senado.institutional_transformer.PlenarioSessoesTransformer"
+  # ── Composição (Issue 08c) ──────────────────────────────────────────────────
+  blocos_senado:
+    extractor: "ipolitico.extractors.senado.api.composicao.BlocosSenadoExtractor"
+    transformer: "ipolitico.transformers.senado.institutional_transformer.BlocosSenadoTransformer"
+  liderancas_senado:
+    extractor: "ipolitico.extractors.senado.api.composicao.LiderancasSenadoExtractor"
+    transformer: "ipolitico.transformers.senado.institutional_transformer.LiderancasSenadoTransformer"
+  mesa_senado:
+    extractor: "ipolitico.extractors.senado.api.composicao.MesaSenadoExtractor"
+    transformer: "ipolitico.transformers.senado.institutional_transformer.MesaSenadoTransformer"
+  mesa_congresso:
+    extractor: "ipolitico.extractors.senado.api.composicao.MesaCongressoExtractor"
+    transformer: "ipolitico.transformers.senado.institutional_transformer.MesaCongressoTransformer"
+  orientacao_bancada:
+    extractor: "ipolitico.extractors.senado.api.orientacao_bancada.SenadoOrientacaoBancadaExtractor"
+    transformer: "ipolitico.transformers.senado.orientacao_bancada_transformer.SenadoOrientacaoBancadaTransformer"

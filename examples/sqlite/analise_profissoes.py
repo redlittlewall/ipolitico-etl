@@ -2,6 +2,7 @@ import logging
 import sqlite3
 
 import polars as pl
+
 from ipolitico.core.config import DB_PATH
 
 logger = logging.getLogger(__name__)

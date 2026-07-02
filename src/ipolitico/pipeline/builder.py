@@ -3,7 +3,6 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict
 
-from ipolitico.core.client import CamaraClient
 from ipolitico.core.config import DATA_DIR
 from ipolitico.core.constants import SinkType, SourceType
 from ipolitico.extractors.base import BaseExtractor
@@ -34,12 +33,13 @@ class PipelineBuilder:
     corretas em tempo de execução.
     """
 
-    def __init__(self, client: CamaraClient):
+    def __init__(self, client: Any):
         """
-        Inicializa o construtor com as dependências de rede globais.
+        Inicializa o construtor com as dependências de rede (cliente HTTP).
 
         Args:
-            client (CamaraClient): Cliente HTTP compartilhado para injeção nos extratores.
+            client: Cliente HTTP compartilhado para injeção nos extratores
+                    (CamaraClient, SenadoClient ou similar).
         """
         self.client = client
 

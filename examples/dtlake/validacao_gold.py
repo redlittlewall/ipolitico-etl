@@ -2,6 +2,7 @@ from pathlib import Path
 
 import duckdb
 import pandas as pd
+
 from ipolitico.core.schemas import DESPESAS_PARTITION_KEYS
 
 # Aponta para o diretório Gold que o Optimizer gerou

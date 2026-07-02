@@ -1,6 +1,6 @@
 [project]
 name = "ipolitico-etl"
-version = "0.2.0"
+version = "0.3.0"
 description = "ETL Open Source, neutro e determinístico para dados da política brasileira."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -8,42 +8,69 @@ license = { text = "MIT" }
 authors = [
     { name = "iPolitico Contributors" },
 ]
-keywords = ["etl", "camara-dos-deputados", "dados-abertos", "politica-brasileira", "transparencia", "data-lake"]
+keywords = [
+    "etl",
+    "camara-dos-deputados",
+    "senado-federal",
+    "dados-abertos",
+    "politica-brasileira",
+    "transparencia",
+    "data-lake",
+    "polars",
+    "data-engineering",
+    "congresso-nacional",
+    "duckdb",
+    "python",
+    "open-data",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Legal Industry",
     "License :: OSI Approved :: MIT License",
     "Natural Language :: Portuguese (Brazilian)",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Database :: Database Engines/Servers",
     "Topic :: Scientific/Engineering :: Information Analysis",
     "Topic :: Sociology :: Politics",
+    "Topic :: Sociology :: Political Science",
 ]
 dependencies = [
-    "httpx",
-    "polars",
-    "pydantic",
-    "respx",
-    "duckdb",
-    "python-dotenv",
-    "tenacity",
-    "PyYAML",
+    "httpx>=0.27",
+    "polars>=1.0",
+    "pydantic>=2.0",
+    "duckdb>=1.0",
+    "python-dotenv>=1.0",
+    "tenacity>=8.0",
+    "PyYAML>=6.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/redlittlewall/ipolitico-etl"
 Repository = "https://github.com/redlittlewall/ipolitico-etl"
 Documentation = "https://github.com/redlittlewall/ipolitico-etl#readme"
-Changelog = "https://github.com/redlittlewall/ipolitico-etl/releases"
+Changelog = "https://github.com/redlittlewall/ipolitico-etl/blob/main/CHANGELOG.md"
+IssueTracker = "https://github.com/redlittlewall/ipolitico-etl/issues"
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
+    "respx>=0.21",
     "ruff>=0.6",
+]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.0",
+]
+analysis = [
+    "jupyter>=1.0",
+    "matplotlib>=3.0",
+    "seaborn>=0.13",
 ]
 
 [project.scripts]

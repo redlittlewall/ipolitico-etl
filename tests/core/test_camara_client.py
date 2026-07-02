@@ -5,7 +5,7 @@ import httpx
 import pytest
 import respx
 
-from ipolitico.core.client import CamaraAPIError, CamaraClient
+from ipolitico.core.camara_client import CamaraAPIError, CamaraClient
 
 
 @pytest.mark.asyncio
@@ -67,7 +67,7 @@ async def test_camara_client_success():
 
 @pytest.mark.asyncio
 @patch(
-    "ipolitico.core.client.asyncio.sleep"
+    "ipolitico.core.camara_client.asyncio.sleep"
 )  # Mockamos o sleep para o teste não demorar de verdade
 async def test_camara_client_retry_and_backoff(mock_sleep):
     """
@@ -100,7 +100,7 @@ async def test_camara_client_exhausted_retries():
     """Garante que a exceção CamaraAPIError é levantada se a API não voltar (Fail Fast)."""
     client = CamaraClient(max_retries=2)
 
-    with respx.mock, patch("ipolitico.core.client.asyncio.sleep"):
+    with respx.mock, patch("ipolitico.core.camara_client.asyncio.sleep"):
         # O governo caiu de vez
         respx.get("https://dadosabertos.camara.leg.br/api/v2/deputados").respond(status_code=500)
 
@@ -110,7 +110,7 @@ async def test_camara_client_exhausted_retries():
 
 
 @pytest.mark.asyncio
-@patch("ipolitico.core.client.asyncio.sleep")
+@patch("ipolitico.core.camara_client.asyncio.sleep")
 async def test_camara_client_fetch_network_error(mock_sleep):
     """
     Garante que falhas FÍSICAS de rede (DNS, Timeout, Drop)
@@ -131,7 +131,7 @@ async def test_camara_client_fetch_network_error(mock_sleep):
 
 
 @pytest.mark.asyncio
-@patch("ipolitico.core.client.urllib.request.urlopen")
+@patch("ipolitico.core.camara_client.urllib.request.urlopen")
 async def test_camara_client_download_file(mock_urlopen, tmp_path):
     client = CamaraClient(max_retries=1)
     dest_path = tmp_path / "dump_teste.csv"
@@ -156,7 +156,7 @@ async def test_camara_client_close_method():
 
 
 @pytest.mark.asyncio
-@patch("ipolitico.core.client.asyncio.sleep")
+@patch("ipolitico.core.camara_client.asyncio.sleep")
 async def test_camara_client_explicit_request_error(mock_sleep):
     """
     Força a cobertura exata da linha 'except httpx.RequestError'.
