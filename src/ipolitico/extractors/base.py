@@ -96,6 +96,9 @@ class BaseExtractor(abc.ABC):
         Returns:
             pl.DataFrame: DataFrame com ``_source_url`` como primeira coluna.
         """
+        if df.is_empty():
+            return df
+
         if resource_id_col is not None and resource_id_col in df.columns:
             source_urls = [
                 self.build_source_url(endpoint, resource_id=str(rid), params=params)

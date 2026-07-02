@@ -52,9 +52,9 @@ class TestDomainSpecEntries:
 
 
 class TestDomainSpecSourceUrlFormat:
-    def test_default_source_url_format_is_none(self):
-        """DomainSpec padrao deve ter source_url_format=None."""
-        spec = spec_for(DomainType.DEPUTADOS)
+    def test_domain_without_format_is_none(self):
+        """DomainSpec sem source_url_format definido deve retornar None."""
+        spec = spec_for(DomainType.DESPESAS)
         assert spec is not None
         assert spec.source_url_format is None
 
