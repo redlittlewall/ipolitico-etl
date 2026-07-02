@@ -1,5 +1,6 @@
 # iPolitico ETL — .dockerignore
 # Exclui diretórios e arquivos desnecessários da imagem Docker
+# NOTA: README.md é necessário para o Dockerfile; tests/ para os testes
 # NOTA: tests/ NÃO está aqui porque pytest roda dentro do container
 
 # Dados e cache
@@ -17,4 +18,3 @@ data/
 
 # Documentação local
 docs/
-*.md

@@ -1,3 +1,5 @@
+ARG PROFILE=base
+
 FROM python:3.12-slim AS base
 WORKDIR /app
 
@@ -12,7 +14,9 @@ RUN pip install --no-cache-dir -e ".[dev]"
 FROM base AS analysis
 RUN pip install --no-cache-dir jupyter matplotlib seaborn
 
-FROM ${PROFILE:-base} AS final
+# Re-declara ARG para uso no FROM final (Docker consome ARGs globais no primeiro FROM)
+ARG PROFILE
+FROM ${PROFILE} AS final
 # Garante que o entrypoint exista para comandos avulsos
 COPY --from=base /app /app
 # Copia testes para execução dentro do container
