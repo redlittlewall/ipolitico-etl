@@ -39,7 +39,8 @@ class SenadoProcessosExtractor(SenadoBaseExtractor):
         if not raw or not isinstance(raw, list):
             return pl.DataFrame()
 
-        return pl.DataFrame(raw, infer_schema_length=None)
+        df = pl.DataFrame(raw, infer_schema_length=None)
+        return self._inject_source_url(df, "processo")
 
 
 class SenadoProcessosDetalheExtractor(SenadoBaseExtractor):
@@ -66,16 +67,18 @@ class SenadoProcessosDetalheExtractor(SenadoBaseExtractor):
         if not entity_ids:
             return pl.DataFrame()
 
-        all_records: list[dict[str, Any]] = []
+        all_dfs: list[pl.DataFrame] = []
         for pid in entity_ids:
             raw = await self.fetch_flat(f"processo/{pid}")
             if isinstance(raw, dict):
-                all_records.append(raw)
+                df = pl.DataFrame([raw], infer_schema_length=None)
+                df = self._inject_source_url(df, f"processo/{pid}")
+                all_dfs.append(df)
 
-        if not all_records:
+        if not all_dfs:
             return pl.DataFrame()
 
-        return pl.DataFrame(all_records, infer_schema_length=None)
+        return pl.concat(all_dfs)
 
 
 class SenadoProcessosEmendasExtractor(SenadoBaseExtractor):
@@ -115,7 +118,8 @@ class SenadoProcessosEmendasExtractor(SenadoBaseExtractor):
         if not raw or not isinstance(raw, list):
             return pl.DataFrame()
 
-        return pl.DataFrame(raw, infer_schema_length=None)
+        df = pl.DataFrame(raw, infer_schema_length=None)
+        return self._inject_source_url(df, "processo/emenda", params=params or None)
 
 
 class SenadoProcessosDocumentosExtractor(SenadoBaseExtractor):
@@ -155,4 +159,5 @@ class SenadoProcessosDocumentosExtractor(SenadoBaseExtractor):
         if not raw or not isinstance(raw, list):
             return pl.DataFrame()
 
-        return pl.DataFrame(raw, infer_schema_length=None)
+        df = pl.DataFrame(raw, infer_schema_length=None)
+        return self._inject_source_url(df, "processo/documento", params=params or None)

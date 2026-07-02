@@ -50,12 +50,11 @@ class SenadoVotacoesComissaoExtractor(SenadoBaseExtractor):
         if df:
             params["dataFim"] = df
 
-        raw = await self.fetch_flat(
-            f"votacaoComissao/comissao/{sigla}",
-            params=params or None,
-        )
+        endpoint = f"votacaoComissao/comissao/{sigla}"
+        raw = await self.fetch_flat(endpoint, params=params or None)
 
         if not raw or not isinstance(raw, list):
             return pl.DataFrame()
 
-        return pl.DataFrame(raw, infer_schema_length=None)
+        df = pl.DataFrame(raw, infer_schema_length=None)
+        return self._inject_source_url(df, endpoint, params=params or None)

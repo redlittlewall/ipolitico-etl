@@ -62,7 +62,8 @@ class SenadoComissoesListaExtractor(SenadoBaseExtractor):
         if not records:
             return pl.DataFrame()
 
-        return pl.DataFrame(records, infer_schema_length=None)
+        df = pl.DataFrame(records, infer_schema_length=None)
+        return self._inject_source_url(df, "comissao/lista/colegiados")
 
 
 class SenadoComissoesDetalheExtractor(SenadoBaseExtractor):
@@ -99,21 +100,23 @@ class SenadoComissoesDetalheExtractor(SenadoBaseExtractor):
         if not ids:
             return pl.DataFrame()
 
-        all_records: list[dict[str, Any]] = []
+        all_dfs: list[pl.DataFrame] = []
         for codigo in ids:
             raw = await self.fetch_flat(f"comissao/{codigo}")
             records = self.flatten_response(
                 raw, ["ComissoesCongressoNacional", "Colegiados", "Colegiado"]
             )
-            all_records.extend(records)
+            if not records:
+                continue
+            _serialize_structs(records)
+            df = pl.DataFrame(records, infer_schema_length=None)
+            df = self._inject_source_url(df, f"comissao/{codigo}")
+            all_dfs.append(df)
 
-        if not all_records:
+        if not all_dfs:
             return pl.DataFrame()
 
-        # Serializa structs inconsistentes (Cargos, Requerimentos, etc.) como JSON
-        _serialize_structs(all_records)
-
-        return pl.DataFrame(all_records, infer_schema_length=None)
+        return pl.concat(all_dfs)
 
 
 class SenadoComissoesReunioesExtractor(SenadoBaseExtractor):
@@ -153,9 +156,8 @@ class SenadoComissoesReunioesExtractor(SenadoBaseExtractor):
             return pl.DataFrame()
 
         # API do Senado espera YYYYMMDD no path da URL (sem hífens)
-        raw = await self.fetch_flat(
-            f"comissao/agenda/{di.replace('-', '')}/{df.replace('-', '')}",
-        )
+        endpoint = f"comissao/agenda/{di.replace('-', '')}/{df.replace('-', '')}"
+        raw = await self.fetch_flat(endpoint)
         records = self.flatten_response(raw, ["AgendaReuniao", "reunioes", "reuniao"])
 
         if not records:
@@ -171,7 +173,8 @@ class SenadoComissoesReunioesExtractor(SenadoBaseExtractor):
         # Serializa structs inconsistentes restantes como JSON
         _serialize_structs(records)
 
-        return pl.DataFrame(records, infer_schema_length=None)
+        df = pl.DataFrame(records, infer_schema_length=None)
+        return self._inject_source_url(df, endpoint)
 
 
 class SenadoComissoesMembrosExtractor(SenadoBaseExtractor):
@@ -210,12 +213,10 @@ class SenadoComissoesMembrosExtractor(SenadoBaseExtractor):
         if not ids:
             return pl.DataFrame()
 
-        all_records: list[dict[str, Any]] = []
+        all_dfs: list[pl.DataFrame] = []
         for codigo in ids:
-            raw = await self.fetch_flat(
-                f"composicao/comissao/{codigo}",
-                params={"ativas": "S"},
-            )
+            endpoint = f"composicao/comissao/{codigo}"
+            raw = await self.fetch_flat(endpoint, params={"ativas": "S"})
 
             if not isinstance(raw, dict):
                 continue
@@ -237,9 +238,11 @@ class SenadoComissoesMembrosExtractor(SenadoBaseExtractor):
                 m["SiglaComissao"] = identificacao.get("SiglaComissao")
                 m["NomeComissao"] = identificacao.get("NomeComissao")
 
-            all_records.extend(membros)
+            df = pl.DataFrame(membros, infer_schema_length=None)
+            df = self._inject_source_url(df, endpoint, params={"ativas": "S"})
+            all_dfs.append(df)
 
-        if not all_records:
+        if not all_dfs:
             return pl.DataFrame()
 
-        return pl.DataFrame(all_records, infer_schema_length=None)
+        return pl.concat(all_dfs)

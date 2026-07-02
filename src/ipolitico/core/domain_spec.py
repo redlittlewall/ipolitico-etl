@@ -32,6 +32,23 @@ _SOURCE_URL_FORMATS: dict[DomainType, str] = {
     DomainType.BLOCOS_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/blocos/{resource_id}",
     DomainType.VOTOS: "https://dadosabertos.camara.leg.br/api/v2/votacoes/{resource_id}/votos",
     DomainType.ORIENTACOES: "https://dadosabertos.camara.leg.br/api/v2/votacoes/{resource_id}/orientacoes",
+    # ── Senado — Entidades raiz ───────────────────────────────────────────────────
+    DomainType.SENADORES: "https://legis.senado.leg.br/dadosabertos/senador/{resource_id}",
+    DomainType.SENADORES_DETALHE: "https://legis.senado.leg.br/dadosabertos/senador/{resource_id}",
+    DomainType.SENADORES_MANDATOS: "https://legis.senado.leg.br/dadosabertos/senador/{resource_id}/mandatos",
+    DomainType.SENADORES_FILIACOES: "https://legis.senado.leg.br/dadosabertos/senador/{resource_id}/filiacoes",
+    DomainType.PROCESSOS: "https://legis.senado.leg.br/dadosabertos/materia/{resource_id}",
+    DomainType.PROCESSOS_DETALHE: "https://legis.senado.leg.br/dadosabertos/materia/{resource_id}",
+    DomainType.PROCESSOS_EMENDAS: "https://legis.senado.leg.br/dadosabertos/materia/{resource_id}/emendas",
+    DomainType.PROCESSOS_DOCUMENTOS: "https://legis.senado.leg.br/dadosabertos/materia/{resource_id}/documentos",
+    DomainType.VOTACOES_SENADO: "https://legis.senado.leg.br/dadosabertos/votacao/{resource_id}",
+    DomainType.VOTACOES_COMISSAO: "https://legis.senado.leg.br/dadosabertos/votacao/{resource_id}",
+    DomainType.COMISSOES_SENADO: "https://legis.senado.leg.br/dadosabertos/comissao/{resource_id}",
+    DomainType.COMISSOES_DETALHE: "https://legis.senado.leg.br/dadosabertos/comissao/{resource_id}",
+    DomainType.BLOCOS_SENADO: "https://legis.senado.leg.br/dadosabertos/bloco/{resource_id}",
+    DomainType.VETOS_PRESIDENCIAIS: "https://legis.senado.leg.br/dadosabertos/veto/{resource_id}",
+    DomainType.VETOS_DETALHE: "https://legis.senado.leg.br/dadosabertos/veto/{resource_id}",
+    DomainType.SENADORES_DISCURSOS: "https://legis.senado.leg.br/dadosabertos/senador/{resource_id}/discursos",
 }
 
 

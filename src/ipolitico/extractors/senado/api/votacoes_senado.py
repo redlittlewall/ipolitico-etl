@@ -39,4 +39,5 @@ class SenadoVotacoesExtractor(SenadoBaseExtractor):
         if not raw or not isinstance(raw, list):
             return pl.DataFrame()
 
-        return pl.DataFrame(raw, infer_schema_length=None)
+        df = pl.DataFrame(raw, infer_schema_length=None)
+        return self._inject_source_url(df, "votacao", params=params)

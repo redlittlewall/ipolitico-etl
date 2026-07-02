@@ -141,7 +141,8 @@ class VetosPresidenciaisExtractor(SenadoBaseExtractor):
             return pl.DataFrame()
 
         flat_records = [_flatten_record(r) for r in records]
-        return pl.DataFrame(flat_records, infer_schema_length=None)
+        df = pl.DataFrame(flat_records, infer_schema_length=None)
+        return self._inject_source_url(df, endpoint)
 
 
 class VetosDetalheExtractor(SenadoBaseExtractor):
@@ -172,14 +173,17 @@ class VetosDetalheExtractor(SenadoBaseExtractor):
         if not entity_ids:
             return pl.DataFrame()
 
-        all_records: list[dict[str, Any]] = []
+        all_dfs: list[pl.DataFrame] = []
         for codigo in entity_ids:
             raw = await self.fetch_flat(f"plenario/resultado/veto/{codigo}")
             records = self.flatten_response(raw, _DATA_PATH_DETALHE)
-            all_records.extend(records)
+            if records:
+                flat_records = [_flatten_record(r) for r in records]
+                df = pl.DataFrame(flat_records, infer_schema_length=None)
+                df = self._inject_source_url(df, f"plenario/resultado/veto/{codigo}")
+                all_dfs.append(df)
 
-        if not all_records:
+        if not all_dfs:
             return pl.DataFrame()
 
-        flat_records = [_flatten_record(r) for r in all_records]
-        return pl.DataFrame(flat_records, infer_schema_length=None)
+        return pl.concat(all_dfs)

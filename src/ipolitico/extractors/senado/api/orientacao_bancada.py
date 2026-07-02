@@ -62,4 +62,5 @@ class SenadoOrientacaoBancadaExtractor(SenadoBaseExtractor):
         if not isinstance(records, list) or not records:
             return pl.DataFrame()
 
-        return pl.DataFrame(records, infer_schema_length=None)
+        df = pl.DataFrame(records, infer_schema_length=None)
+        return self._inject_source_url(df, endpoint)

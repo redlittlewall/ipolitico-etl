@@ -77,7 +77,8 @@ class DiscursosPlenarioExtractor(SenadoBaseExtractor):
         if not raw or not isinstance(raw, list):
             return pl.DataFrame()
 
-        return pl.DataFrame(raw, infer_schema_length=None)
+        df = pl.DataFrame(raw, infer_schema_length=None)
+        return self._inject_source_url(df, endpoint)
 
 
 class DiscursosSenadorExtractor(SenadoBaseExtractor):
@@ -123,7 +124,9 @@ class DiscursosSenadorExtractor(SenadoBaseExtractor):
         if not records:
             return pl.DataFrame()
 
-        return pl.DataFrame(records, infer_schema_length=None)
+        df = pl.DataFrame(records, infer_schema_length=None)
+        endpoint = f"senador/{codigo}/discursos"
+        return self._inject_source_url(df, endpoint, params=params or None)
 
 
 class DiscursosTextoExtractor(SenadoBaseExtractor):
@@ -152,16 +155,18 @@ class DiscursosTextoExtractor(SenadoBaseExtractor):
         if not entity_ids:
             return pl.DataFrame()
 
-        all_records: list[dict[str, Any]] = []
+        all_dfs: list[pl.DataFrame] = []
         for codigo in entity_ids:
             raw = await self.fetch_flat(f"discurso/texto-integral/{codigo}")
             if isinstance(raw, dict):
-                all_records.append(raw)
+                df = pl.DataFrame([raw], infer_schema_length=None)
+                df = self._inject_source_url(df, f"discurso/texto-integral/{codigo}")
+                all_dfs.append(df)
 
-        if not all_records:
+        if not all_dfs:
             return pl.DataFrame()
 
-        return pl.DataFrame(all_records, infer_schema_length=None)
+        return pl.concat(all_dfs)
 
 
 class NotasTaquigrafiaSessaoExtractor(SenadoBaseExtractor):
@@ -189,16 +194,18 @@ class NotasTaquigrafiaSessaoExtractor(SenadoBaseExtractor):
         if not entity_ids:
             return pl.DataFrame()
 
-        all_records: list[dict[str, Any]] = []
+        all_dfs: list[pl.DataFrame] = []
         for sessao_id in entity_ids:
             raw = await self.fetch_flat(f"taquigrafia/notas/sessao/{sessao_id}")
             if isinstance(raw, dict):
-                all_records.append(raw)
+                df = pl.DataFrame([raw], infer_schema_length=None)
+                df = self._inject_source_url(df, f"taquigrafia/notas/sessao/{sessao_id}")
+                all_dfs.append(df)
 
-        if not all_records:
+        if not all_dfs:
             return pl.DataFrame()
 
-        return pl.DataFrame(all_records, infer_schema_length=None)
+        return pl.concat(all_dfs)
 
 
 class NotasTaquigrafiaReuniaoExtractor(SenadoBaseExtractor):
@@ -226,13 +233,15 @@ class NotasTaquigrafiaReuniaoExtractor(SenadoBaseExtractor):
         if not entity_ids:
             return pl.DataFrame()
 
-        all_records: list[dict[str, Any]] = []
+        all_dfs: list[pl.DataFrame] = []
         for reuniao_id in entity_ids:
             raw = await self.fetch_flat(f"taquigrafia/notas/reuniao/{reuniao_id}")
             if isinstance(raw, dict):
-                all_records.append(raw)
+                df = pl.DataFrame([raw], infer_schema_length=None)
+                df = self._inject_source_url(df, f"taquigrafia/notas/reuniao/{reuniao_id}")
+                all_dfs.append(df)
 
-        if not all_records:
+        if not all_dfs:
             return pl.DataFrame()
 
-        return pl.DataFrame(all_records, infer_schema_length=None)
+        return pl.concat(all_dfs)

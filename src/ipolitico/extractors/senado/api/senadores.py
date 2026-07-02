@@ -59,7 +59,8 @@ class SenadoSenadoresExtractor(SenadoBaseExtractor):
         if not records:
             return pl.DataFrame()
 
-        return pl.DataFrame(records, infer_schema_length=None)
+        df = pl.DataFrame(records, infer_schema_length=None)
+        return self._inject_source_url(df, endpoint)
 
 
 class _SenadorChildMixin:
@@ -177,7 +178,9 @@ class SenadoMandatosExtractor(SenadoBaseExtractor, _SenadorChildMixin):
                 if isinstance(partido, dict):
                     partidos["Partido"] = [partido]
 
-        return pl.DataFrame(records, infer_schema_length=None)
+        df = pl.DataFrame(records, infer_schema_length=None)
+        endpoint = f"senador/{codigo}/mandatos"
+        return self._inject_source_url(df, endpoint)
 
 
 class SenadoFiliacoesExtractor(SenadoBaseExtractor, _SenadorChildMixin):
@@ -232,4 +235,6 @@ class SenadoFiliacoesExtractor(SenadoBaseExtractor, _SenadorChildMixin):
         if not records:
             return pl.DataFrame()
 
-        return pl.DataFrame(records, infer_schema_length=None)
+        df = pl.DataFrame(records, infer_schema_length=None)
+        endpoint = f"senador/{codigo}/filiacoes"
+        return self._inject_source_url(df, endpoint)

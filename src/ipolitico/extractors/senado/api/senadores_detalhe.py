@@ -42,13 +42,17 @@ class SenadoSenadoresDetalheExtractor(SenadoBaseExtractor):
         if not entity_ids:
             return pl.DataFrame()
 
-        all_records: list[dict[str, Any]] = []
+        all_dfs: list[pl.DataFrame] = []
         for codigo in entity_ids:
             raw = await self.fetch_flat(f"senador/{codigo}")
             records = self.flatten_response(raw, _DATA_PATH)
-            all_records.extend(records)
+            if not records:
+                continue
+            df = pl.DataFrame(records, infer_schema_length=None)
+            df = self._inject_source_url(df, f"senador/{codigo}")
+            all_dfs.append(df)
 
-        if not all_records:
+        if not all_dfs:
             return pl.DataFrame()
 
-        return pl.DataFrame(all_records, infer_schema_length=None)
+        return pl.concat(all_dfs)
