@@ -1,0 +1,8 @@
+# Mapeamento dinâmico de dependências para a API administrativa do Senado
+# (adm-dadosabertos: servidores, remunerações, despesas CEAPS).
+#
+# Fatia 06 (prefactor): o provider `senado-adm` é registrado na federação com
+# domain_configs vazio — o provider filtra por config e fica inerte. Os
+# domínios (servidores, remuneracoes, despesas_ceaps) são registrados aqui
+# nas fatias 07-09, cada um com seu extrator/transformer.
+domain_configs: {}
