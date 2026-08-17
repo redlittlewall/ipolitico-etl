@@ -8,6 +8,7 @@ from typing import Any, Optional
 import polars as pl
 
 from ipolitico.core.constants import ApiParams, ApiRoutes
+from ipolitico.extractors.base import SOURCE_PAGE_COL
 from ipolitico.extractors.camara.api.camara_base import CamaraBaseExtractor
 
 logger = logging.getLogger(__name__)
@@ -53,15 +54,27 @@ class PartidoChildRouteExtractor(CamaraBaseExtractor):
             ApiParams.ID_LEGISLATURA.value: legislatura_id,
         }
         common_params = self.build_params(raw_params)
+        # Cópia limpa (sem itens/pagina) para montar as URLs de auditoria;
+        # o fetch_paginated muta common_params injetando itens/pagina.
+        audit_params = dict(common_params)
 
         for pid in partido_ids:
             endpoint = f"{ApiRoutes.PARTIDOS.value}/{pid}/{self.route_suffix}"
-            url = self.build_source_url(endpoint, params=common_params)
             try:
                 data = await self.fetch_paginated(endpoint, common_params)
                 for item in data:
                     if isinstance(item, dict):
-                        rows.append({**item, "id_partido": int(pid), "_source_url": url})
+                        # URL replayável até o registro: inclui a página exata
+                        # de origem e não vaza a chave interna _source_page.
+                        page = item.pop(SOURCE_PAGE_COL, None)
+                        row_url = self.build_list_source_url(endpoint, audit_params, page)
+                        rows.append(
+                            {
+                                **item,
+                                "id_partido": int(pid),
+                                "_source_url": row_url,
+                            }
+                        )
             except Exception as e:
                 logger.warning("Erro em %s do partido %s: %s", self.route_suffix, pid, e)
 
