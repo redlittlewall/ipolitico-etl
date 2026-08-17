@@ -132,6 +132,25 @@ async def test_senado_adm_client_retries_on_network_error_then_success(mock_slee
 
 @pytest.mark.asyncio
 @patch("asyncio.sleep")
+async def test_senado_adm_client_does_not_retry_fatal_http_error(mock_sleep):
+    """
+    Erro HTTP fatal (demais 4xx, ex: 400) não é transitório: sem retry,
+    levanta ``SenadoAdmAPIError`` na primeira tentativa — contrato do
+    comentário 'fatal, não tenta novamente'.
+    """
+    client = SenadoAdmClient(max_retries=3)
+
+    with respx.mock:
+        route = respx.get(_url("servidores/servidores")).respond(400)
+
+        with pytest.raises(SenadoAdmAPIError):
+            await client.fetch("servidores/servidores")
+
+    assert route.call_count == 1  # sem retry em erro fatal
+
+
+@pytest.mark.asyncio
+@patch("asyncio.sleep")
 async def test_senado_adm_client_raises_after_exhausted_retries(mock_sleep):
     """
     Se a API responde 429 em todas as tentativas, o cliente lança
@@ -178,6 +197,10 @@ def test_senado_adm_client_exposes_base_url():
     ``BASE_URL`` aponta para a API adm-dadosabertos — base que os extratores
     dos domínios (issues 07-09) usam para montar o ``_source_url``; o mecanismo
     único de auditoria (runner é autoridade) permanece intacto.
+
+    O roteamento de base em ``source_urls.py`` (``_SENADO_DOMAINS``) só ganha
+    os domínios adm nas fatias 07-09, quando ``DomainType`` ganhar os membros —
+    até lá nada há para rotear.
     """
     assert SENADO_ADM_API_BASE_URL == "https://adm.senado.gov.br/adm-dadosabertos/api/v1"
     assert SenadoAdmClient.BASE_URL == SENADO_ADM_API_BASE_URL

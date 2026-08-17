@@ -30,17 +30,34 @@ class SenadoAdmAPIError(Exception):
     pass
 
 
+class SenadoAdmTransientError(SenadoAdmAPIError):
+    """Erro transitório (rede/SSL, HTTP 429/5xx) — deve ser retentado.
+
+    Distingue do erro fatal (demais HTTP 4xx) para que o retry tenacity só
+    tente novamente o que é recuperável — HTTP 400/401/403 não são.
+    """
+
+    pass
+
+
 def _is_transient_error(exception: BaseException) -> bool:
-    """Retorna True se o erro for transitório (deve tentar novamente)."""
+    """
+    Decide se uma exceção é transitória (deve tentar novamente).
+
+    Args:
+        exception: Exceção levantada durante a requisição.
+
+    Returns:
+        True para erro de rede/SSL, timeout e ``SenadoAdmTransientError``
+        (HTTP 429/5xx); False para erros fatais (demais HTTP 4xx).
+    """
+    if isinstance(exception, SenadoAdmTransientError):
+        return True
     if isinstance(exception, ssl.SSLError):
         return True
     if isinstance(exception, httpx.TimeoutException):
         return True
     if isinstance(exception, httpx.NetworkError):
-        return True
-    if isinstance(exception, httpx.HTTPStatusError):
-        return exception.response.status_code in (429, 500, 502, 503, 504)
-    if isinstance(exception, SenadoAdmAPIError):
         return True
     return False
 
@@ -129,7 +146,21 @@ class SenadoAdmClient:
         return await self._fetch_with_retry(url, params)
 
     async def _fetch_once(self, url: str, params: dict[str, Any] | None) -> Any:
-        """Executa uma única tentativa de GET, dentro do semáforo."""
+        """
+        Executa uma única tentativa de GET, dentro do semáforo.
+
+        Args:
+            url: URL completa do recurso (base + endpoint).
+            params: Parâmetros de query string (opcional).
+
+        Returns:
+            JSON decodificado como veio da API, ou lista vazia em 404.
+
+        Raises:
+            SenadoAdmTransientError: Em falha de rede/SSL ou HTTP 429/5xx
+                (retentável pelo tenacity).
+            SenadoAdmAPIError: Em erro HTTP fatal (demais 4xx) — sem retry.
+        """
         async with self._semaphore:
             async with httpx.AsyncClient(
                 timeout=30.0, headers=self.headers, follow_redirects=True
@@ -138,8 +169,8 @@ class SenadoAdmClient:
                     response = await client.get(url, params=params)
                 except (httpx.RequestError, ssl.SSLError) as e:
                     # Rede/SSL transiente (ex: [SSL: INVALID_SESSION_ID] do survey)
-                    # → SenadoAdmAPIError transitório para o tenacity retry.
-                    raise SenadoAdmAPIError(f"Falha de rede/SSL ao acessar {url}: {e}") from e
+                    # → SenadoAdmTransientError para o tenacity retry.
+                    raise SenadoAdmTransientError(f"Falha de rede/SSL ao acessar {url}: {e}") from e
 
                 # 404: recurso sem dados → lista vazia (sem retry)
                 if response.status_code == 404:
@@ -150,14 +181,14 @@ class SenadoAdmClient:
                 if response.is_success:
                     return response.json()
 
-                # 429/5xx: raise SenadoAdmAPIError para o @retry tentar novamente
+                # 429/5xx: transitório → retry via tenacity
                 if response.status_code in (429, 500, 502, 503, 504):
                     logger.warning(
                         "Erro transitório (%d) em %s. Retry via tenacity.",
                         response.status_code,
                         url,
                     )
-                    raise SenadoAdmAPIError(
+                    raise SenadoAdmTransientError(
                         f"Erro transitório HTTP {response.status_code} em {url}"
                     )
 

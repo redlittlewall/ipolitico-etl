@@ -19,6 +19,13 @@ class SenadoAdmSourceProvider:
     name = "senado-adm"
 
     def __init__(self, pipeline_manager: Any) -> None:
+        """
+        Inicializa o provider com o manager do pipeline desta fonte.
+
+        Args:
+            pipeline_manager: PipelineManager que executa os domínios desta
+                fonte (config, state store, metadata).
+        """
         self._manager = pipeline_manager
 
     async def run_domains(
@@ -30,6 +37,26 @@ class SenadoAdmSourceProvider:
         end_date: str | None,
         warmup: bool = True,
     ) -> None:
+        """
+        Executa os domínios desta fonte na federação, um por um.
+
+        Diferente dos providers Câmara/Senado (que encaminham todos os domínios
+        e dependem do manager para ignorar os não configurados), este provider
+        filtra pelos domínios que o manager conhece — sem isso, ``--source all``
+        e até ``--source senado-adm`` registrariam ``logger.error`` para cada
+        domínio ainda não configurado (config vazia nesta fatia).
+
+        Args:
+            domains: Domínios solicitados na execução (todas as fontes).
+            strategy: Estratégia de carga (FULL_LOAD ou INCREMENTAL).
+            sink_type: Tipo de sink (DATALAKE).
+            start_date: Data de início da janela (opcional).
+            end_date: Data de fim da janela (opcional).
+            warmup: Se deve pré-aquecer cache da API.
+
+        Returns:
+            None.
+        """
         for domain in self._owned_domains(domains):
             await self._manager.run_domain(
                 domain=domain,
@@ -51,6 +78,6 @@ class SenadoAdmSourceProvider:
             ``domain_configs`` da config do manager; lista vazia quando a
             config ainda não registra domínios (fatia 06).
         """
-        config = getattr(self._manager, "config", {}) or {}
+        config = self._manager.config or {}
         known = set(config.get("domain_configs", {}))
         return [d for d in domains if d.value in known]
