@@ -11,6 +11,7 @@ from ipolitico.extractors.camara.api.evento_child import EventoOrgaosExtractor
 @pytest.fixture
 def extractor() -> EventoOrgaosExtractor:
     client = AsyncMock()
+    client.BASE_URL = "https://dadosabertos.camara.leg.br/api/v2"
     ext = EventoOrgaosExtractor(client)
     ext.fetch_unpaginated = AsyncMock()
     return ext
@@ -94,3 +95,56 @@ class TestEventoOrgaosExtractor:
 
         assert df.height == 1
         assert df["id_evento"][0] == 2
+
+
+class TestEventoSourceUrl:
+    """Testes de _source_url nos extratores de /eventos/{id}/<suffix>."""
+
+    @pytest.fixture
+    def extractor(self) -> EventoOrgaosExtractor:
+        ext = EventoOrgaosExtractor(client=AsyncMock())
+        ext.base_url = "https://dadosabertos.camara.leg.br/api/v2"
+        ext.fetch_unpaginated = AsyncMock()
+        return ext
+
+    @pytest.mark.asyncio
+    async def test_extract_injects_source_url(self, extractor: EventoOrgaosExtractor):
+        """Cada registro deve ter _source_url apontando para /eventos/{id}/orgaos."""
+        extractor.fetch_unpaginated.return_value = [
+            {"id": 10, "sigla": "CD", "nome": "Comissão A"},
+        ]
+
+        df = await extractor.extract(evento_ids=[5])
+
+        assert "_source_url" in df.columns
+        assert df["_source_url"][0] == "https://dadosabertos.camara.leg.br/api/v2/eventos/5/orgaos"
+
+    @pytest.mark.asyncio
+    async def test_source_url_mesmo_para_todos_registros_mesmo_evento(
+        self, extractor: EventoOrgaosExtractor
+    ):
+        """Todos os registros de um mesmo evento têm o mesmo _source_url."""
+        extractor.fetch_unpaginated.return_value = [
+            {"id": 10, "sigla": "CD"},
+            {"id": 20, "sigla": "CE"},
+        ]
+
+        df = await extractor.extract(evento_ids=[5])
+
+        expected = "https://dadosabertos.camara.leg.br/api/v2/eventos/5/orgaos"
+        assert all(url == expected for url in df["_source_url"].to_list())
+
+    @pytest.mark.asyncio
+    async def test_source_url_por_evento(self, extractor: EventoOrgaosExtractor):
+        """Registros de eventos diferentes têm _source_url diferentes."""
+        extractor.fetch_unpaginated.side_effect = [
+            [{"id": 10, "sigla": "CD"}],
+            [{"id": 20, "sigla": "CE"}],
+        ]
+
+        df = await extractor.extract(evento_ids=[1, 2])
+
+        assert df["_source_url"].to_list() == [
+            "https://dadosabertos.camara.leg.br/api/v2/eventos/1/orgaos",
+            "https://dadosabertos.camara.leg.br/api/v2/eventos/2/orgaos",
+        ]

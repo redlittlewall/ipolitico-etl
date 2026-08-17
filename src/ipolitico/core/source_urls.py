@@ -5,11 +5,14 @@ correspondente na API oficial (Câmara ou Senado). A coluna ``_source_url``
 é adicionada a todo registro na camada Silver, permitindo que qualquer
 cidadão verifique a fonte oficial dos dados.
 
-Domínios bulk-only (CSV) não possuem URL de API por registro individual.
+Domínios bulk-only (CSV) não possuem URL de API por registro individual:
+a URL do arquivo em bulk é injetada na extração e preservada na Silver
+(via ``finalize_source_url``), nunca substituída por string vazia.
 """
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 
@@ -20,6 +23,8 @@ from ipolitico.core.constants import DomainType
 
 _CAMARA_BASE = CAMARA_API_BASE_URL.rstrip("/")
 _SENADO_BASE = SENADO_API_BASE_URL.rstrip("/")
+
+logger = logging.getLogger(__name__)
 
 # ── Conjunto de domínios do Senado (para rotear base URL) ─────────────────────
 _SENADO_DOMAINS: frozenset[DomainType] = frozenset(
@@ -215,10 +220,13 @@ def _resolve_url(template: str, base: str, row: dict[str, Any]) -> str:
 
 
 def add_source_url_column(df: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
-    """Adiciona a coluna ``_source_url`` a um DataFrame Silver.
+    """Adiciona a coluna ``_source_url`` a um DataFrame Silver via template.
 
-    A URL é construída a partir do template do domínio e dos valores
-    de cada linha. Domínios bulk-only recebem string vazia.
+    Caminho de fallback do mecanismo único (``finalize_source_url``): usado
+    apenas quando a extração não injetou ``_source_url``. A URL é construída
+    a partir do template do domínio e dos valores de cada linha. Domínios
+    bulk-only e domínios sem template recebem string vazia — nesses casos a
+    URL real vem da extração (arquivo em bulk), não deste fallback.
 
     Args:
         df: DataFrame já transformado (camada Silver).
@@ -242,3 +250,67 @@ def add_source_url_column(df: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
     # Constrói a URL linha a linha via expressão Polars
     urls = [_resolve_url(template, base, row) for row in df.iter_rows(named=True)]
     return df.with_columns(pl.Series(urls).alias("_source_url"))
+
+
+def finalize_source_url(df: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
+    """Autoridade única sobre ``_source_url`` no DataFrame Silver final.
+
+    Preserva a URL injetada na extração (URL de download do arquivo em bulk,
+    URL com ``pagina`` em listas paginadas, URL do recurso em registros com
+    ID), preenchendo apenas valores vazios/nulos via template do domínio
+    quando aplicável. Nunca sobrescreve uma URL não-vazia e nunca zera
+    domínios bulk-only — a URL do arquivo nunca é perdida.
+
+    Args:
+        df: DataFrame já transformado (camada Silver), possivelmente com
+            coluna ``_source_url`` vinda da extração.
+        domain: Tipo do domínio para resolver o template de fallback.
+
+    Returns:
+        DataFrame com a coluna ``_source_url`` garantida: valores não-vazios
+        preservados; vazios/nulos preenchidos via template quando o domínio
+        tem template; bulk-only sem template mantém o valor da extração.
+    """
+    if df.is_empty():
+        # Mantém o contrato Silver mesmo com df vazio (coluna sempre presente).
+        return add_source_url_column(df, domain)
+
+    template = SOURCE_URL_TEMPLATES.get(domain)
+
+    # Sem coluna: delega ao fallback por template (mesmo comportamento de antes).
+    if "_source_url" not in df.columns:
+        return add_source_url_column(df, domain)
+
+    # Bulk-only e domínios sem template: preserva integralmente o que a
+    # extração injetou (URL do arquivo em bulk). Nunca zera. O warn sinaliza
+    # extração que falhou em injetar a URL (auditoria fica com furo).
+    if domain in _BULK_ONLY_DOMAINS or not template:
+        empty = df["_source_url"].is_null() | (df["_source_url"] == "")
+        if int(empty.sum()):
+            logger.warning(
+                "Domínio %s: %s registro(s) sem _source_url (bulk/sem template); "
+                "extração não injetou a URL do arquivo.",
+                domain.value,
+                int(empty.sum()),
+            )
+        return df
+
+    # Preenche apenas vazios/nulos com o template do domínio.
+    source_url = df["_source_url"]
+    mask = source_url.is_null() | (source_url == "")
+    if not mask.any():
+        return df
+
+    base = _SENADO_BASE if domain in _SENADO_DOMAINS else _CAMARA_BASE
+    urls = pl.Series([_resolve_url(template, base, row) for row in df.iter_rows(named=True)])
+    # mask=True (vazio) recebe o template; senão preserva o valor da extração.
+    filled = urls.zip_with(mask, source_url)
+
+    remaining = int((mask & urls.eq("")).sum())
+    if remaining:
+        logger.warning(
+            "Domínio %s: %s registro(s) sem campo para resolver _source_url via template",
+            domain.value,
+            remaining,
+        )
+    return df.with_columns(filled.alias("_source_url"))

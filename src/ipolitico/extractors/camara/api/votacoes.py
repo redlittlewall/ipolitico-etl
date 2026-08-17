@@ -17,6 +17,8 @@ class VotacoesExtractor(CamaraBaseExtractor):
     a resposta HTTP exata no formato de DataFrame.
     """
 
+    source_url_format: str = "https://dadosabertos.camara.leg.br/api/v2/votacoes/{resource_id}"
+
     async def extract(
         self, start_date: Optional[str] = None, end_date: Optional[str] = None, **kwargs: Any
     ) -> pl.DataFrame:
@@ -29,7 +31,8 @@ class VotacoesExtractor(CamaraBaseExtractor):
             **kwargs: Parâmetros adicionais.
 
         Returns:
-            pl.DataFrame: Metadados puros das votações.
+            pl.DataFrame: Metadados puros das votações com coluna ``_source_url``
+                          de auditoria.
         """
         raw_params = {
             ApiParams.DATA_INICIO.value: start_date,
@@ -50,7 +53,10 @@ class VotacoesExtractor(CamaraBaseExtractor):
             return pl.DataFrame()
 
         logger.info("API votações: %s registros brutos no período.", len(data))
-        return pl.DataFrame(data, infer_schema_length=None)
+        df = pl.DataFrame(data, infer_schema_length=None) if data else pl.DataFrame()
+        if df.is_empty():
+            return df
+        return self._inject_source_url(df, "votacoes", resource_id_col="id")
 
     async def extract_votos(self, votacao_id: str) -> pl.DataFrame:
         """

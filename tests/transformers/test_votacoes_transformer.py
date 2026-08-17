@@ -19,6 +19,7 @@ def test_votacoes_transformer_nested_proposicao_objeto():
             "proposicaoObjeto": [{"uri": "http://proposicao/1", "id": 99}],
             "descricao": ["desc"],
             "aprovacao": [1],
+            "_source_url": [""],
         }
     )
 
@@ -40,6 +41,7 @@ def test_votacoes_transformer_aprovacao_string_coercion():
             "uriOrgao": ["uo"],
             "descricao": ["d"],
             "aprovacao": ["1"],
+            "_source_url": [""],
         }
     )
 

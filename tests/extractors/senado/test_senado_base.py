@@ -80,3 +80,10 @@ def test_ensure_list_none():
     extractor = SenadoBaseExtractor(client=None)
     result = extractor._ensure_list(None)
     assert result == []
+
+
+def test_senado_base_url_comes_from_client():
+    """SenadoBaseExtractor.base_url deve vir do client.BASE_URL."""
+    client = SenadoClient()
+    extractor = SenadoBaseExtractor(client)
+    assert extractor.base_url == "https://legis.senado.leg.br/dadosabertos"

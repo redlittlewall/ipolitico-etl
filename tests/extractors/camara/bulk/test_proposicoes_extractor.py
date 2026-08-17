@@ -16,6 +16,7 @@ def test_proposicoes_transformer_datetime():
             "ano": [2026],
             "ementa": ["e"],
             "dataApresentacao": ["2026-05-10T14:00:00"],
+            "_source_url": [""],
         }
     )
 

@@ -34,8 +34,14 @@ class VotacaoChildRouteExtractor(CamaraBaseExtractor):
             except Exception as e:
                 logger.warning("Erro em %s para votação %s: %s", self.route_suffix, vid, e)
 
-        return pl.DataFrame(rows, infer_schema_length=None) if rows else pl.DataFrame()
+        df = pl.DataFrame(rows, infer_schema_length=None) if rows else pl.DataFrame()
+        return self._inject_source_url(df, "votacoes", resource_id_col="votacao_id")
 
 
 class OrientacoesExtractor(VotacaoChildRouteExtractor):
+    """Orientação de voto dos partidos/blocos em uma votação."""
+
     route_suffix = "orientacoes"
+    source_url_format: str = (
+        "https://dadosabertos.camara.leg.br/api/v2/votacoes/{resource_id}/orientacoes"
+    )

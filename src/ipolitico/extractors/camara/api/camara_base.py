@@ -4,7 +4,7 @@ from typing import Any, Dict, List
 from ipolitico.core.camara_client import CamaraClient
 from ipolitico.core.config import CAMARA_PAGE_SIZE
 from ipolitico.core.constants import ApiParams
-from ipolitico.extractors.base import BaseExtractor
+from ipolitico.extractors.base import SOURCE_PAGE_COL, BaseExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,7 @@ class CamaraBaseExtractor(BaseExtractor):
             client (CamaraClient): Cliente HTTP configurado para requisições na Câmara.
         """
         self.client = client
+        self.base_url = client.BASE_URL
 
     def build_params(self, raw_params: Dict[Any, Any]) -> Dict[str, Any]:
         """
@@ -57,7 +58,10 @@ class CamaraBaseExtractor(BaseExtractor):
             params (Dict[str, Any]): Parâmetros de filtro e ordenação já limpos.
 
         Returns:
-            List[Dict[str, Any]]: Todos os registros acumulados das múltiplas páginas.
+            List[Dict[str, Any]]: Todos os registros acumulados das múltiplas
+            páginas. Cada registro carrega a chave reservada ``_source_page``
+            com o número da página de origem, consumida depois pelo
+            ``_inject_source_url`` para montar a URL replayável.
         """
         page_limit_key = ApiParams.ITENS.value
         if params.get(page_limit_key) is None:
@@ -74,6 +78,12 @@ class CamaraBaseExtractor(BaseExtractor):
 
             if not data:
                 break
+
+            # Marca a página de origem em cada registro antes de fundir,
+            # para a URL de auditoria ser replayável até o registro (issue 01).
+            for item in data:
+                if isinstance(item, dict):
+                    item[SOURCE_PAGE_COL] = page
 
             all_data.extend(data)
 

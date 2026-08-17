@@ -7,9 +7,22 @@ from ipolitico.extractors.camara.api.camara_base import CamaraBaseExtractor
 
 
 class LegislaturasExtractor(CamaraBaseExtractor):
+    source_url_format: str = "https://dadosabertos.camara.leg.br/api/v2/legislaturas/{resource_id}"
+
     async def extract(
         self, start_date: Optional[str] = None, end_date: Optional[str] = None, **kwargs: Any
     ):
+        """
+        Extrai lista de legislaturas da API.
+
+        Args:
+            start_date: Ignorado.
+            end_date: Ignorado.
+            **kwargs: Parâmetros adicionais.
+
+        Returns:
+            pl.DataFrame: Dados brutos com ``_source_url`` de auditoria.
+        """
         _ = start_date, end_date
         raw_params = {
             ApiParams.ORDEM.value: ApiParams.ORDEM_ASC.value,
@@ -18,4 +31,5 @@ class LegislaturasExtractor(CamaraBaseExtractor):
         data = await self.fetch_paginated(
             ApiRoutes.LEGISLATURAS.value, self.build_params(raw_params)
         )
-        return pl.DataFrame(data, infer_schema_length=None) if data else pl.DataFrame()
+        df = pl.DataFrame(data, infer_schema_length=None) if data else pl.DataFrame()
+        return self._inject_source_url(df, "legislaturas", resource_id_col="id")

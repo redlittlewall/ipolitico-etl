@@ -98,8 +98,10 @@ class BaseBulkExtractor(BaseExtractor):
         um hash da configuração do registro para invalidar em mudanças de schema.
 
         Returns:
-            pl.DataFrame: DataFrame contendo os dados estritamente brutos.
-                          Retorna um DataFrame vazio em caso de falha ou arquivo inexistente.
+            pl.DataFrame: DataFrame contendo os dados estritamente brutos,
+                          com ``_source_url`` (URL de download do CSV) como
+                          primeira coluna. Retorna um DataFrame vazio em caso
+                          de falha ou arquivo inexistente (sem ``_source_url``).
         """
         if not self.domain_name:
             raise NotImplementedError("domain_name deve ser fornecido no construtor.")
@@ -170,6 +172,10 @@ class BaseBulkExtractor(BaseExtractor):
                     existing = {k: v for k, v in rename_map.items() if k in df.columns}
                     if existing:
                         df = df.rename(existing)
+
+                # ── _source_url: URL de download do CSV (audit trail) ─────
+                df = df.with_columns(pl.lit(url).alias("_source_url").cast(pl.String))
+                df = df.select(["_source_url"] + [c for c in df.columns if c != "_source_url"])
 
                 # ── Popula cache antes de retornar ────────────────────────
                 config_hash = hash(str(config_registry))

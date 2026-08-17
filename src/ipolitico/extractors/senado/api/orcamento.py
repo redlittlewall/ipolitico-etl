@@ -59,7 +59,8 @@ class OrcamentoEmendasExtractor(SenadoBaseExtractor):
         if not records:
             return pl.DataFrame()
 
-        return pl.DataFrame(records, infer_schema_length=None)
+        df = pl.DataFrame(records, infer_schema_length=None)
+        return self._inject_source_url(df, "orcamento/lista", params=params)
 
 
 class OrcamentoOficiosExtractor(SenadoBaseExtractor):
@@ -94,4 +95,5 @@ class OrcamentoOficiosExtractor(SenadoBaseExtractor):
         if not raw or not isinstance(raw, list):
             return pl.DataFrame()
 
-        return pl.DataFrame(raw, infer_schema_length=None)
+        df = pl.DataFrame(raw, infer_schema_length=None)
+        return self._inject_source_url(df, "orcamento/oficios", params=params)
