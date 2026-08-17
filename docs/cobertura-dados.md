@@ -18,6 +18,8 @@ conhecidas no meio da série (a fonte responde vazio/404 para o período).
 
 ## Câmara dos Deputados
 
+API: https://dadosabertos.camara.leg.br
+
 | Domínio | Início dos dados | Lacunas no meio da série |
 |---|---|---|
 | `deputados` | 1826-04-29 | — |
@@ -86,6 +88,8 @@ conhecidas no meio da série (a fonte responde vazio/404 para o período).
 | `proposicoes_detalhe` | 1988-01-01 | — |
 
 ## Senado Federal
+
+API: https://legis.senado.leg.br
 
 | Domínio | Início dos dados | Lacunas no meio da série |
 |---|---|---|

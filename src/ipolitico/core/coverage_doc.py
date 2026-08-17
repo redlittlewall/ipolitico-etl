@@ -4,8 +4,8 @@ Fonte única: o registry de cobertura — ``EARLIEST_DATE_MAP`` (data de início
 ``COVERAGE_GAPS`` (lacunas no meio da série) e ``DOMAIN_SOURCE_SYSTEM``
 (sistema/API de origem). A renderização é pura: um registry conhecido sempre
 produz o mesmo Markdown. O entrypoint ``generate_coverage_doc`` grava o documento
-em ``docs/cobertura-dados.md``, para que a documentação nunca dessincronize do
-comportamento real (issue 03).
+em Markdown no caminho pedido; o CLI aponta o padrão para ``docs/cobertura-dados.md``
+(issue 03).
 """
 
 from __future__ import annotations
@@ -43,28 +43,15 @@ _SYSTEMS_IN_ORDER: tuple[SourceSystem, ...] = (SourceSystem.CAMARA, SourceSystem
 # Marca de ausência de lacunas nas tabelas.
 _NO_GAPS = "—"
 
-# Domínios documentados no registry (EarliestDates) mas ainda sem DomainType —
-# chegam em issues próprias (folha → issue 04; remunerações/CEAPs → issues 08/09).
-# Tupla: (nome, rótulo, sistema de origem, data documentada via EarliestDates).
-_DOCUMENTED_ONLY: tuple[tuple[str, str, SourceSystem, str], ...] = (
-    (
-        "folha_pagamento",
-        "Folha de pagamento consolidada (Câmara)",
-        SourceSystem.CAMARA,
-        EarliestDates.FOLHA_PAGAMENTO,
-    ),
-    (
-        "remuneracoes",
-        "Remunerações do Senado (administrativo)",
-        SourceSystem.SENADO,
-        EarliestDates.REMUNERACOES,
-    ),
-    (
-        "despesas_ceaps",
-        "Despesas de CEAPs do Senado",
-        SourceSystem.SENADO,
-        EarliestDates.DESPESAS_CEAPS,
-    ),
+# Domínios documentados no registry (EarliestDates/DOMAIN_SOURCE_SYSTEM) mas
+# ainda sem DomainType — chegam em issues próprias (folha → issue 04;
+# remunerações/CEAPs → issues 08/09). Guarda apenas o rótulo: sistema de origem
+# e data de início são lidos das fontes únicas (DOMAIN_SOURCE_SYSTEM e
+# EarliestDates) em build_coverage_entries, nunca copiados.
+_DOCUMENTED_ONLY: tuple[tuple[str, str], ...] = (
+    ("folha_pagamento", "Folha de pagamento consolidada (Câmara)"),
+    ("remuneracoes", "Remunerações do Senado (administrativo)"),
+    ("despesas_ceaps", "Despesas de CEAPs do Senado"),
 )
 
 
@@ -90,12 +77,25 @@ class CoverageEntry:
     implemented: bool = True
 
 
+def _format_gaps(gaps: Sequence[str]) -> str:
+    """Une as notas de lacunas para exibição em tabela.
+
+    Args:
+        gaps: Notas de lacunas do domínio (pode ser vazio).
+
+    Returns:
+        Notas separadas por "; " ou a marca ``—`` quando não há lacunas.
+    """
+    return "; ".join(gaps) if gaps else _NO_GAPS
+
+
 def build_coverage_entries() -> list[CoverageEntry]:
     """Monta as entradas de cobertura a partir do registry de cobertura.
 
     Percorre os ``DomainType`` na ordem canônica da pipeline (``FULL_PIPELINE``,
     com fallback alfabético para domínios fora da tupla) e acrescenta ao final os
-    domínios documentados no ``EarliestDates`` que ainda não têm ``DomainType``.
+    domínios documentados no registry que ainda não têm ``DomainType`` — lendo
+    sistema de origem e data de início das fontes únicas.
 
     Returns:
         Lista de ``CoverageEntry`` — uma por domínio, na ordem de exibição
@@ -118,13 +118,13 @@ def build_coverage_entries() -> list[CoverageEntry]:
             )
         )
 
-    for name, label, system, earliest in _DOCUMENTED_ONLY:
+    for name, label in _DOCUMENTED_ONLY:
         entries.append(
             CoverageEntry(
                 domain=name,
                 label=label,
-                source_system=system,
-                earliest_iso=earliest,
+                source_system=DOMAIN_SOURCE_SYSTEM[name],
+                earliest_iso=getattr(EarliestDates, name.upper()),
                 gaps=COVERAGE_GAPS.get(name, ()),
                 implemented=False,
             )
@@ -155,6 +155,9 @@ def render_coverage_doc(
         houver entradas implementadas de um sistema, a seção é omitida; idem
         para a seção de planejados quando vazia.
     """
+    implemented = [e for e in entries if e.implemented]
+    planned = [e for e in entries if not e.implemented]
+
     lines: list[str] = [
         "# Cobertura de Dados — iPolitico ETL",
         "",
@@ -172,26 +175,25 @@ def render_coverage_doc(
         "| Sistema | API |",
         "|---|---|",
     ]
-    # Lista apenas os sistemas presentes nas entradas (na ordem canônica).
-    present_systems = [s for s in _SYSTEMS_IN_ORDER if any(e.source_system == s for e in entries)]
+    # Lista apenas os sistemas presentes nas entradas implementadas (na ordem
+    # canônica) — os domínios planejados declaram o próprio sistema na seção deles.
+    present_systems = [
+        s for s in _SYSTEMS_IN_ORDER if any(e.source_system == s for e in implemented)
+    ]
     for system in present_systems:
         lines.append(f"| {source_system_labels[system]} | {source_api_urls[system]} |")
     lines.append("")
 
-    implemented = [e for e in entries if e.implemented]
-    planned = [e for e in entries if not e.implemented]
-
     for system in present_systems:
         system_entries = [e for e in implemented if e.source_system == system]
-        if not system_entries:
-            continue
         lines.append(f"## {source_system_labels[system]}")
+        lines.append("")
+        lines.append(f"API: {source_api_urls[system]}")
         lines.append("")
         lines.append("| Domínio | Início dos dados | Lacunas no meio da série |")
         lines.append("|---|---|---|")
         for entry in system_entries:
-            gaps = "; ".join(entry.gaps) if entry.gaps else _NO_GAPS
-            lines.append(f"| `{entry.domain}` | {entry.earliest_iso} | {gaps} |")
+            lines.append(f"| `{entry.domain}` | {entry.earliest_iso} | {_format_gaps(entry.gaps)} |")
         lines.append("")
 
     if planned:
@@ -204,26 +206,26 @@ def render_coverage_doc(
         lines.append("| Domínio | Sistema | Início documentado | Lacunas |")
         lines.append("|---|---|---|---|")
         for entry in planned:
-            gaps = "; ".join(entry.gaps) if entry.gaps else _NO_GAPS
             system_label = source_system_labels[entry.source_system]
-            lines.append(f"| `{entry.domain}` | {system_label} | {entry.earliest_iso} | {gaps} |")
+            lines.append(
+                f"| `{entry.domain}` | {system_label} | {entry.earliest_iso} | "
+                f"{_format_gaps(entry.gaps)} |"
+            )
         lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"
 
 
-def generate_coverage_doc(output_path: Path = Path("docs/cobertura-dados.md")) -> Path:
+def generate_coverage_doc(output_path: Path) -> None:
     """Gera o documento de cobertura de dados e grava em ``output_path``.
 
-    Monta as entradas a partir do registry (``build_coverage_entries``), renderiza
-    (``render_coverage_doc``) e escreve o Markdown no disco.
+    Comando (não retorna valor): monta as entradas a partir do registry
+    (``build_coverage_entries``), renderiza (``render_coverage_doc``) e escreve o
+    Markdown no disco. Quem decide o caminho padrão é o CLI.
 
     Args:
         output_path: Caminho de destino do Markdown gerado. O diretório pai é
             criado se necessário.
-
-    Returns:
-        O ``Path`` de destino (permite encadeamento em scripts/CI).
 
     Raises:
         OSError: se o diretório pai não puder ser criado ou a escrita falhar.
@@ -232,4 +234,3 @@ def generate_coverage_doc(output_path: Path = Path("docs/cobertura-dados.md")) -
     output_path.parent.mkdir(parents=True, exist_ok=True)
     markdown = render_coverage_doc(build_coverage_entries())
     output_path.write_text(markdown, encoding="utf-8")
-    return output_path

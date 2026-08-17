@@ -277,7 +277,8 @@ async def main():
     if args.generate_coverage_doc:
         from ipolitico.core.coverage_doc import generate_coverage_doc
 
-        output = generate_coverage_doc(Path(args.coverage_doc_output))
+        output = Path(args.coverage_doc_output)
+        generate_coverage_doc(output)
         print(f"Documento de cobertura gerado em: {output}")
         return
 

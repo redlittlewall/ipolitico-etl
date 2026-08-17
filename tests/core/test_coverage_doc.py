@@ -11,6 +11,7 @@ from ipolitico.core.constants import (
     DOMAIN_SOURCE_SYSTEM,
     EARLIEST_DATE_MAP,
     DomainType,
+    EarliestDates,
     SourceSystem,
 )
 from ipolitico.core.coverage_doc import (
@@ -82,12 +83,16 @@ class TestRenderCoberturaDoc:
             "\n"
             "## Câmara dos Deputados\n"
             "\n"
+            "API: https://dadosabertos.camara.leg.br\n"
+            "\n"
             "| Domínio | Início dos dados | Lacunas no meio da série |\n"
             "|---|---|---|\n"
             "| `despesas` | 2009-01-01 | — |\n"
             "| `proposicoes` | 1988-01-01 | — |\n"
             "\n"
             "## Senado Federal\n"
+            "\n"
+            "API: https://legis.senado.leg.br\n"
             "\n"
             "| Domínio | Início dos dados | Lacunas no meio da série |\n"
             "|---|---|---|\n"
@@ -130,6 +135,7 @@ class TestRenderCoberturaDoc:
         )
         assert "| Casa A | https://api.example |" in markdown
         assert "## Casa A" in markdown
+        assert "API: https://api.example" in markdown
 
 
 class TestRegistrySistemaOrigem:
@@ -178,6 +184,14 @@ class TestBuildCoverageEntries:
         assert by_name["despesas"].implemented is True
         assert by_name["folha_pagamento"].implemented is False
 
+    def test_documentados_leem_sistema_e_data_do_registry(self):
+        """Planejados não copiam valores: sistema/data vêm das fontes únicas."""
+        by_name = {e.domain: e for e in build_coverage_entries()}
+        for name in ("folha_pagamento", "remuneracoes", "despesas_ceaps"):
+            entry = by_name[name]
+            assert entry.source_system == DOMAIN_SOURCE_SYSTEM[name]
+            assert entry.earliest_iso == getattr(EarliestDates, name.upper())
+
     def test_entradas_em_ordem_canonica_da_pipeline(self):
         from ipolitico.pipeline.domain_order import FULL_PIPELINE
 
@@ -194,8 +208,7 @@ class TestGeracaoArquivo:
 
     def test_generate_escreve_arquivo(self, tmp_path):
         out = tmp_path / "cobertura.md"
-        written = generate_coverage_doc(out)
-        assert written == out
+        generate_coverage_doc(out)
         assert out.is_file()
         assert out.read_text(encoding="utf-8") == render_coverage_doc(build_coverage_entries())
 
@@ -211,3 +224,28 @@ class TestGeracaoArquivo:
         out = tmp_path / "sub" / "dir" / "cobertura.md"
         generate_coverage_doc(out)
         assert out.is_file()
+
+
+class TestGeracaoViaCLI:
+    """O entrypoint argparse (--generate-coverage-doc) grava o documento."""
+
+    def test_cli_gera_documento_no_caminho_pedido(self, tmp_path, monkeypatch, capsys):
+        from ipolitico.main import main_cli
+
+        out = tmp_path / "cli" / "cobertura.md"
+        monkeypatch.setattr(
+            "sys.argv",
+            ["ipolitico", "--generate-coverage-doc", "--coverage-doc-output", str(out)],
+        )
+        main_cli()
+        assert out.is_file()
+        assert "Documento de cobertura gerado em" in capsys.readouterr().out
+        assert out.read_text(encoding="utf-8") == render_coverage_doc(build_coverage_entries())
+
+    def test_cli_padrao_aponta_para_docs(self, monkeypatch, tmp_path):
+        from ipolitico.main import main_cli
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr("sys.argv", ["ipolitico", "--generate-coverage-doc"])
+        main_cli()
+        assert (tmp_path / "docs" / "cobertura-dados.md").is_file()
