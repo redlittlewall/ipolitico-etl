@@ -84,6 +84,7 @@ API: https://dadosabertos.camara.leg.br
 | `eventos_requerimentos` | 1991-01-01 | — |
 | `votacoes_objetos` | 1991-01-01 | — |
 | `votacoes_proposicoes` | 1991-01-01 | — |
+| `folha_pagamento` | 2012-01-01 | 2011, 2015 e 2022 não publicados (HTTP 404) — ausência, não erro |
 | `blocos_detalhe` | 1826-04-29 | — |
 | `proposicoes_detalhe` | 1988-01-01 | — |
 
@@ -132,6 +133,5 @@ Domínios com data de disponibilidade já confirmada no registry, ainda não ing
 
 | Domínio | Sistema | Início documentado | Lacunas |
 |---|---|---|---|
-| `folha_pagamento` | Câmara dos Deputados | 2012-01-01 | 2011, 2015 e 2022 não publicados (HTTP 404) — ausência, não erro |
 | `remuneracoes` | Senado Federal | 2013-01-01 | — |
 | `despesas_ceaps` | Senado Federal | 2008-01-01 | — |

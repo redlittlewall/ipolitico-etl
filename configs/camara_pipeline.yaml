@@ -211,6 +211,10 @@ domain_configs:
   votacoes_proposicoes:
     extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
     transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraVotacoesProposicoesTransformer"
+  # ── Domínio bulk-only mensal (issue 04) — folha de pagamento consolidada ──
+  folha_pagamento:
+    extractor: "ipolitico.extractors.camara.bulk.base_bulk.BaseBulkExtractor"
+    transformer: "ipolitico.transformers.camara.institutional_transformer.CamaraFolhaPagamentoTransformer"
   legislaturas_lideres:
     extractor: "ipolitico.extractors.camara.api.legislatura_child.LegislaturaLideresExtractor"
     transformer: "ipolitico.transformers.camara.membros_transformer.CamaraMembrosTransformer"

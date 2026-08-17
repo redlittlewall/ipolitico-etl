@@ -70,6 +70,7 @@ FULL_PIPELINE: tuple[DomainType, ...] = (
     DomainType.EVENTOS_REQUERIMENTOS,
     DomainType.VOTACOES_OBJETOS,
     DomainType.VOTACOES_PROPOSICOES,
+    DomainType.FOLHA_PAGAMENTO,
     # ── Senado ────────────────────────────────────────────────────────────
     DomainType.SENADORES,
     DomainType.SENADORES_DETALHE,

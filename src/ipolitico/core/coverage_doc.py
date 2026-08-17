@@ -49,7 +49,7 @@ _NO_GAPS = "—"
 # e data de início são lidos das fontes únicas (DOMAIN_SOURCE_SYSTEM e
 # EarliestDates) em build_coverage_entries, nunca copiados.
 _DOCUMENTED_ONLY: tuple[tuple[str, str], ...] = (
-    ("folha_pagamento", "Folha de pagamento consolidada (Câmara)"),
+    # NOTA: folha_pagamento removido — virou DomainType implementado (issue 04)
     ("remuneracoes", "Remunerações do Senado (administrativo)"),
     ("despesas_ceaps", "Despesas de CEAPs do Senado"),
 )
