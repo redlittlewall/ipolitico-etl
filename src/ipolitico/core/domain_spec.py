@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import FrozenSet
 
-from ipolitico.core.constants import EARLIEST_DATE_MAP, DomainType
+from ipolitico.core.constants import COVERAGE_GAPS, EARLIEST_DATE_MAP, DomainType
 from ipolitico.extractors.camara.bulk.registry import BULK_REGISTRY
 
 # URLs de auditoria para recursos com ID único na API da Câmara.
@@ -63,6 +63,7 @@ class DomainSpec:
     bulk_granularity: str | None = None
     stable: bool = False
     source_url_format: str | None = None
+    coverage_gaps: tuple[str, ...] = ()
 
 
 def _spec(
@@ -85,6 +86,7 @@ def _spec(
         bulk_granularity=meta.get("bulk_granularity"),
         stable=stable,
         source_url_format=source_url_format or _SOURCE_URL_FORMATS.get(domain),
+        coverage_gaps=COVERAGE_GAPS.get(domain.value, ()),
     )
 
 

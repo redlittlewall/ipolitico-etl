@@ -78,6 +78,8 @@ Se o código editado **não tiver docstring** ou a docstring estiver **desatuali
 
 ### Testes
 
+- **TDD obrigatório (red → green → refactor).** Escreva os testes antes do código.
+  Testes novos acompanham código novo; não commite sem `pytest -q` passando.
 - **Novos fluxos exigem testes unitários assíncronos no Pytest.**
 - Use `pytest-asyncio` (modo `asyncio_mode = auto` já configurado).
 - Teste cada camada isoladamente: extrator (mock `httpx`/`respx`), transformer
@@ -104,7 +106,8 @@ Se o código editado **não tiver docstring** ou a docstring estiver **desatuali
 1. **Antes de escrever código novo**, leia `CONTEXT.md` e verifique `core/`
    e as classes base para não duplicar lógica existente.
 2. **Sempre adicione/atualize docstrings** em qualquer classe ou função tocada.
-3. **Testes novos** acompanham código novo. Não commite sem `pytest -q` passando.
+3. **TDD obrigatório:** escreva os testes antes do código (red → green → refactor).
+   Testes novos acompanham código novo. Não commite sem `pytest -q` passando.
 4. **Nunca aumente o semáforo de concorrência** sem justificativa documentada.
 5. **Nunca substitua append-only por upsert na ingestão** — a dedup é responsabilidade
    da camada Gold (`DataLakeOptimizer`), não da ingestão.

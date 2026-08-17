@@ -180,6 +180,9 @@ class MedallionLayer(str, Enum):
 class EarliestDates:
     """Datas mínimas de dados por domínio para evitar loops infinitos."""
 
+    # DEPUTADOS = "1826-04-29" é a data de fundação da Câmara — o limite real
+    # para mandatos históricos, NÃO um default. Manter quando a disponibilidade
+    # for igual à existência do órgão (issue 02).
     DEPUTADOS = "1826-04-29"
     PROPOSICOES = "1988-01-01"
     VOTACOES = "1991-01-01"
@@ -196,6 +199,13 @@ class EarliestDates:
     VOTACOES_OBJETOS = "1991-01-01"
     VOTACOES_PROPOSICOES = "1991-01-01"
     LICITACOES = "1999-01-01"
+    # ── Domínios confirmados (PRD Consumo Absoluto) ───────────────────────
+    # Datas reais de disponibilidade levantadas na pesquisa. Ainda sem
+    # DomainType/EARLIEST_DATE_MAP (o extrator chega na issue própria); quando
+    # o domínio for criado, o map deve apontar para estes valores.
+    FOLHA_PAGAMENTO = "2012-01-01"  # consolidado da folha da Câmara (issue 02/04)
+    REMUNERACOES = "2013-01-01"  # remunerações do Senado, adm (issue 08)
+    DESPESAS_CEAPS = "2008-01-01"  # despesas CEAPs do Senado, adm (issue 09)
     # ── Senado ──────────────────────────────────────────────────────────
     SENADORES = "1949-01-01"
     SENADORES_DETALHE = "1949-01-01"
@@ -236,6 +246,9 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.DEPUTADOS: EarliestDates.DEPUTADOS,
     DomainType.PROPOSICOES: EarliestDates.PROPOSICOES,
     DomainType.VOTACOES: EarliestDates.VOTACOES,
+    # VOTOS compartilha o piso de VOTACOES (só existem votos onde há votação).
+    # Sem esta entrada, caía no fallback silencioso 1826-04-29 (issue 02).
+    DomainType.VOTOS: EarliestDates.VOTACOES,
     DomainType.DESPESAS: EarliestDates.DESPESAS,
     DomainType.PROFISSÕES: EarliestDates.DEPUTADOS,
     DomainType.OCUPACOES: EarliestDates.DEPUTADOS,
@@ -336,6 +349,17 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.SENADORES_MANDATOS: EarliestDates.SENADORES_MANDATOS,
     DomainType.SENADORES_FILIACOES: EarliestDates.SENADORES_FILIACOES,
     DomainType.ORIENTACAO_BANCADA: EarliestDates.ORIENTACAO_BANCADA,
+}
+
+
+# ── Lacunas de cobertura no meio da série (issue 02) ────────────────────────
+# Notas de ausência PERMANENTE no meio da série, chaveadas pelo nome do domínio
+# (domain.value). Chave por nome — e não por DomainType — para registrar fatos
+# confirmados na pesquisa antes de o domínio existir no enum (ex: FOLHA_PAGAMENTO
+# chega na issue 04). Quando o DomainType for criado, spec_for/coverage_gaps
+# passa a consumir esta entrada automaticamente.
+COVERAGE_GAPS: Dict[str, tuple[str, ...]] = {
+    "folha_pagamento": ("2011, 2015 e 2022 não publicados (HTTP 404) — ausência, não erro",),
 }
 
 
