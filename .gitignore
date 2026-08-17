@@ -37,6 +37,8 @@ datalake/
 *.parquet
 *.csv
 *.zip
+# Exceção: fixtures de teste de extração bulk (CSV local ISO-8859-1, ex: folha)
+!tests/fixtures/*.csv
 
 # Backups
 data_backup_*/

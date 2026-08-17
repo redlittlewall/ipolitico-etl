@@ -60,6 +60,8 @@ class CamaraExtractorFactory:
             DomainType.OCUPACOES.value: BaseBulkExtractor,
             DomainType.PROFISSÕES.value: BaseBulkExtractor,
             DomainType.ORIENTACOES.value: BaseBulkExtractor,
+            # Issue 04 — folha de pagamento consolidada (bulk mensal)
+            DomainType.FOLHA_PAGAMENTO.value: BaseBulkExtractor,
         }
 
     @classmethod

@@ -28,16 +28,34 @@ class BaseBulkExtractor(BaseExtractor):
     de cast nos transformers. Colunas de moeda BR permanecem como ``pl.Utf8``
     para processamento posterior pelo helper ``convert_br_currency_columns``.
 
-    Implementa cache de DataFrames por chave (domínio, ano) para evitar downloads
-    redundantes do mesmo arquivo CSV quando múltiplos jobs processam o mesmo
-    snapshot (ex: 7275 jobs para deputados_frentes que baixam o mesmo CSV).
-    O cache é compartilhado entre todos os domínios via dicionário de classe;
-    cada entrada contém uma tupla (DataFrame, config_registry) para detectar
-    mudanças de schema. Use ``clear_cache()`` para resetar entre execuções.
+    Implementa cache de DataFrames por chave (domínio, ano, mês) para evitar
+    downloads redundantes do mesmo arquivo CSV quando múltiplos jobs processam
+    o mesmo snapshot (ex: 7275 jobs para deputados_frentes que baixam o mesmo
+    CSV). O cache é compartilhado entre todos os domínios via dicionário de
+    classe; cada entrada contém uma tupla (DataFrame, config_registry) para
+    detectar mudanças de schema. Use ``clear_cache()`` para resetar entre
+    execuções.
     """
 
-    # Cache compartilhado: {(domain_name, year): (DataFrame, config_hash)}
-    _bulk_cache: dict[tuple[str, int | None], tuple[pl.DataFrame, int]] = {}
+    # Cache compartilhado: {(domain_name, year, month): (DataFrame, config_hash)}
+    _bulk_cache: dict[tuple[str, int | None, int | None], tuple[pl.DataFrame, int]] = {}
+
+    # Nomes de mês em português sem acento — convenção da fonte para URLs de
+    # dumps mensais (ex: "marco", nunca "março"). Índice 0 = janeiro.
+    _MONTH_NAMES = (
+        "janeiro",
+        "fevereiro",
+        "marco",
+        "abril",
+        "maio",
+        "junho",
+        "julho",
+        "agosto",
+        "setembro",
+        "outubro",
+        "novembro",
+        "dezembro",
+    )
 
     @classmethod
     def clear_cache(cls) -> None:
@@ -56,15 +74,24 @@ class BaseBulkExtractor(BaseExtractor):
         self.client = client
         self.domain_name = domain_name
 
-    def _build_url(self, year: Optional[int] = None) -> str:
+    def _build_url(self, year: Optional[int] = None, month: Optional[int] = None) -> str:
         """
-        Constrói a URL de download com base no domínio e ano fornecidos.
+        Constrói a URL de download com base no domínio, ano e mês fornecidos.
+
+        Para domínios mensais (``requires_month``, ex: ``folha_pagamento``),
+        o mês é obrigatório e é convertido para o nome por extenso sem acento
+        (``marco``, não ``março``) — convenção da fonte.
 
         Args:
             year (int, optional): Ano de referência para arquivos particionados.
+            month (int, optional): Mês (1-12) para arquivos mensais.
 
         Returns:
             str: URL formatada para download.
+
+        Raises:
+            ValueError: Se o domínio não está no registry, ou se um parâmetro
+                obrigatório (year/month) estiver ausente.
         """
         config = BULK_REGISTRY.get(self.domain_name)
         if not config:
@@ -73,13 +100,25 @@ class BaseBulkExtractor(BaseExtractor):
         if config["requires_year"] and not year:
             raise ValueError(f"O domínio {self.domain_name} exige o parâmetro 'year'.")
 
+        if config.get("requires_month") and not month:
+            raise ValueError(f"O domínio {self.domain_name} exige o parâmetro 'month'.")
+
+        if config.get("requires_month"):
+            month_name = self._MONTH_NAMES[month - 1]
+            return config["url_template"].format(year=year, month=month_name)
+
         return (
             config["url_template"].format(year=year)
             if config["requires_year"]
             else config["url_template"]
         )
 
-    async def extract(self, year: Optional[int] = None, **kwargs: Any) -> pl.DataFrame:
+    async def extract(
+        self,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        **kwargs: Any,
+    ) -> pl.DataFrame:
         """
         Descarrega o arquivo estático, descompacta (se aplicável) e lê o CSV.
 
@@ -87,27 +126,37 @@ class BaseBulkExtractor(BaseExtractor):
         a ``pl.read_csv``, tipando colunas conhecidas diretamente na leitura.
         Colunas de moeda BR (ex: ``vlrLiquido``) são mantidas como ``pl.Utf8``
         para processamento posterior pelo helper ``convert_br_currency_columns``.
+        A codificação é definida por domínio no ``BULK_REGISTRY`` (campo
+        ``encoding``, padrão ``utf8-lossy``); o consolidado mensal da folha usa
+        ``latin1`` (ISO-8859-1).
 
         Args:
             year (int, optional): Ano para particionamento do arquivo.
+            month (int, optional): Mês (1-12) para arquivos mensais (obrigatório
+                quando ``requires_month`` é True no registry).
             **kwargs: Parâmetros contextuais adicionais.
 
         Utiliza cache compartilhado (``_bulk_cache``) para evitar downloads
         redundantes do mesmo arquivo CSV quando múltiplos jobs processam o
-        mesmo snapshot. O cache é chaveado por (domain_name, year) e inclui
-        um hash da configuração do registro para invalidar em mudanças de schema.
+        mesmo snapshot. O cache é chaveado por (domain_name, year, month) e
+        inclui um hash da configuração do registro para invalidar em mudanças
+        de schema.
 
         Returns:
             pl.DataFrame: DataFrame contendo os dados estritamente brutos,
                           com ``_source_url`` (URL de download do CSV) como
                           primeira coluna. Retorna um DataFrame vazio em caso
                           de falha ou arquivo inexistente (sem ``_source_url``).
+
+        Raises:
+            ValueError: Se ``requires_month`` estiver configurado e ``month``
+                não for fornecido (mesma regra do ``_build_url``).
         """
         if not self.domain_name:
             raise NotImplementedError("domain_name deve ser fornecido no construtor.")
 
         # ── Cache hit: retorna clone do DataFrame em cache ────────────────
-        cache_key: tuple[str, int | None] = (self.domain_name, year)
+        cache_key: tuple[str, int | None, int | None] = (self.domain_name, year, month)
         cached = BaseBulkExtractor._bulk_cache.get(cache_key)
         if cached is not None:
             df_cached, _ = cached
@@ -117,18 +166,19 @@ class BaseBulkExtractor(BaseExtractor):
             )
             return df_cached.clone()
 
-        url = self._build_url(year)
+        url = self._build_url(year, month)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             file_name = url.split("/")[-1]
             dest_path = str(Path(tmpdir) / file_name)
 
-            logger.info(f"Baixando Dump Estático ({self.domain_name} {year or ''})...")
+            ref = f"{year or ''} {month or ''}".strip()
+            logger.info(f"Baixando Dump Estático ({self.domain_name} {ref})...")
 
             success = await self.client.download_file(url, dest_path)
 
             if not success:
-                logger.warning(f"Dump de {self.domain_name} para {year} não existe no servidor.")
+                logger.warning(f"Dump de {self.domain_name} para {ref} não existe no servidor.")
                 return pl.DataFrame()
 
             if dest_path.endswith(".zip"):
@@ -153,7 +203,7 @@ class BaseBulkExtractor(BaseExtractor):
                     separator=";",
                     ignore_errors=True,
                     infer_schema_length=0,
-                    encoding="utf8-lossy",
+                    encoding=config_registry.get("encoding", "utf8-lossy"),
                     truncate_ragged_lines=True,
                     quote_char=None,
                     schema_overrides=config_registry.get("schema_overrides"),

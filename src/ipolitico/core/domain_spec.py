@@ -5,7 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import FrozenSet
 
-from ipolitico.core.constants import COVERAGE_GAPS, EARLIEST_DATE_MAP, DomainType
+from ipolitico.core.constants import (
+    COVERAGE_GAP_YEARS,
+    COVERAGE_GAPS,
+    EARLIEST_DATE_MAP,
+    DomainType,
+)
 from ipolitico.extractors.camara.bulk.registry import BULK_REGISTRY
 
 # URLs de auditoria para recursos com ID único na API da Câmara.
@@ -64,6 +69,7 @@ class DomainSpec:
     stable: bool = False
     source_url_format: str | None = None
     coverage_gaps: tuple[str, ...] = ()
+    coverage_gap_years: tuple[int, ...] = ()
 
 
 def _spec(
@@ -87,6 +93,7 @@ def _spec(
         stable=stable,
         source_url_format=source_url_format or _SOURCE_URL_FORMATS.get(domain),
         coverage_gaps=COVERAGE_GAPS.get(domain.value, ()),
+        coverage_gap_years=COVERAGE_GAP_YEARS.get(domain.value, ()),
     )
 
 
@@ -455,6 +462,14 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         None,
         uk=("idLicitacao", "numItem", "numProposta", "fornecedorCpfCnpj"),
         stable=True,
+    ),
+    # ── Domínio bulk-only mensal (issue 04) — folha de pagamento consolidada ──
+    # NÃO estável: o consolidado é republicado mensalmente com os valores do mês
+    # fechado. Anos com 404 (lacuna) são pulados pelo planner via coverage_gap_years.
+    DomainType.FOLHA_PAGAMENTO: _spec(
+        DomainType.FOLHA_PAGAMENTO,
+        None,
+        uk=("_source_url", "cargo", "grupo_funcional"),
     ),
     # ── Domínios do Senado (Fase 1) ─────────────────────────────────────────
     DomainType.SENADORES: _spec(DomainType.SENADORES, None),

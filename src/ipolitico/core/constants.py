@@ -144,6 +144,8 @@ class DomainType(str, Enum):
     LICITACOES_ITENS = "licitacoes_itens"
     LICITACOES_PEDIDOS = "licitacoes_pedidos"
     LICITACOES_PROPOSTAS = "licitacoes_propostas"
+    # Domínio bulk-only mensal (folha de pagamento consolidada por ano/mês)
+    FOLHA_PAGAMENTO = "folha_pagamento"
 
     # ── Domínios do Senado ───────────────────────────────────────────────
     SENADORES = "senadores"
@@ -327,6 +329,7 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.LICITACOES_ITENS: EarliestDates.LICITACOES,
     DomainType.LICITACOES_PEDIDOS: EarliestDates.LICITACOES,
     DomainType.LICITACOES_PROPOSTAS: EarliestDates.LICITACOES,
+    DomainType.FOLHA_PAGAMENTO: EarliestDates.FOLHA_PAGAMENTO,
     # ── Domínios do Senado ──────────────────────────────────────────────
     DomainType.SENADORES: EarliestDates.SENADORES,
     DomainType.SENADORES_DETALHE: EarliestDates.SENADORES_DETALHE,
@@ -371,6 +374,16 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
 # passa a consumir esta entrada automaticamente.
 COVERAGE_GAPS: Dict[str, tuple[str, ...]] = {
     "folha_pagamento": ("2011, 2015 e 2022 não publicados (HTTP 404) — ausência, não erro",),
+}
+
+
+# ── Anos de lacuna por domínio (issue 04) ──────────────────────────────────────
+# Anos inteiros em que a fonte não publicou arquivo (404) — usados pelo planner
+# mensal (MonthlyBulkStrategy) para pular jobs em vez de fazer requisições que
+# retornam vazio. Chaveado pelo nome do domínio (domain.value), mesma convenção
+# de COVERAGE_GAPS; a versão legível ao leitor vive em COVERAGE_GAPS.
+COVERAGE_GAP_YEARS: Dict[str, tuple[int, ...]] = {
+    "folha_pagamento": (2011, 2015, 2022),
 }
 
 
@@ -563,6 +576,7 @@ DOMAIN_LABELS: dict[DomainType, str] = {
     DomainType.LICITACOES_ITENS: "Itens de licitacao",
     DomainType.LICITACOES_PEDIDOS: "Pedidos de licitacao",
     DomainType.LICITACOES_PROPOSTAS: "Propostas de licitacao",
+    DomainType.FOLHA_PAGAMENTO: "Folha de pagamento consolidada (Camara, por ano/mes)",
     # ── Senado ──────────────────────────────────────────────────────────────────
     DomainType.SENADORES: "Senadores (mandato ativo e historico)",
     DomainType.SENADORES_DETALHE: "Dados cadastrais detalhados dos senadores",
