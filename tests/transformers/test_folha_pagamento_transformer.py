@@ -17,7 +17,7 @@ from ipolitico.transformers.camara.institutional_transformer import (
 def _raw_df() -> pl.DataFrame:
     return pl.DataFrame(
         {
-            "Cargo Individualizado do Servidor": ["Deputado 42", "Servidor João da Silva"],
+            "Cargo Individualizado do Servidor": ["Deputado 42", "Servidor"],
             "Grupo Funcional": ["Parlamentar", "Técnico Legislativo"],
             "Folha de Pagamento": ["Subsídio", "Salário e Remunerações"],
             "Ano Ingresso": ["2019", "2011"],

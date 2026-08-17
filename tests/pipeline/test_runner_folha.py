@@ -68,7 +68,7 @@ async def test_runner_folha_fixture_iso8859_1():
 
     df = _captured_silver_df(sink)
     assert df.height == 3
-    assert df["cargo"].to_list() == ["Deputado 42", "Deputado 7", "Servidor João da Silva"]
+    assert df["cargo"].to_list() == ["Deputado 42", "Deputado 7", "Servidor"]
     assert df["grupo_funcional"].to_list()[0] == "Parlamentar"
     assert df["remuneracao_fixa"].dtype == pl.Float64
     assert df["remuneracao_fixa"].to_list()[0] == 39293.32

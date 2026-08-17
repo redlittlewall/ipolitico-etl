@@ -47,6 +47,13 @@ class TestBuildUrlMensal:
         with pytest.raises(ValueError, match="month"):
             ext._build_url(year=2026)
 
+    def test_url_mes_fora_de_1_12_levanta_valueerror(self):
+        """Mês fora de 1-12 deve falhar com ValueError claro, não IndexError cru."""
+        ext = BaseBulkExtractor(None, domain_name="folha_pagamento")
+        for mes_invalido in (0, 13, -1):
+            with pytest.raises(ValueError, match="Mês inválido"):
+                ext._build_url(year=2026, month=mes_invalido)
+
     def test_url_exige_year(self):
         ext = BaseBulkExtractor(None, domain_name="folha_pagamento")
         with pytest.raises(ValueError, match="year"):

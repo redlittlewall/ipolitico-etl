@@ -90,8 +90,9 @@ class BaseBulkExtractor(BaseExtractor):
             str: URL formatada para download.
 
         Raises:
-            ValueError: Se o domínio não está no registry, ou se um parâmetro
-                obrigatório (year/month) estiver ausente.
+            ValueError: Se o domínio não está no registry, se um parâmetro
+                obrigatório (year/month) estiver ausente, ou se o mês estiver
+                fora de 1-12 (evita IndexError cru no `_MONTH_NAMES`).
         """
         config = BULK_REGISTRY.get(self.domain_name)
         if not config:
@@ -100,10 +101,13 @@ class BaseBulkExtractor(BaseExtractor):
         if config["requires_year"] and not year:
             raise ValueError(f"O domínio {self.domain_name} exige o parâmetro 'year'.")
 
-        if config.get("requires_month") and not month:
-            raise ValueError(f"O domínio {self.domain_name} exige o parâmetro 'month'.")
-
         if config.get("requires_month"):
+            if month is None:
+                raise ValueError(f"O domínio {self.domain_name} exige o parâmetro 'month'.")
+            if not 1 <= month <= 12:
+                raise ValueError(
+                    f"Mês inválido para {self.domain_name}: {month}. Esperado 1-12."
+                )
             month_name = self._MONTH_NAMES[month - 1]
             return config["url_template"].format(year=year, month=month_name)
 
