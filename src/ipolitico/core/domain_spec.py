@@ -8,6 +8,49 @@ from typing import FrozenSet
 from ipolitico.core.constants import EARLIEST_DATE_MAP, DomainType
 from ipolitico.extractors.camara.bulk.registry import BULK_REGISTRY
 
+# URLs de auditoria para recursos com ID único na API da Câmara.
+_SOURCE_URL_FORMATS: dict[DomainType, str] = {
+    DomainType.DEPUTADOS: "https://dadosabertos.camara.leg.br/api/v2/deputados/{resource_id}",
+    DomainType.PROPOSICOES: "https://dadosabertos.camara.leg.br/api/v2/proposicoes/{resource_id}",
+    DomainType.VOTACOES: "https://dadosabertos.camara.leg.br/api/v2/votacoes/{resource_id}",
+    DomainType.ORGAOS: "https://dadosabertos.camara.leg.br/api/v2/orgaos/{resource_id}",
+    DomainType.PARTIDOS: "https://dadosabertos.camara.leg.br/api/v2/partidos/{resource_id}",
+    DomainType.EVENTOS: "https://dadosabertos.camara.leg.br/api/v2/eventos/{resource_id}",
+    DomainType.BLOCOS: "https://dadosabertos.camara.leg.br/api/v2/blocos/{resource_id}",
+    DomainType.FRENTES: "https://dadosabertos.camara.leg.br/api/v2/frentes/{resource_id}",
+    DomainType.GRUPOS: "https://dadosabertos.camara.leg.br/api/v2/grupos/{resource_id}",
+    DomainType.LEGISLATURAS: "https://dadosabertos.camara.leg.br/api/v2/legislaturas/{resource_id}",
+    DomainType.DEPUTADOS_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/deputados/{resource_id}",
+    DomainType.PROPOSICOES_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/proposicoes/{resource_id}",
+    DomainType.VOTACOES_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/votacoes/{resource_id}",
+    DomainType.ORGAOS_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/orgaos/{resource_id}",
+    DomainType.PARTIDOS_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/partidos/{resource_id}",
+    DomainType.EVENTOS_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/eventos/{resource_id}",
+    DomainType.FRENTES_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/frentes/{resource_id}",
+    DomainType.GRUPOS_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/grupos/{resource_id}",
+    DomainType.LEGISLATURAS_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/legislaturas/{resource_id}",
+    DomainType.BLOCOS_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/blocos/{resource_id}",
+    DomainType.VOTOS: "https://dadosabertos.camara.leg.br/api/v2/votacoes/{resource_id}/votos",
+    DomainType.ORIENTACOES: "https://dadosabertos.camara.leg.br/api/v2/votacoes/{resource_id}/orientacoes",
+    # ── Senado — Entidades raiz ───────────────────────────────────────────────────
+    DomainType.SENADORES: "https://legis.senado.leg.br/dadosabertos/senador/{resource_id}",
+    DomainType.SENADORES_DETALHE: "https://legis.senado.leg.br/dadosabertos/senador/{resource_id}",
+    DomainType.SENADORES_MANDATOS: "https://legis.senado.leg.br/dadosabertos/senador/{resource_id}/mandatos",
+    DomainType.SENADORES_FILIACOES: "https://legis.senado.leg.br/dadosabertos/senador/{resource_id}/filiacoes",
+    DomainType.PROCESSOS: "https://legis.senado.leg.br/dadosabertos/materia/{resource_id}",
+    DomainType.PROCESSOS_DETALHE: "https://legis.senado.leg.br/dadosabertos/materia/{resource_id}",
+    DomainType.PROCESSOS_EMENDAS: "https://legis.senado.leg.br/dadosabertos/materia/{resource_id}/emendas",
+    DomainType.PROCESSOS_DOCUMENTOS: "https://legis.senado.leg.br/dadosabertos/materia/{resource_id}/documentos",
+    DomainType.VOTACOES_SENADO: "https://legis.senado.leg.br/dadosabertos/votacao/{resource_id}",
+    DomainType.VOTACOES_COMISSAO: "https://legis.senado.leg.br/dadosabertos/votacao/{resource_id}",
+    DomainType.COMISSOES_SENADO: "https://legis.senado.leg.br/dadosabertos/comissao/{resource_id}",
+    DomainType.COMISSOES_DETALHE: "https://legis.senado.leg.br/dadosabertos/comissao/{resource_id}",
+    DomainType.BLOCOS_SENADO: "https://legis.senado.leg.br/dadosabertos/bloco/{resource_id}",
+    DomainType.VETOS_PRESIDENCIAIS: "https://legis.senado.leg.br/dadosabertos/veto/{resource_id}",
+    DomainType.VETOS_DETALHE: "https://legis.senado.leg.br/dadosabertos/veto/{resource_id}",
+    DomainType.SENADORES_DISCURSOS: "https://legis.senado.leg.br/dadosabertos/senador/{resource_id}/discursos",
+}
+
 
 @dataclass(frozen=True)
 class DomainSpec:
@@ -19,6 +62,7 @@ class DomainSpec:
     sub_domain: str | None = None
     bulk_granularity: str | None = None
     stable: bool = False
+    source_url_format: str | None = None
 
 
 def _spec(
@@ -28,6 +72,7 @@ def _spec(
     uk: tuple[str, ...] = ("id",),
     sub: str | None = None,
     stable: bool = False,
+    source_url_format: str | None = None,
 ) -> DomainSpec:
     meta = BULK_REGISTRY.get(domain.value, {})
     return DomainSpec(
@@ -39,6 +84,7 @@ def _spec(
         sub_domain=sub,
         bulk_granularity=meta.get("bulk_granularity"),
         stable=stable,
+        source_url_format=source_url_format or _SOURCE_URL_FORMATS.get(domain),
     )
 
 

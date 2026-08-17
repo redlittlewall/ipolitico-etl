@@ -37,6 +37,22 @@ async def test_extract_empty_returns_empty(extractor: VotacoesExtractor):
 
 
 @pytest.mark.asyncio
+async def test_extract_injects_source_url(extractor: VotacoesExtractor):
+    """Cada registro deve ter _source_url apontando para /votacoes/{id}."""
+    extractor.fetch_paginated.return_value = [
+        {"id": "V1", "data": "2026-01-15"},
+        {"id": "V2", "data": "2026-01-20"},
+    ]
+
+    df = await extractor.extract(start_date="2026-01-01", end_date="2026-01-31")
+
+    assert df["_source_url"].to_list() == [
+        "https://dadosabertos.camara.leg.br/api/v2/votacoes/V1",
+        "https://dadosabertos.camara.leg.br/api/v2/votacoes/V2",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_extract_votos_returns_list_as_dataframe(extractor: VotacoesExtractor):
     extractor.client.fetch.return_value = [
         {

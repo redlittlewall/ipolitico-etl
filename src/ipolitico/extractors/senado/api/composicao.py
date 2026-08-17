@@ -51,7 +51,8 @@ class BlocosSenadoExtractor(SenadoBaseExtractor):
             if isinstance(membros, (dict, list)):
                 record["Membros"] = json.dumps(membros, ensure_ascii=False)
 
-        return pl.DataFrame(records, infer_schema_length=None)
+        df = pl.DataFrame(records, infer_schema_length=None)
+        return self._inject_source_url(df, "composicao/lista/blocos")
 
 
 class LiderancasSenadoExtractor(SenadoBaseExtractor):
@@ -80,7 +81,8 @@ class LiderancasSenadoExtractor(SenadoBaseExtractor):
         if not isinstance(raw, list) or not raw:
             return pl.DataFrame()
 
-        return pl.DataFrame(raw, infer_schema_length=None)
+        df = pl.DataFrame(raw, infer_schema_length=None)
+        return self._inject_source_url(df, "composicao/lideranca")
 
 
 class MesaSenadoExtractor(SenadoBaseExtractor):
@@ -133,7 +135,8 @@ class MesaSenadoExtractor(SenadoBaseExtractor):
         if not all_cargos:
             return pl.DataFrame()
 
-        return pl.DataFrame(all_cargos, infer_schema_length=None)
+        df = pl.DataFrame(all_cargos, infer_schema_length=None)
+        return self._inject_source_url(df, "composicao/mesaSF")
 
 
 class MesaCongressoExtractor(SenadoBaseExtractor):
@@ -179,4 +182,5 @@ class MesaCongressoExtractor(SenadoBaseExtractor):
         if not all_cargos:
             return pl.DataFrame()
 
-        return pl.DataFrame(all_cargos, infer_schema_length=None)
+        df = pl.DataFrame(all_cargos, infer_schema_length=None)
+        return self._inject_source_url(df, "composicao/mesaCN")

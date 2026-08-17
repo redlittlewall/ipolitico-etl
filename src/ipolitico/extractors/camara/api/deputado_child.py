@@ -26,7 +26,9 @@ class DeputadoChildRouteExtractor(DeputadosExtractor):
         df = await self.extract_child_route(int(deputado_id), self.route_suffix)
         if df.is_empty():
             return df
-        return df.with_columns(pl.lit(int(deputado_id)).alias("id_deputado"))
+        df = df.with_columns(pl.lit(int(deputado_id)).alias("id_deputado"))
+        endpoint = f"deputados/{int(deputado_id)}/{self.route_suffix}"
+        return self._inject_source_url(df, endpoint)
 
 
 class ProfissoesExtractor(DeputadoChildRouteExtractor):
@@ -87,19 +89,25 @@ class DeputadoTemporalChildExtractor(DeputadosExtractor):
             return pl.DataFrame()
 
         chunks = _chunk_date_range(start_date, end_date)
+        endpoint = f"deputados/{int(deputado_id)}/{self.route_suffix}"
         frames: list[pl.DataFrame] = []
         for chunk_start, chunk_end in chunks:
             df = await self.extract_temporal_route(
                 int(deputado_id), self.route_suffix, chunk_start, chunk_end
             )
             if not df.is_empty():
+                # Injeta a URL por chunk: cada chunk carrega seu próprio
+                # dataInicio/dataFim + pagina local, tornando a URL replayável
+                # até o registro mesmo com a janela completa particionada.
+                chunk_params = {"dataInicio": chunk_start, "dataFim": chunk_end}
+                df = df.with_columns(pl.lit(int(deputado_id)).alias("id_deputado"))
+                df = self._inject_source_url(df, endpoint, params=chunk_params)
                 frames.append(df)
 
         if not frames:
             return pl.DataFrame()
 
-        result = pl.concat(frames)
-        return result.with_columns(pl.lit(int(deputado_id)).alias("id_deputado"))
+        return pl.concat(frames)
 
 
 class DiscursosExtractor(DeputadoTemporalChildExtractor):

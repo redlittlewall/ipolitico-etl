@@ -63,6 +63,7 @@ class TestMandatosExternosTransformer:
         out = tr.transform(raw, sub_domain="mandatos_externos")
         # Todas as colunas do contrato devem existir
         assert set(out.columns) == {
+            "_source_url",
             "id_deputado",
             "anoFim",
             "anoInicio",

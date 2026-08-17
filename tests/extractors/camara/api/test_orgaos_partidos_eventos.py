@@ -28,6 +28,7 @@ async def test_orgaos_extractor_paginated():
     df = await ext.extract(start_date="2024-01-01", end_date="2024-01-31")
     await ext.client.close()
     assert df.height == 1
+    assert df["_source_url"][0] == "https://dadosabertos.camara.leg.br/api/v2/orgaos/1"
 
 
 @pytest.mark.asyncio
@@ -43,6 +44,7 @@ async def test_partidos_extractor():
     df = await ext.extract(start_date="2024-01-01", end_date="2024-12-31", legislatura_id=57)
     await ext.client.close()
     assert df.height == 1
+    assert df["_source_url"][0] == "https://dadosabertos.camara.leg.br/api/v2/partidos/10"
 
 
 @pytest.mark.asyncio
@@ -68,6 +70,7 @@ async def test_eventos_extractor():
     df = await ext.extract(start_date="2024-03-01", end_date="2024-03-31")
     await ext.client.close()
     assert df.height == 1
+    assert df["_source_url"][0] == "https://dadosabertos.camara.leg.br/api/v2/eventos/99"
 
 
 @pytest.mark.asyncio
@@ -86,6 +89,7 @@ async def test_blocos_extractor():
     df = await ext.extract(start_date="2024-01-01", end_date="2024-12-31", legislatura_id=57)
     await ext.client.close()
     assert df.height == 1
+    assert df["_source_url"][0] == "https://dadosabertos.camara.leg.br/api/v2/blocos/1"
 
 
 @pytest.mark.asyncio
@@ -104,6 +108,7 @@ async def test_frentes_extractor():
     df = await ext.extract(start_date="2024-01-01", end_date="2024-12-31", legislatura_id=57)
     await ext.client.close()
     assert df.height == 1
+    assert df["_source_url"][0] == "https://dadosabertos.camara.leg.br/api/v2/frentes/10"
 
 
 @pytest.mark.asyncio
@@ -131,6 +136,7 @@ async def test_grupos_extractor():
     df = await ext.extract(start_date="2024-01-01", end_date="2024-12-31")
     await ext.client.close()
     assert df.height == 1
+    assert df["_source_url"][0] == "https://dadosabertos.camara.leg.br/api/v2/grupos/1"
 
 
 @pytest.mark.asyncio
@@ -156,3 +162,4 @@ async def test_legislaturas_extractor():
     df = await ext.extract(start_date="2023-01-01", end_date="2026-12-31")
     await ext.client.close()
     assert df.height == 1
+    assert df["_source_url"][0] == "https://dadosabertos.camara.leg.br/api/v2/legislaturas/57"

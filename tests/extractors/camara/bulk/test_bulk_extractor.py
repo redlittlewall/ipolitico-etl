@@ -294,3 +294,179 @@ async def test_base_bulk_extract_csv_parsing_exception(mock_read_csv):
     result = await ext.extract()
 
     assert result.is_empty()
+
+
+# ── _source_url tests (Issue 04) ────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+@patch(
+    "ipolitico.extractors.camara.bulk.base_bulk.BULK_REGISTRY",
+    new={
+        "snapshot_test": {
+            "requires_year": False,
+            "url_template": "https://dadosabertos.camara.leg.br/arquivos/teste/csv/teste.csv",
+            "bulk_granularity": "snapshot",
+            "bulk_filter_date_column": None,
+        },
+    },
+)
+@patch("ipolitico.extractors.camara.bulk.base_bulk.pl.read_csv")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.ZipFile")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.is_zipfile")
+async def test_bulk_source_url_snapshot(mock_is_zipfile, mock_zipfile, mock_read_csv, mock_client):
+    """
+    [SNAPSHOT _source_url] Domínio bulk snapshot deve retornar _source_url
+    com a URL de download do CSV.
+    """
+    mock_is_zipfile.return_value = True
+    mock_zip_instance = MagicMock()
+    mock_zip_instance.namelist.return_value = ["teste.csv"]
+    mock_zipfile.return_value.__enter__.return_value = mock_zip_instance
+
+    mock_read_csv.return_value = pl.DataFrame({"id": [1, 2], "nome": ["A", "B"]})
+
+    ext = BaseBulkExtractor(mock_client, domain_name="snapshot_test")
+    result = await ext.extract()
+
+    assert not result.is_empty()
+    assert "_source_url" in result.columns
+    assert result.columns[0] == "_source_url"
+    expected_url = "https://dadosabertos.camara.leg.br/arquivos/teste/csv/teste.csv"
+    assert result["_source_url"].to_list() == [expected_url, expected_url]
+
+
+@pytest.mark.asyncio
+@patch(
+    "ipolitico.extractors.camara.bulk.base_bulk.BULK_REGISTRY",
+    new={
+        "yearly_test": {
+            "requires_year": True,
+            "url_template": "https://dadosabertos.camara.leg.br/arquivos/anual/csv/{year}.csv",
+            "bulk_granularity": "year",
+            "bulk_filter_date_column": "data",
+        },
+    },
+)
+@patch("ipolitico.extractors.camara.bulk.base_bulk.pl.read_csv")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.ZipFile")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.is_zipfile")
+async def test_bulk_source_url_anual(mock_is_zipfile, mock_zipfile, mock_read_csv, mock_client):
+    """
+    [ANUAL _source_url] Domínio bulk anual deve retornar _source_url
+    com a URL de download contendo o ano específico.
+    """
+    mock_is_zipfile.return_value = True
+    mock_zip_instance = MagicMock()
+    mock_zip_instance.namelist.return_value = ["2026.csv"]
+    mock_zipfile.return_value.__enter__.return_value = mock_zip_instance
+
+    mock_read_csv.return_value = pl.DataFrame({"id": [1], "nome": ["X"]})
+
+    ext = BaseBulkExtractor(mock_client, domain_name="yearly_test")
+    result = await ext.extract(year=2026)
+
+    assert not result.is_empty()
+    assert "_source_url" in result.columns
+    assert result.columns[0] == "_source_url"
+    expected_url = "https://dadosabertos.camara.leg.br/arquivos/anual/csv/2026.csv"
+    assert result["_source_url"][0] == expected_url
+
+
+@pytest.mark.asyncio
+async def test_bulk_source_url_download_failed_no_source_url():
+    """
+    [EMPTY _source_url] Quando download falha (retorna vazio), o DataFrame
+    não deve conter _source_url.
+    """
+    client = AsyncMock()
+    client.download_file.return_value = False
+    ext = BaseBulkExtractor(client, domain_name="grupos")
+    result = await ext.extract()
+
+    assert result.is_empty()
+    assert "_source_url" not in result.columns
+
+
+@pytest.mark.asyncio
+@patch(
+    "ipolitico.extractors.camara.bulk.base_bulk.BULK_REGISTRY",
+    new={
+        "cache_source_url": {
+            "requires_year": False,
+            "url_template": "https://dadosabertos.camara.leg.br/arquivos/cache_test/csv/data.csv",
+            "bulk_granularity": "snapshot",
+            "bulk_filter_date_column": None,
+        },
+    },
+)
+@patch("ipolitico.extractors.camara.bulk.base_bulk.pl.read_csv")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.ZipFile")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.is_zipfile")
+async def test_bulk_source_url_cache_hit(mock_is_zipfile, mock_zipfile, mock_read_csv, mock_client):
+    """
+    [CACHE _source_url] Mesmo em cache hit, o DataFrame deve conter _source_url.
+    """
+    mock_is_zipfile.return_value = True
+    mock_zip_instance = MagicMock()
+    mock_zip_instance.namelist.return_value = ["data.csv"]
+    mock_zipfile.return_value.__enter__.return_value = mock_zip_instance
+
+    mock_read_csv.return_value = pl.DataFrame({"id": [1], "nome": ["A"]})
+
+    ext = BaseBulkExtractor(mock_client, domain_name="cache_source_url")
+
+    # Primeira chamada → preenche cache com _source_url
+    result1 = await ext.extract()
+    assert "_source_url" in result1.columns
+    assert result1["_source_url"][0] == (
+        "https://dadosabertos.camara.leg.br/arquivos/cache_test/csv/data.csv"
+    )
+
+    # Segunda chamada → cache hit, _source_url ainda presente
+    result2 = await ext.extract()
+    assert "_source_url" in result2.columns
+    assert result2["_source_url"][0] == (
+        "https://dadosabertos.camara.leg.br/arquivos/cache_test/csv/data.csv"
+    )
+
+
+@pytest.mark.asyncio
+@patch(
+    "ipolitico.extractors.camara.bulk.base_bulk.BULK_REGISTRY",
+    new={
+        "rename_source_url_test": {
+            "requires_year": False,
+            "url_template": "https://dadosabertos.camara.leg.br/arquivos/rename_test/csv/data.csv",
+            "bulk_granularity": "snapshot",
+            "bulk_filter_date_column": None,
+            "schema_overrides": {"oldId": pl.Int64},
+            "rename_map": {"oldId": "id"},
+        },
+    },
+)
+@patch("ipolitico.extractors.camara.bulk.base_bulk.pl.read_csv")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.ZipFile")
+@patch("ipolitico.extractors.camara.bulk.base_bulk.zipfile.is_zipfile")
+async def test_bulk_source_url_with_rename_map(
+    mock_is_zipfile, mock_zipfile, mock_read_csv, mock_client
+):
+    """
+    [RENAME + _source_url] Após rename_map, _source_url deve continuar
+    sendo a primeira coluna do DataFrame.
+    """
+    mock_is_zipfile.return_value = True
+    mock_zip_instance = MagicMock()
+    mock_zip_instance.namelist.return_value = ["data.csv"]
+    mock_zipfile.return_value.__enter__.return_value = mock_zip_instance
+
+    mock_read_csv.return_value = pl.DataFrame({"oldId": [42], "nome": ["Teste"]})
+
+    ext = BaseBulkExtractor(mock_client, domain_name="rename_source_url_test")
+    result = await ext.extract()
+
+    assert "id" in result.columns
+    assert "oldId" not in result.columns
+    assert result.columns[0] == "_source_url"
+    expected_url = "https://dadosabertos.camara.leg.br/arquivos/rename_test/csv/data.csv"
+    assert result["_source_url"][0] == expected_url

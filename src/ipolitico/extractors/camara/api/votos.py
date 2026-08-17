@@ -15,6 +15,10 @@ class VotosExtractor(CamaraBaseExtractor):
     Lida com o Problema N+1 recebendo lotes de IDs.
     """
 
+    source_url_format: str = (
+        "https://dadosabertos.camara.leg.br/api/v2/votacoes/{resource_id}/votos"
+    )
+
     async def extract(self, votacao_ids: list[str] = None, **kwargs: Any) -> pl.DataFrame:
         if not votacao_ids:
             return pl.DataFrame()
@@ -32,4 +36,5 @@ class VotosExtractor(CamaraBaseExtractor):
                 logger.warning(f"Erro ao extrair votos da votação {v_id}: {e}")
                 continue
 
-        return pl.DataFrame(all_votos) if all_votos else pl.DataFrame()
+        df = pl.DataFrame(all_votos) if all_votos else pl.DataFrame()
+        return self._inject_source_url(df, "votacoes", resource_id_col="votacao_id")

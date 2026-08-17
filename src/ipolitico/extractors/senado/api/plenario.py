@@ -56,7 +56,8 @@ class PlenarioAgendaExtractor(SenadoBaseExtractor):
 
         # API do Senado espera YYYYMMDD no path da URL (sem hífens)
         url_dt = dt.replace("-", "")
-        raw = await self.fetch_flat(f"plenario/agenda/dia/{url_dt}")
+        endpoint = f"plenario/agenda/dia/{url_dt}"
+        raw = await self.fetch_flat(endpoint)
         records = self.flatten_response(raw, ["AgendaPlenario", "Sessoes", "Sessao"])
 
         if not records:
@@ -69,7 +70,8 @@ class PlenarioAgendaExtractor(SenadoBaseExtractor):
                 if isinstance(val, (dict, list)):
                     record[key] = json.dumps(val, ensure_ascii=False)
 
-        return pl.DataFrame(records, infer_schema_length=None)
+        df = pl.DataFrame(records, infer_schema_length=None)
+        return self._inject_source_url(df, endpoint)
 
 
 class PlenarioResultadosExtractor(SenadoBaseExtractor):
@@ -106,7 +108,8 @@ class PlenarioResultadosExtractor(SenadoBaseExtractor):
 
         # API do Senado espera YYYYMMDD no path da URL (sem hífens)
         url_dt = dt.replace("-", "")
-        raw = await self.fetch_flat(f"plenario/resultado/{url_dt}")
+        endpoint = f"plenario/resultado/{url_dt}"
+        raw = await self.fetch_flat(endpoint)
         sessoes = self.flatten_response(raw, ["ResultadoPlenario", "Sessoes", "Sessao"])
 
         if not sessoes:
@@ -130,7 +133,8 @@ class PlenarioResultadosExtractor(SenadoBaseExtractor):
         if not all_items:
             return pl.DataFrame()
 
-        return pl.DataFrame(all_items, infer_schema_length=None)
+        df = pl.DataFrame(all_items, infer_schema_length=None)
+        return self._inject_source_url(df, endpoint)
 
 
 class PlenarioSessoesExtractor(SenadoBaseExtractor):
@@ -168,7 +172,8 @@ class PlenarioSessoesExtractor(SenadoBaseExtractor):
 
         # API do Senado espera YYYYMMDD no path da URL (sem hífens)
         url_dt = dt.replace("-", "")
-        raw = await self.fetch_flat(f"plenario/legislatura/{url_dt}")
+        endpoint = f"plenario/legislatura/{url_dt}"
+        raw = await self.fetch_flat(endpoint)
         legislaturas = self.flatten_response(
             raw, ["ListaLegislatura", "Legislaturas", "Legislatura"]
         )
@@ -193,4 +198,5 @@ class PlenarioSessoesExtractor(SenadoBaseExtractor):
         if not all_sessoes:
             return pl.DataFrame()
 
-        return pl.DataFrame(all_sessoes, infer_schema_length=None)
+        df = pl.DataFrame(all_sessoes, infer_schema_length=None)
+        return self._inject_source_url(df, endpoint)

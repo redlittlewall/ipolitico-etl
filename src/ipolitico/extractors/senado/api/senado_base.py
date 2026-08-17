@@ -33,6 +33,7 @@ class SenadoBaseExtractor(BaseExtractor):
             client: Cliente HTTP configurado para a API do Senado.
         """
         self.client = client
+        self.base_url = client.BASE_URL if client else ""
 
     async def fetch_flat(self, endpoint: str, params: dict[str, Any] | None = None) -> Any:
         """

@@ -44,6 +44,14 @@ def test_build_params_limpa_nulos_e_extrai_enums(extractor):
     assert cleaned["param_estranho"] == "valor"
 
 
+def test_camara_base_url_comes_from_client():
+    """CamaraBaseExtractor.base_url deve vir do client.BASE_URL."""
+    client = AsyncMock()
+    client.BASE_URL = "https://dadosabertos.camara.leg.br/api/v2"
+    ext = DummyCamaraExtractor(client=client)
+    assert ext.base_url == "https://dadosabertos.camara.leg.br/api/v2"
+
+
 @pytest.mark.asyncio
 async def test_fetch_paginated_injetar_itens_quando_ausente(extractor):
     """Garante itens=CAMARA_PAGE_SIZE na requisição quando o cliente não envia explicitamente."""

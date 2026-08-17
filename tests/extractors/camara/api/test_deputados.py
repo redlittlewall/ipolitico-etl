@@ -37,6 +37,23 @@ async def test_extract_empty_api_returns_empty_frame(extractor: DeputadosExtract
 
 
 @pytest.mark.asyncio
+async def test_extract_injects_source_url(extractor: DeputadosExtractor):
+    """Cada registro deve ter _source_url apontando para /deputados/{id}."""
+    extractor.fetch_paginated.return_value = [
+        {"id": 42, "nome": "João"},
+        {"id": 99, "nome": "Maria"},
+    ]
+
+    df = await extractor.extract()
+
+    assert "_source_url" in df.columns
+    assert df["_source_url"].to_list() == [
+        "https://dadosabertos.camara.leg.br/api/v2/deputados/42",
+        "https://dadosabertos.camara.leg.br/api/v2/deputados/99",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_extract_detalhes_builds_row_dataframe(extractor: DeputadosExtractor):
     complex_response = {
         "id": 999,

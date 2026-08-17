@@ -122,6 +122,65 @@ def validar_camada_gold():
     else:
         print("⚠️ Arquivo de deputados não encontrado no Gold para cruzar os dados.")
 
+    # ---------------------------------------------------------
+    # 4. VALIDAÇÃO DE _source_url (AUDITABILIDADE)
+    # ---------------------------------------------------------
+    print("\n[4] 🔗 Validação de _source_url (Auditabilidade):")
+    conn.execute("SET threads=2")
+
+    # Varre todos os domínios Gold e checa cobertura _source_url
+    dominios = sorted(
+        d.name for d in GOLD_DIR.iterdir() if d.is_dir() and (d / f"{d.name}.parquet").exists()
+    )
+
+    total_registros = 0
+    total_sem_url = 0
+    dominios_problema: list[str] = []
+
+    for dominio in dominios:
+        parquet_path = GOLD_DIR / dominio / f"{dominio}.parquet"
+        try:
+            total = conn.execute(f"SELECT COUNT(*) FROM read_parquet('{parquet_path}')").fetchone()[
+                0
+            ]
+            tem_url = conn.execute(
+                f"SELECT COUNT(*) FROM read_parquet('{parquet_path}') "
+                f"WHERE _source_url IS NOT NULL AND _source_url != ''"
+            ).fetchone()[0]
+            sem_url = total - tem_url
+            total_registros += total
+            total_sem_url += sem_url
+
+            if sem_url > 0:
+                dominios_problema.append(f"{dominio} ({sem_url}/{total:,} sem URL)")
+                print(
+                    f"   ⚠️  {dominio:<30} {tem_url:>8,}/{total:<8,} "
+                    f"com URL  ({sem_url:,} pendentes)"
+                )
+            else:
+                print(f"   ✅ {dominio:<30} {tem_url:>8,}/{total:<8,} com URL")
+        except Exception as e:
+            dominios_problema.append(f"{dominio} (erro: {e})")
+            print(f"   ❌ {dominio:<30} ERRO: {e}")
+
+    pct_geral = (
+        (total_registros - total_sem_url) / total_registros * 100 if total_registros > 0 else 0
+    )
+
+    print(f"\n   {'─' * 50}")
+    print(f"   📊 RESUMO: {total_registros:,} registros em {len(dominios)} domínios")
+    print(f"   📊 Cobertura _source_url: {pct_geral:.1f}%")
+
+    if dominios_problema:
+        print("\n   ⚠️  Domínios com registros sem _source_url:")
+        for d in dominios_problema:
+            print(f"      - {d}")
+        print("\n   ❌ VALIDAÇÃO FALHOU: Nem todos os registros têm _source_url.")
+    elif total_registros == 0:
+        print("\n   ⚠️  Nenhum registro encontrado para validação.")
+    else:
+        print("\n   ✅ VALIDAÇÃO OK: 100% dos registros têm _source_url não-nulo.")
+
 
 if __name__ == "__main__":
     validar_camada_gold()

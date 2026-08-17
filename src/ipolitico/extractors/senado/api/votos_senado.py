@@ -58,4 +58,5 @@ class SenadoVotosExtractor(SenadoBaseExtractor):
         if not all_votos:
             return pl.DataFrame()
 
-        return pl.DataFrame(all_votos, infer_schema_length=None)
+        df = pl.DataFrame(all_votos, infer_schema_length=None)
+        return self._inject_source_url(df, "votacao", params=params)
