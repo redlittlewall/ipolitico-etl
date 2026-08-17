@@ -22,6 +22,17 @@ class SinkType(str, Enum):
     DATALAKE = "datalake"
 
 
+class SourceSystem(str, Enum):
+    """Sistemas de origem dos dados (casas do Congresso Nacional).
+
+    Usado como fonte única da coluna "sistema/API de origem" do documento de
+    cobertura de dados (issue 03) — nunca derivar do nome do domínio.
+    """
+
+    CAMARA = "camara"
+    SENADO = "senado"
+
+
 class ApiRoutes(str, Enum):
     """Mapeamento oficial dos endpoints raiz da API da Câmara."""
 
@@ -133,6 +144,8 @@ class DomainType(str, Enum):
     LICITACOES_ITENS = "licitacoes_itens"
     LICITACOES_PEDIDOS = "licitacoes_pedidos"
     LICITACOES_PROPOSTAS = "licitacoes_propostas"
+    # Domínio bulk-only mensal (folha de pagamento consolidada por ano/mês)
+    FOLHA_PAGAMENTO = "folha_pagamento"
 
     # ── Domínios do Senado ───────────────────────────────────────────────
     SENADORES = "senadores"
@@ -316,6 +329,7 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.LICITACOES_ITENS: EarliestDates.LICITACOES,
     DomainType.LICITACOES_PEDIDOS: EarliestDates.LICITACOES,
     DomainType.LICITACOES_PROPOSTAS: EarliestDates.LICITACOES,
+    DomainType.FOLHA_PAGAMENTO: EarliestDates.FOLHA_PAGAMENTO,
     # ── Domínios do Senado ──────────────────────────────────────────────
     DomainType.SENADORES: EarliestDates.SENADORES,
     DomainType.SENADORES_DETALHE: EarliestDates.SENADORES_DETALHE,
@@ -360,6 +374,126 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
 # passa a consumir esta entrada automaticamente.
 COVERAGE_GAPS: Dict[str, tuple[str, ...]] = {
     "folha_pagamento": ("2011, 2015 e 2022 não publicados (HTTP 404) — ausência, não erro",),
+}
+
+
+# ── Anos de lacuna por domínio (issue 04) ──────────────────────────────────────
+# Anos inteiros em que a fonte não publicou arquivo (404) — usados pelo planner
+# mensal (MonthlyBulkStrategy) para pular jobs em vez de fazer requisições que
+# retornam vazio. Chaveado pelo nome do domínio (domain.value), mesma convenção
+# de COVERAGE_GAPS; a versão legível ao leitor vive em COVERAGE_GAPS.
+COVERAGE_GAP_YEARS: Dict[str, tuple[int, ...]] = {
+    "folha_pagamento": (2011, 2015, 2022),
+}
+
+
+# ── Sistema de origem por domínio (issue 03) ──────────────────────────────────
+# Chaveado pelo nome (domain.value) — mesma convenção de COVERAGE_GAPS — para
+# registrar fatos antes de o DomainType existir no enum (ex: FOLHA_PAGAMENTO
+# chega na issue 04). É a fonte única da coluna "sistema/API de origem" do
+# documento de cobertura (docs/cobertura-dados.md).
+DOMAIN_SOURCE_SYSTEM: Dict[str, SourceSystem] = {
+    "deputados": SourceSystem.CAMARA,
+    "despesas": SourceSystem.CAMARA,
+    "proposicoes": SourceSystem.CAMARA,
+    "votacoes": SourceSystem.CAMARA,
+    "votos": SourceSystem.CAMARA,
+    "profissoes": SourceSystem.CAMARA,
+    "ocupacoes": SourceSystem.CAMARA,
+    "orgaos": SourceSystem.CAMARA,
+    "partidos": SourceSystem.CAMARA,
+    "eventos": SourceSystem.CAMARA,
+    "blocos": SourceSystem.CAMARA,
+    "frentes": SourceSystem.CAMARA,
+    "grupos": SourceSystem.CAMARA,
+    "legislaturas": SourceSystem.CAMARA,
+    "discursos": SourceSystem.CAMARA,
+    "tramitacoes": SourceSystem.CAMARA,
+    "autores": SourceSystem.CAMARA,
+    "orientacoes": SourceSystem.CAMARA,
+    "orgaos_membros": SourceSystem.CAMARA,
+    "frentes_membros": SourceSystem.CAMARA,
+    "relacionadas": SourceSystem.CAMARA,
+    "temas": SourceSystem.CAMARA,
+    "deputados_frentes": SourceSystem.CAMARA,
+    "deputados_orgaos": SourceSystem.CAMARA,
+    "deputados_eventos": SourceSystem.CAMARA,
+    "deputados_historico": SourceSystem.CAMARA,
+    "mandatos_externos": SourceSystem.CAMARA,
+    "eventos_deputados": SourceSystem.CAMARA,
+    "eventos_votacoes": SourceSystem.CAMARA,
+    "eventos_pauta": SourceSystem.CAMARA,
+    "partidos_membros": SourceSystem.CAMARA,
+    "partidos_lideres": SourceSystem.CAMARA,
+    "proposicoes_votacoes": SourceSystem.CAMARA,
+    "blocos_partidos": SourceSystem.CAMARA,
+    "referencias": SourceSystem.CAMARA,
+    "deputados_detalhe": SourceSystem.CAMARA,
+    "orgaos_detalhe": SourceSystem.CAMARA,
+    "eventos_detalhe": SourceSystem.CAMARA,
+    "votacoes_detalhe": SourceSystem.CAMARA,
+    "frentes_detalhe": SourceSystem.CAMARA,
+    "partidos_detalhe": SourceSystem.CAMARA,
+    "grupos_detalhe": SourceSystem.CAMARA,
+    "legislaturas_detalhe": SourceSystem.CAMARA,
+    "blocos_detalhe": SourceSystem.CAMARA,
+    "proposicoes_detalhe": SourceSystem.CAMARA,
+    "eventos_orgaos": SourceSystem.CAMARA,
+    "orgaos_eventos": SourceSystem.CAMARA,
+    "orgaos_votacoes": SourceSystem.CAMARA,
+    "grupos_membros": SourceSystem.CAMARA,
+    "grupos_historico": SourceSystem.CAMARA,
+    "legislaturas_lideres": SourceSystem.CAMARA,
+    "legislaturas_mesa": SourceSystem.CAMARA,
+    "funcionarios": SourceSystem.CAMARA,
+    "tecad_categorias": SourceSystem.CAMARA,
+    "tecad_termos": SourceSystem.CAMARA,
+    "eventos_presenca_deputados": SourceSystem.CAMARA,
+    "eventos_requerimentos": SourceSystem.CAMARA,
+    "votacoes_objetos": SourceSystem.CAMARA,
+    "votacoes_proposicoes": SourceSystem.CAMARA,
+    "licitacoes": SourceSystem.CAMARA,
+    "licitacoes_contratos": SourceSystem.CAMARA,
+    "licitacoes_itens": SourceSystem.CAMARA,
+    "licitacoes_pedidos": SourceSystem.CAMARA,
+    "licitacoes_propostas": SourceSystem.CAMARA,
+    # ── Senado ────────────────────────────────────────────────────────────
+    "senadores": SourceSystem.SENADO,
+    "senadores_detalhe": SourceSystem.SENADO,
+    "processos": SourceSystem.SENADO,
+    "processos_detalhe": SourceSystem.SENADO,
+    "processos_emendas": SourceSystem.SENADO,
+    "processos_documentos": SourceSystem.SENADO,
+    "votacoes_senado": SourceSystem.SENADO,
+    "votos_senado": SourceSystem.SENADO,
+    "votacoes_comissao": SourceSystem.SENADO,
+    "orcamento_emendas": SourceSystem.SENADO,
+    "orcamento_oficios": SourceSystem.SENADO,
+    "vetos_presidenciais": SourceSystem.SENADO,
+    "vetos_detalhe": SourceSystem.SENADO,
+    "senadores_discursos": SourceSystem.SENADO,
+    "discursos_plenario": SourceSystem.SENADO,
+    "discursos_texto": SourceSystem.SENADO,
+    "notas_taquigrafia_sessao": SourceSystem.SENADO,
+    "notas_taquigrafia_reuniao": SourceSystem.SENADO,
+    "comissoes_senado": SourceSystem.SENADO,
+    "comissoes_detalhe": SourceSystem.SENADO,
+    "comissoes_reunioes": SourceSystem.SENADO,
+    "comissoes_membros": SourceSystem.SENADO,
+    "plenario_agenda": SourceSystem.SENADO,
+    "plenario_resultados": SourceSystem.SENADO,
+    "plenario_sessoes": SourceSystem.SENADO,
+    "blocos_senado": SourceSystem.SENADO,
+    "liderancas_senado": SourceSystem.SENADO,
+    "mesa_senado": SourceSystem.SENADO,
+    "mesa_congresso": SourceSystem.SENADO,
+    "senadores_mandatos": SourceSystem.SENADO,
+    "senadores_filiacoes": SourceSystem.SENADO,
+    "orientacao_bancada": SourceSystem.SENADO,
+    # ── Domínios documentados no registry, ainda sem DomainType ─────────────
+    "folha_pagamento": SourceSystem.CAMARA,
+    "remuneracoes": SourceSystem.SENADO,
+    "despesas_ceaps": SourceSystem.SENADO,
 }
 
 
@@ -442,6 +576,7 @@ DOMAIN_LABELS: dict[DomainType, str] = {
     DomainType.LICITACOES_ITENS: "Itens de licitacao",
     DomainType.LICITACOES_PEDIDOS: "Pedidos de licitacao",
     DomainType.LICITACOES_PROPOSTAS: "Propostas de licitacao",
+    DomainType.FOLHA_PAGAMENTO: "Folha de pagamento consolidada (Camara, por ano/mes)",
     # ── Senado ──────────────────────────────────────────────────────────────────
     DomainType.SENADORES: "Senadores (mandato ativo e historico)",
     DomainType.SENADORES_DETALHE: "Dados cadastrais detalhados dos senadores",

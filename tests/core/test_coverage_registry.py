@@ -1,6 +1,7 @@
 """Issue 02 — Cobertura temporal: datas reais, lacunas e fallback ausente."""
 
 from ipolitico.core.constants import (
+    COVERAGE_GAP_YEARS,
     COVERAGE_GAPS,
     EARLIEST_DATE_MAP,
     DomainType,
@@ -44,6 +45,17 @@ class TestEarliestDatesReais:
         spec = spec_for(DomainType.VOTOS)
         assert spec is not None
         assert spec.earliest_iso == "1991-01-01"
+
+    def test_folha_pagamento_earliest_no_map(self):
+        """Folha (issue 04): data real de início registrada no EARLIEST_DATE_MAP."""
+        assert EARLIEST_DATE_MAP[DomainType.FOLHA_PAGAMENTO] == "2012-01-01"
+
+    def test_folha_pagamento_coverage_gap_years(self):
+        """Folha (issue 04): anos de lacuna lidos do spec via COVERAGE_GAP_YEARS."""
+        assert COVERAGE_GAP_YEARS["folha_pagamento"] == (2011, 2015, 2022)
+        spec = spec_for(DomainType.FOLHA_PAGAMENTO)
+        assert spec is not None
+        assert spec.coverage_gap_years == (2011, 2015, 2022)
 
 
 class TestCoverageGapsRegistry:

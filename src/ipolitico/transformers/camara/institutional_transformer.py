@@ -10,6 +10,7 @@ import polars as pl
 from ipolitico.core.constants import DomainType
 from ipolitico.core.schemas import SILVER_SCHEMAS
 from ipolitico.transformers.base import BaseTransformer
+from ipolitico.transformers.br_locale import convert_br_currency_columns
 
 logger = logging.getLogger(__name__)
 
@@ -280,3 +281,70 @@ class CamaraVotacoesProposicoesTransformer(BaseTransformer):
         if df.is_empty():
             return df
         return _apply_contract(df, DomainType.VOTACOES_PROPOSICOES.value)
+
+
+class CamaraFolhaPagamentoTransformer(BaseTransformer):
+    """Transformer para o domínio folhaPagamento (bulk-only mensal, issue 04).
+
+    O consolidado mensal da folha da Câmara é anônimo: valores por pessoa,
+    sem nome/CPF/lotação. O CSV tem colunas com acento/espaços/parênteses
+    (ex: "Remuneração Após Descontos Obrigatórios") que são normalizadas para
+    snake_case via ``_FOLHA_COLUMN_MAP``, os valores em moeda BR ("1.234,56")
+    são convertidos para ``Float64`` e o contrato SILVER_SCHEMAS é aplicado.
+
+    ``Cargo = "Deputado {id}"`` (grupo "Parlamentar") é preservado intacto
+    para permitir a atribuição downstream do subsídio ao ``id_deputado``.
+    """
+
+    # Colunas acentuadas do CSV → nomes normalizados (contrato Silver).
+    _FOLHA_COLUMN_MAP = {
+        "Cargo Individualizado do Servidor": "cargo",
+        "Grupo Funcional": "grupo_funcional",
+        "Folha de Pagamento": "folha",
+        "Ano Ingresso": "ano_ingresso",
+        "Remuneração Fixa": "remuneracao_fixa",
+        "Vantagens de Natureza Pessoal": "vantagens_pessoais",
+        "Função ou Cargo em Comissão": "funcao_comissao",
+        "Gratificação Natalina": "gratificacao_natalina",
+        "Férias (1/3 Constitucional)": "ferias",
+        "Outras Remunerações Eventuais/Provisórias(*)": "outras_remuneracoes_eventuais",
+        "Abono de Permanência": "abono_permanencia",
+        "Redutor Constitucional": "redutor_constitucional",
+        "Constribuição Previdenciária": "contribuicao_previdenciaria",
+        "Imposto de Renda": "imposto_renda",
+        "Remuneração Após Descontos Obrigatórios": "remuneracao_apos_descontos",
+        "Diárias": "diarias",
+        "Auxílios": "auxilios",
+        "Vantagens Indenizatórias": "vantagens_indenizatorias",
+    }
+
+    # Colunas monetárias (formato BR) após a normalização de nomes.
+    _FOLHA_MONEY_COLUMNS = (
+        "remuneracao_fixa",
+        "vantagens_pessoais",
+        "funcao_comissao",
+        "gratificacao_natalina",
+        "ferias",
+        "outras_remuneracoes_eventuais",
+        "abono_permanencia",
+        "redutor_constitucional",
+        "contribuicao_previdenciaria",
+        "imposto_renda",
+        "remuneracao_apos_descontos",
+        "diarias",
+        "auxilios",
+        "vantagens_indenizatorias",
+    )
+
+    def transform(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        if df.is_empty():
+            return df
+
+        existing_map = {
+            src: dst for src, dst in self._FOLHA_COLUMN_MAP.items() if src in df.columns
+        }
+        df = df.rename(existing_map)
+
+        df = convert_br_currency_columns(df, columns=list(self._FOLHA_MONEY_COLUMNS))
+
+        return _apply_contract(df, DomainType.FOLHA_PAGAMENTO.value)

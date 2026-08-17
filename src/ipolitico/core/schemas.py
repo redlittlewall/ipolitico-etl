@@ -671,6 +671,30 @@ SILVER_SCHEMAS = {
         "observacoes": pl.String,
         "urlDocumento": pl.String,
     },
+    # ── Domínio bulk-only mensal (issue 04) — folha de pagamento consolidada ──
+    # Valores anônimos por pessoa (sem nome/CPF/lotação). Cargo preserva
+    # "Deputado {id}" para atribuição downstream do subsídio ao id_deputado.
+    DomainType.FOLHA_PAGAMENTO.value: {
+        "_source_url": pl.String,
+        "cargo": pl.String,
+        "grupo_funcional": pl.String,
+        "folha": pl.String,
+        "ano_ingresso": pl.Int64,
+        "remuneracao_fixa": pl.Float64,
+        "vantagens_pessoais": pl.Float64,
+        "funcao_comissao": pl.Float64,
+        "gratificacao_natalina": pl.Float64,
+        "ferias": pl.Float64,
+        "outras_remuneracoes_eventuais": pl.Float64,
+        "abono_permanencia": pl.Float64,
+        "redutor_constitucional": pl.Float64,
+        "contribuicao_previdenciaria": pl.Float64,
+        "imposto_renda": pl.Float64,
+        "remuneracao_apos_descontos": pl.Float64,
+        "diarias": pl.Float64,
+        "auxilios": pl.Float64,
+        "vantagens_indenizatorias": pl.Float64,
+    },
     # ── Senado ─────────────────────────────────────────────────────────────────
     DomainType.SENADORES.value: {
         "_source_url": pl.String,

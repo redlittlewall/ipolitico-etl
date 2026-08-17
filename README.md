@@ -250,6 +250,10 @@ ipolitico --strategy incremental --optimize --export-gold sqlite
 | API da Câmara dos Deputados | **78/78** endpoints (100%) ✅ |
 | API do Senado Federal | **32/32** domínios implementados ✅ |
 
+> 📄 **[Cobertura de dados por domínio](docs/cobertura-dados.md)** — data de início
+> real, lacunas no meio da série e sistema/API de origem, gerado automaticamente
+> do código (`ipolitico --generate-coverage-doc`).
+
 | Categoria | Domínios | Exemplos |
 |---|---|---|
 | Entidades principais | 10 | deputados, proposicoes, votacoes, orgaos, partidos, eventos |

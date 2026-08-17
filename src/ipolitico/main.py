@@ -217,6 +217,20 @@ async def main():
         help="Audita cobertura dos dados: registros em Silver e Gold por domínio.",
     )
     parser.add_argument(
+        "--generate-coverage-doc",
+        action="store_true",
+        help=(
+            "Gera docs/cobertura-dados.md a partir do registry de cobertura "
+            "do código (datas reais, lacunas, sistema/API de origem)."
+        ),
+    )
+    parser.add_argument(
+        "--coverage-doc-output",
+        type=str,
+        default="docs/cobertura-dados.md",
+        help="Caminho de destino do documento de cobertura (com --generate-coverage-doc).",
+    )
+    parser.add_argument(
         "--optimize",
         action="store_true",
         help="Executa a consolidação (Camada Gold) via DuckDB após a ingestão.",
@@ -258,6 +272,14 @@ async def main():
 
     if args.audit_coverage:
         _print_audit_coverage()
+        return
+
+    if args.generate_coverage_doc:
+        from ipolitico.core.coverage_doc import generate_coverage_doc
+
+        output = Path(args.coverage_doc_output)
+        generate_coverage_doc(output)
+        print(f"Documento de cobertura gerado em: {output}")
         return
 
     if args.domains is None:

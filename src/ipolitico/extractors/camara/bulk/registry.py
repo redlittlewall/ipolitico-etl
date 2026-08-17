@@ -379,4 +379,21 @@ BULK_REGISTRY: dict[str, dict] = {
         },
         "bulk_only": True,
     },
+    # ── Domínio mensal (issue 04) — folha de pagamento consolidada ──────────────
+    # 1 arquivo CSV por ano/mês (ex: julho-de-2026-csv), ISO-8859-1, sem coluna
+    # de data para filtro temporal. Nome do mês no URL sem acento ("marco", não
+    # "março"). O valor anônimo por pessoa preserva Cargo = "Deputado {id}".
+    "folha_pagamento": {
+        "requires_year": True,
+        "requires_month": True,
+        "url_template": (
+            "https://www2.camara.leg.br/transparencia/recursos-humanos/remuneracao/"
+            "relatorios-consolidados-por-ano-e-mes/{year}/{month}-de-{year}-csv"
+        ),
+        "bulk_granularity": "month",
+        "bulk_filter_date_column": None,
+        "encoding": "latin1",
+        "schema_overrides": {},
+        "bulk_only": True,
+    },
 }

@@ -1259,6 +1259,62 @@ class AnnualWindowStrategy(DomainJobStrategy):
         return jobs, annual_mapper
 
 
+class MonthlyBulkStrategy(DomainJobStrategy):
+    """Estratégia para domínios bulk mensais: 1 job por (ano, mês).
+
+    Domínios mensais (ex: ``folha_pagamento``) publicam 1 arquivo por
+    (ano, mês). Gera 1 job por mês dentro da janela temporal, recortando
+    os meses das bordas (primeiro/último ano da janela) e pulando anos
+    inteiros de lacuna de cobertura (``spec.coverage_gap_years``) para
+    evitar requisições que retornariam 404 (ex: 2011/2015/2022 da folha).
+    """
+
+    def build(
+        self,
+        domain: DomainType,
+        spec: DomainSpec,
+        start: str,
+        end: str,
+        current_leg: int,
+        anchor_year: int,
+        extraction_plan: ExtractionPlan,
+        state_store: StateStore,
+        lake: DataLakeRepository | None,
+    ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
+        start_year = int(start.split("-")[0])
+        start_month = int(start.split("-")[1])
+        end_year = int(end.split("-")[0])
+        end_month = int(end.split("-")[1])
+        gap_years = set(spec.coverage_gap_years)
+
+        jobs: list[dict[str, Any]] = []
+        for y in range(start_year, end_year + 1):
+            if y in gap_years:
+                logger.info(
+                    "[%s] Pulando ano de lacuna (sem arquivo publicado): %s.",
+                    domain.value.upper(),
+                    y,
+                )
+                continue
+            m_start = start_month if y == start_year else 1
+            m_end = end_month if y == end_year else 12
+            for m in range(m_start, m_end + 1):
+                jobs.append({"year": y, "month": m})
+
+        logger.info(
+            "[%s] Jobs mensais: %s (%s-%s).",
+            domain.value.upper(),
+            len(jobs),
+            start_year,
+            end_year,
+        )
+
+        def monthly_mapper(job: dict) -> dict:
+            return {"year": job["year"], "month": job["month"]}
+
+        return jobs, monthly_mapper
+
+
 # ─── Helpers de resolução para ParentBatchedStrategy ────────────────────────
 
 
@@ -1682,6 +1738,8 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     DomainType.LICITACOES_ITENS: TimeWindowStrategy(),
     DomainType.LICITACOES_PEDIDOS: TimeWindowStrategy(),
     DomainType.LICITACOES_PROPOSTAS: TimeWindowStrategy(),
+    # ── Domínio bulk-only mensal (issue 04) — folha de pagamento consolidada ──
+    DomainType.FOLHA_PAGAMENTO: MonthlyBulkStrategy(),
     # ── Senado ──────────────────────────────────────────────────────────────
     DomainType.SENADORES: LegislaturaScopeStrategy(),
     DomainType.SENADORES_DETALHE: DetailStrategy(),

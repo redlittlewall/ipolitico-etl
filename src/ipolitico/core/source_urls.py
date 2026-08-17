@@ -79,6 +79,8 @@ _BULK_ONLY_DOMAINS: frozenset[DomainType] = frozenset(
         DomainType.LICITACOES_ITENS,
         DomainType.LICITACOES_PEDIDOS,
         DomainType.LICITACOES_PROPOSTAS,
+        # Issue 04 — folha de pagamento consolidada (bulk mensal)
+        DomainType.FOLHA_PAGAMENTO,
     }
 )
 

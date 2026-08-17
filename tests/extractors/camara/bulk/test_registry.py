@@ -42,6 +42,8 @@ REQUIRED_SCHEMA_OVERRIDE_DOMAINS = {
     "eventos_requerimentos",
     "votacoes_objetos",
     "votacoes_proposicoes",
+    # Issue 04 — folha de pagamento (consolidado mensal)
+    "folha_pagamento",
 }
 
 REQUIRED_KEYS = frozenset(
@@ -98,6 +100,9 @@ YEARLY_DOMAINS_NO_FILTER = frozenset(
     }
 )
 
+# Issue 04 — domínios bulk-only mensais (1 arquivo por ano/mês)
+MONTHLY_DOMAINS = frozenset({"folha_pagamento"})
+
 
 def test_all_bulk_domains_have_schema_overrides():
     """
@@ -149,6 +154,21 @@ def test_new_yearly_domains_granularity():
         entry = BULK_REGISTRY[domain]
         assert entry["bulk_granularity"] == "year", f"{domain} deveria ser year"
         assert entry["requires_year"] is True, f"{domain} deveria ter requires_year=True"
+
+
+def test_new_monthly_domains_granularity():
+    """
+    [GRANULARIDADE] Domínios mensais (folha_pagamento) devem ter
+    bulk_granularity='month', requires_year e requires_month True, encoding
+    ISO-8859-1 (latin1) e bulk_only.
+    """
+    for domain in MONTHLY_DOMAINS:
+        entry = BULK_REGISTRY[domain]
+        assert entry["bulk_granularity"] == "month", f"{domain} deveria ser month"
+        assert entry["requires_year"] is True, f"{domain} deveria ter requires_year=True"
+        assert entry["requires_month"] is True, f"{domain} deveria ter requires_month=True"
+        assert entry["encoding"] == "latin1", f"{domain} deveria ser latin1 (ISO-8859-1)"
+        assert entry["bulk_only"] is True, f"{domain} deveria ser bulk_only"
 
 
 def test_snapshot_domains_no_filter_date_column():
