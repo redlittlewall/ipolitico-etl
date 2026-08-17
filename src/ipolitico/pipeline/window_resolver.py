@@ -12,6 +12,33 @@ from ipolitico.storage.state_store import StateStore
 logger = logging.getLogger(__name__)
 
 
+def _log_coverage_window(domain: DomainType, requested_start: str, effective_start: str) -> None:
+    """
+    Loga explicação amigável quando o piso dominial eleva o início da janela.
+
+    Issue 02 (PRD Passo 0): o analista precisa entender POR QUE o filtro começa
+    depois do solicitado — "Extraindo {domínio} — filtro de {X}, iniciando em
+    {Y} por ser a janela temporal disponível".
+
+    Args:
+        domain: Domínio em extração.
+        requested_start: Início solicitado/orquestrado (ISO YYYY-MM-DD).
+        effective_start: Início efetivo após aplicar o piso do domínio (ISO).
+
+    Returns:
+        None — apenas emite log em nível INFO.
+    """
+    if requested_start < effective_start:
+        logger.info(
+            "[%s] Extraindo %s — filtro de %s, iniciando em %s por ser a "
+            "janela temporal disponível.",
+            domain.value.upper(),
+            domain.value,
+            requested_start,
+            effective_start,
+        )
+
+
 def resolve_calendar_years(span_start: str, span_end: str) -> tuple[int, int]:
     """Retorna anos civis inicial e final a partir de ISO YYYY-MM-DD."""
     y0 = int(span_start.split("-")[0])
@@ -54,10 +81,13 @@ def resolve_effective_iso_window(
     end = min(orchestration_end, today)
 
     # Parâmetros reservados para extensões futuras (P1)
-    _ = strategy, state_store, watermark_column, domain
+    _ = strategy, state_store, watermark_column
 
     if start > end:
         end = today
+
+    if orchestration_start < start:
+        _log_coverage_window(domain, orchestration_start, start)
     return start, end
 
 
@@ -128,10 +158,7 @@ class WindowResolver:
         if start_date:
             actual_start = max(start_date, earliest_possible)
             if start_date != actual_start:
-                logger.warning(
-                    f"[{domain.value.upper()}] A data {start_date} é anterior à existência "
-                    f"destes dados. Ajustando limite inicial para {actual_start}."
-                )
+                _log_coverage_window(domain, start_date, actual_start)
             return actual_start, actual_end
 
         if strategy == LoadStrategy.FULL_LOAD:

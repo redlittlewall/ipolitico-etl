@@ -52,3 +52,29 @@ def test_effective_window_caps_at_today(monkeypatch):
     )
     assert start >= "1988-01-01"
     assert end == "2024-03-15"
+
+
+def test_effective_window_friendly_log_quando_piso_eleva_start(caplog, monkeypatch):
+    """Issue 02: log amigável quando o piso dominial eleva o início da janela."""
+    import logging
+
+    monkeypatch.setattr(
+        "ipolitico.pipeline.window_resolver.datetime",
+        MagicMock(now=MagicMock(return_value=datetime(2025, 6, 1))),
+    )
+    with caplog.at_level(logging.INFO, logger="ipolitico.pipeline.window_resolver"):
+        start, end = resolve_effective_iso_window(
+            DomainType.DESPESAS,
+            orchestration_start="2000-01-01",
+            orchestration_end="2025-12-31",
+            earliest_possible="2009-01-01",
+            strategy=LoadStrategy.FULL_LOAD,
+            state_store=None,
+            watermark_column="dataDocumento",
+        )
+    assert start == "2009-01-01"
+    assert end == "2025-06-01"
+    assert (
+        "Extraindo despesas — filtro de 2000-01-01, "
+        "iniciando em 2009-01-01 por ser a janela temporal disponível" in caplog.text
+    )
