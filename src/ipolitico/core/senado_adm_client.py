@@ -139,9 +139,7 @@ class SenadoAdmClient:
                 except (httpx.RequestError, ssl.SSLError) as e:
                     # Rede/SSL transiente (ex: [SSL: INVALID_SESSION_ID] do survey)
                     # → SenadoAdmAPIError transitório para o tenacity retry.
-                    raise SenadoAdmAPIError(
-                        f"Falha de rede/SSL ao acessar {url}: {e}"
-                    ) from e
+                    raise SenadoAdmAPIError(f"Falha de rede/SSL ao acessar {url}: {e}") from e
 
                 # 404: recurso sem dados → lista vazia (sem retry)
                 if response.status_code == 404:
