@@ -106,7 +106,9 @@ def build_coverage_entries() -> list[CoverageEntry]:
 
     for domain in sorted(DomainType, key=lambda d: (order.get(d, 999), d.value)):
         spec = spec_for(domain)
-        gaps = spec.coverage_gaps if spec is not None else COVERAGE_GAPS.get(domain.value, ())
+        # spec_for nunca retorna None: todo DomainType tem entrada no DOMAIN_SPECS,
+        # e _spec já hidrata coverage_gaps a partir do COVERAGE_GAPS.
+        gaps = spec.coverage_gaps
         entries.append(
             CoverageEntry(
                 domain=domain.value,
@@ -193,7 +195,8 @@ def render_coverage_doc(
         lines.append("| Domínio | Início dos dados | Lacunas no meio da série |")
         lines.append("|---|---|---|")
         for entry in system_entries:
-            lines.append(f"| `{entry.domain}` | {entry.earliest_iso} | {_format_gaps(entry.gaps)} |")
+            gaps_cell = _format_gaps(entry.gaps)
+            lines.append(f"| `{entry.domain}` | {entry.earliest_iso} | {gaps_cell} |")
         lines.append("")
 
     if planned:

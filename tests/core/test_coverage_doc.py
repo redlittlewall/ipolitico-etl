@@ -32,6 +32,19 @@ def _entry(
     label: str | None = None,
     implemented: bool = True,
 ) -> CoverageEntry:
+    """Factory de ``CoverageEntry`` para testes.
+
+    Args:
+        domain: Nome do domínio.
+        system: Sistema de origem.
+        earliest: Data de início real (ISO).
+        gaps: Lacunas no meio da série.
+        label: Rótulo amigável (default: próprio nome do domínio).
+        implemented: Se o domínio é considerado implementado.
+
+    Returns:
+        ``CoverageEntry`` preenchido com os valores fornecidos.
+    """
     return CoverageEntry(
         domain=domain,
         label=label or domain,
