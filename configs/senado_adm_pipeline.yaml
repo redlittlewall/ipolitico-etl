@@ -5,4 +5,12 @@
 # domain_configs vazio — o provider filtra por config e fica inerte. Os
 # domínios (servidores, remuneracoes, despesas_ceaps) são registrados aqui
 # nas fatias 07-09, cada um com seu extrator/transformer.
-domain_configs: {}
+domain_configs:
+  # ── Issue 07 — SERVIDORES (roster) ─────────────────────────────────────────
+  # Snapshot: 1 chamada a /servidores/servidores (a API ignora `pagina` e
+  # devolve o roster completo de ~22,9 mil registros). `_source_url` = URL da
+  # coleção. Filtros opcionais (tipoVinculoEquals etc.) são case-sensitive —
+  # não expostos nesta fatia.
+  servidores:
+    extractor: "ipolitico.extractors.senado.api.servidores.SenadoServidoresExtractor"
+    transformer: "ipolitico.transformers.senado.servidores_transformer.SenadoServidoresTransformer"

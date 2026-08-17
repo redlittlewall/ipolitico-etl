@@ -104,6 +104,8 @@ FULL_PIPELINE: tuple[DomainType, ...] = (
     DomainType.SENADORES_MANDATOS,
     DomainType.SENADORES_FILIACOES,
     DomainType.ORIENTACAO_BANCADA,
+    # ── Senado — API administrativa (adm-dadosabertos) ─────────────────────
+    DomainType.SERVIDORES,
 )
 
 # Dependências obrigatórias (silver/gold já populado antes do domínio)

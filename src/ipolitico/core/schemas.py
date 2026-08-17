@@ -1232,4 +1232,27 @@ SILVER_SCHEMAS = {
         "orientacao": pl.String,
         "data_sessao": pl.String,
     },
+    # ── Senado — API administrativa (adm-dadosabertos, issue 07) ──────────────
+    # Roster: 12 campos JSON com aninhamentos achatados no mesmo conjunto do
+    # subpath CSV (16 cols). ``sequencial``/``nome`` preservados — join
+    # roster↔remuneração por nome é downstream, não responsabilidade do ETL.
+    DomainType.SERVIDORES.value: {
+        "_source_url": pl.String,
+        "sequencial": pl.Int64,
+        "nome": pl.String,
+        "vinculo": pl.String,
+        "situacao": pl.String,
+        "ano_admissao": pl.Int64,
+        "padrao": pl.String,
+        "especialidade": pl.String,
+        "cargo": pl.String,
+        "funcao": pl.String,
+        "lotacao_sigla": pl.String,
+        "lotacao_nome": pl.String,
+        "categoria_codigo": pl.String,
+        "categoria_nome": pl.String,
+        "tipo_cessao": pl.String,
+        "orgao_origem": pl.String,
+        "orgao_destino": pl.String,
+    },
 }

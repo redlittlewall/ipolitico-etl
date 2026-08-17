@@ -1796,6 +1796,9 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     DomainType.SENADORES_FILIACOES: SenatorChildStrategy(include_date_range=False),
     # ── Senado — Orientação de Bancada (Issue 17) ─────────────────────────────
     DomainType.ORIENTACAO_BANCADA: TimeWindowStrategy(),
+    # ── Senado — API administrativa adm-dadosabertos (Issue 07) ──────────────
+    # Snapshot: 1 job vazio — a coleção retorna o roster completo numa chamada.
+    DomainType.SERVIDORES: SnapshotWindowStrategy(),
 }
 
 

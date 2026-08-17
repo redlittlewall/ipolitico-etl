@@ -180,6 +180,8 @@ class DomainType(str, Enum):
     SENADORES_MANDATOS = "senadores_mandatos"
     SENADORES_FILIACOES = "senadores_filiacoes"
     ORIENTACAO_BANCADA = "orientacao_bancada"
+    # ── Senado — API administrativa (adm-dadosabertos, issues 07-09) ──────────
+    SERVIDORES = "servidores"
 
 
 class MedallionLayer(str, Enum):
@@ -252,6 +254,9 @@ class EarliestDates:
     SENADORES_MANDATOS = "1949-01-01"
     SENADORES_FILIACOES = "1949-01-01"
     ORIENTACAO_BANCADA = "1991-01-01"
+    # SERVIDORES (issue 07): snapshot do roster — disponibilidade = existência
+    # do órgão (mesma convenção de FUNCIONARIOS na Câmara), não série temporal.
+    SERVIDORES = "1826-04-29"
 
 
 # Facilita o acesso dinâmico: EarliestDateMap[DomainType.DESPESAS]
@@ -363,6 +368,8 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.SENADORES_MANDATOS: EarliestDates.SENADORES_MANDATOS,
     DomainType.SENADORES_FILIACOES: EarliestDates.SENADORES_FILIACOES,
     DomainType.ORIENTACAO_BANCADA: EarliestDates.ORIENTACAO_BANCADA,
+    # ── Senado — API administrativa (adm-dadosabertos) ───────────────────────
+    DomainType.SERVIDORES: EarliestDates.SERVIDORES,
 }
 
 
@@ -490,6 +497,7 @@ DOMAIN_SOURCE_SYSTEM: Dict[str, SourceSystem] = {
     "senadores_mandatos": SourceSystem.SENADO,
     "senadores_filiacoes": SourceSystem.SENADO,
     "orientacao_bancada": SourceSystem.SENADO,
+    "servidores": SourceSystem.SENADO,
     # ── Domínios documentados no registry, ainda sem DomainType ─────────────
     "folha_pagamento": SourceSystem.CAMARA,
     "remuneracoes": SourceSystem.SENADO,
@@ -610,4 +618,6 @@ DOMAIN_LABELS: dict[DomainType, str] = {
     DomainType.SENADORES_MANDATOS: "Histórico de mandatos dos senadores",
     DomainType.SENADORES_FILIACOES: "Histórico de filiações partidárias dos senadores",
     DomainType.ORIENTACAO_BANCADA: "Orientação de bancada nas votações do Senado",
+    # ── Senado — API administrativa (adm-dadosabertos) ───────────────────────
+    DomainType.SERVIDORES: "Servidores do Senado Federal (roster)",
 }

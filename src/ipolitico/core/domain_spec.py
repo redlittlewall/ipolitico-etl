@@ -557,6 +557,14 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         frozenset({DomainType.VOTACOES_SENADO}),
         uk=("codigo_votacao", "sigla_partido"),
     ),
+    # ── Senado — API administrativa (adm-dadosabertos, issue 07) ─────────────
+    # Snapshot (roster completo numa chamada, sem paginação), chave por
+    # ``sequencial``. NÃO estável (diferente dos bulk-only estáveis — ex:
+    # FUNCIONARIOS/TECAD — que são arquivos publicados imutáveis): o roster é
+    # uma visão VIVA do quadro — vínculo/situação mudam e desligados se acumulam
+    # (survey: DESLIGADO 12.227 de 22.916) — então o incremental deve re-extrair
+    # (não pular), mesmo custo da FOLHA_PAGAMENTO não-estável.
+    DomainType.SERVIDORES: _spec(DomainType.SERVIDORES, None, uk=("sequencial",)),
 }
 
 

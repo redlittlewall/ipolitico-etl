@@ -126,6 +126,7 @@ API: https://legis.senado.leg.br
 | `senadores_mandatos` | 1949-01-01 | — |
 | `senadores_filiacoes` | 1949-01-01 | — |
 | `orientacao_bancada` | 1991-01-01 | — |
+| `servidores` | 1826-04-29 | — |
 
 ## Domínios planejados (datas documentadas)
 
