@@ -105,9 +105,7 @@ class BaseBulkExtractor(BaseExtractor):
             if month is None:
                 raise ValueError(f"O domínio {self.domain_name} exige o parâmetro 'month'.")
             if not 1 <= month <= 12:
-                raise ValueError(
-                    f"Mês inválido para {self.domain_name}: {month}. Esperado 1-12."
-                )
+                raise ValueError(f"Mês inválido para {self.domain_name}: {month}. Esperado 1-12.")
             month_name = self._MONTH_NAMES[month - 1]
             return config["url_template"].format(year=year, month=month_name)
 
