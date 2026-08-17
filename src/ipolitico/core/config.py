@@ -25,6 +25,15 @@ LEGISLATURA_ATUAL = int(os.getenv("LEGISLATURA_ATUAL", 57))
 SENADO_API_BASE_URL = os.getenv("SENADO_API_BASE_URL", "https://legis.senado.leg.br/dadosabertos")
 SENADO_HTTP_CONCURRENCY = int(os.getenv("SENADO_HTTP_CONCURRENCY", "10"))
 
+# --- Configurações do Senado (API administrativa adm-dadosabertos) ---
+# Sem autenticação; base usada pelos extratores dos domínios (issues 07-09)
+# para montar o ``_source_url``. Concorrência própria e conservadora, no mesmo
+# patamar das demais fontes (semáforo global protege o servidor).
+SENADO_ADM_API_BASE_URL = os.getenv(
+    "SENADO_ADM_API_BASE_URL", "https://adm.senado.gov.br/adm-dadosabertos/api/v1"
+)
+SENADO_ADM_HTTP_CONCURRENCY = int(os.getenv("SENADO_ADM_HTTP_CONCURRENCY", "10"))
+
 # --- Tuning de Performance ---
 MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", 10))
 # Limite de GETs simultâneos no CamaraClient (respeitar fair use da API).

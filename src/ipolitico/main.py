@@ -202,9 +202,9 @@ async def main():
     parser.add_argument(
         "--source",
         type=str,
-        choices=["camara", "senado", "all"],
+        choices=["camara", "senado", "senado-adm", "all"],
         default="all",
-        help="Fonte de dados: camara, senado, ou all (ambas em paralelo).",
+        help="Fonte de dados: camara, senado, senado-adm, ou all (todas em paralelo).",
     )
     parser.add_argument(
         "--list-domains",
@@ -296,8 +296,10 @@ async def main():
         providers_configs = ["camara"]
     elif source_name == "senado":
         providers_configs = ["senado"]
+    elif source_name == "senado-adm":
+        providers_configs = ["senado-adm"]
     else:  # all
-        providers_configs = ["camara", "senado"]
+        providers_configs = ["camara", "senado", "senado-adm"]
     logger.info("=" * 60)
     logger.info(
         f" iPolitico ETL (Ingestão) | Destino: DATALAKE  |"
@@ -309,6 +311,7 @@ async def main():
     base_dir = Path(__file__).resolve().parent.parent.parent / "configs"
     camara_config = load_config(base_dir / "camara_pipeline.yaml")
     senado_config = load_config(base_dir / "senado_pipeline.yaml")
+    senado_adm_config = load_config(base_dir / "senado_adm_pipeline.yaml")
 
     runner = PipelineRunner()
     state_store = DataLakeSink()
@@ -339,6 +342,19 @@ async def main():
             senado_builder, runner, senado_config, state_store, senado_metadata
         )
         providers.append(SenadoSourceProvider(senado_manager))
+
+    if "senado-adm" in providers_configs:
+        from ipolitico.core.senado_adm_client import SenadoAdmClient
+        from ipolitico.services.senado_metadata import SenadoMetadataService
+        from ipolitico.sources.senado_adm_provider import SenadoAdmSourceProvider
+
+        senado_adm_client = SenadoAdmClient()
+        senado_adm_builder = PipelineBuilder(senado_adm_client)
+        senado_adm_metadata = SenadoMetadataService()
+        senado_adm_manager = PipelineManager(
+            senado_adm_builder, runner, senado_adm_config, state_store, senado_adm_metadata
+        )
+        providers.append(SenadoAdmSourceProvider(senado_adm_manager))
 
     federation = FederationOrchestrator(providers)
 
