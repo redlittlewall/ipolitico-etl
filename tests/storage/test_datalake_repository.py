@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import polars as pl
@@ -84,3 +85,31 @@ def test_list_deputy_ids_for_legislature_bounds_with_gold_without_pandas(tmp_pat
     ids = repo.list_deputy_ids_for_legislature_bounds(56, 56, silver_fallback_ids=[999])
 
     assert ids == [102]
+
+
+@pytest.mark.parametrize("layer", ["silver", "gold"])
+def test_list_ids_missing_column_returns_empty_silently(tmp_path: Path, caplog, layer):
+    """
+    Coluna inexistente retorna [] sem ERROR, em Silver e Gold.
+
+    Tabelas do Senado usam 'codigo', não 'id'. O fallback em
+    ``list_entity_ids_with_child_materialized`` depende de ``list_ids``
+    devolver [] quando a coluna não existe — se ele explodir com
+    "unable to find column", o fallback vira ruído de ERROR no log.
+    """
+    caplog.set_level(logging.ERROR, logger="ipolitico.storage.datalake_repository")
+    repo = DataLakeRepository(tmp_path)
+
+    if layer == "silver":
+        dir_path = tmp_path / "silver" / "senadores_detalhe"
+        dir_path.mkdir(parents=True)
+        pl.DataFrame({"codigo": [1, 2, 3]}).write_parquet(dir_path / "lote.parquet")
+    else:
+        dir_path = tmp_path / "gold" / "senadores_detalhe"
+        dir_path.mkdir(parents=True)
+        pl.DataFrame({"codigo": [1, 2, 3]}).write_parquet(dir_path / "senadores_detalhe.parquet")
+
+    ids = repo.list_ids("senadores_detalhe", layer, "id")
+
+    assert ids == []
+    assert not any(r.levelname == "ERROR" for r in caplog.records)
