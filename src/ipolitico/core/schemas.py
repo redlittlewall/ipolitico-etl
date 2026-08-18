@@ -1255,4 +1255,33 @@ SILVER_SCHEMAS = {
         "orgao_origem": pl.String,
         "orgao_destino": pl.String,
     },
+    # ── Senado — API administrativa (adm-dadosabertos, issue 08) ──────────────
+    # Folha mensal: 20 campos top-level (sem envelope nem aninhamento). Os 15
+    # campos monetários vêm como string BR (``"1.234,56"``, ``"-9.463,65"``) e
+    # são convertidos para Float64 pelo transformer via br_locale.
+    # ``sequencial``/``nome`` preservados — join roster↔remuneração por nome é
+    # downstream. ``tipo_folha`` (``Normal`` + ``Suplementar``) é dado real.
+    DomainType.REMUNERACOES.value: {
+        "_source_url": pl.String,
+        "sequencial": pl.Int64,
+        "nome": pl.String,
+        "mes": pl.Int64,
+        "ano": pl.Int64,
+        "tipo_folha": pl.String,
+        "remuneracao_basica": pl.Float64,
+        "vantagens_pessoais": pl.Float64,
+        "funcao_comissionada": pl.Float64,
+        "gratificacao_natalina": pl.Float64,
+        "horas_extras": pl.Float64,
+        "outras_eventuais": pl.Float64,
+        "abono_permanencia": pl.Float64,
+        "reversao_teto_constitucional": pl.Float64,
+        "imposto_renda": pl.Float64,
+        "previdencia": pl.Float64,
+        "faltas": pl.Float64,
+        "remuneracao_liquida": pl.Float64,
+        "diarias": pl.Float64,
+        "auxilios": pl.Float64,
+        "vantagens_indenizatorias": pl.Float64,
+    },
 }

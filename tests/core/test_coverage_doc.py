@@ -178,7 +178,8 @@ class TestBuildCoverageEntries:
         implemented_names = {e.domain for e in entries if e.implemented}
         assert set(DomainType) == {DomainType(n) for n in implemented_names}
         planned_names = {e.domain for e in entries if not e.implemented}
-        assert planned_names == {"remuneracoes", "despesas_ceaps"}
+        # remuneracoes virou DomainType implementado (issue 08) — só CEAPs planeja.
+        assert planned_names == {"despesas_ceaps"}
 
     def test_usa_data_real_de_inicio(self):
         by_name = {e.domain: e for e in build_coverage_entries()}
@@ -200,7 +201,7 @@ class TestBuildCoverageEntries:
     def test_documentados_leem_sistema_e_data_do_registry(self):
         """Planejados não copiam valores: sistema/data vêm das fontes únicas."""
         by_name = {e.domain: e for e in build_coverage_entries()}
-        for name in ("remuneracoes", "despesas_ceaps"):
+        for name in ("despesas_ceaps",):  # remuneracoes virou implementado (issue 08)
             entry = by_name[name]
             assert entry.source_system == DOMAIN_SOURCE_SYSTEM[name]
             assert entry.earliest_iso == getattr(EarliestDates, name.upper())

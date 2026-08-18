@@ -1799,6 +1799,10 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     # ── Senado — API administrativa adm-dadosabertos (Issue 07) ──────────────
     # Snapshot: 1 job vazio — a coleção retorna o roster completo numa chamada.
     DomainType.SERVIDORES: SnapshotWindowStrategy(),
+    # ── Senado — API administrativa adm-dadosabertos (Issue 08) ──────────────
+    # Bulk mensal: 1 job por (ano, mês) — path {ano}/{mes} da API. Sem anos de
+    # lacuna (série contínua 2013-01 → presente) — ver COVERAGE_GAPS/COVERAGE_GAP_YEARS.
+    DomainType.REMUNERACOES: MonthlyBulkStrategy(),
 }
 
 

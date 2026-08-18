@@ -127,6 +127,7 @@ API: https://legis.senado.leg.br
 | `senadores_filiacoes` | 1949-01-01 | — |
 | `orientacao_bancada` | 1991-01-01 | — |
 | `servidores` | 1826-04-29 | — |
+| `remuneracoes` | 2013-01-01 | 404 para 2012 e anteriores (início da série 2013-01) — ausência permanente; mês corrente não publicado = HTTP 200 com lista vazia (ausência temporária) |
 
 ## Domínios planejados (datas documentadas)
 
@@ -134,5 +135,4 @@ Domínios com data de disponibilidade já confirmada no registry, ainda não ing
 
 | Domínio | Sistema | Início documentado | Lacunas |
 |---|---|---|---|
-| `remuneracoes` | Senado Federal | 2013-01-01 | — |
 | `despesas_ceaps` | Senado Federal | 2008-01-01 | — |

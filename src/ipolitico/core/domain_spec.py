@@ -565,6 +565,19 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
     # (survey: DESLIGADO 12.227 de 22.916) — então o incremental deve re-extrair
     # (não pular), mesmo custo da FOLHA_PAGAMENTO não-estável.
     DomainType.SERVIDORES: _spec(DomainType.SERVIDORES, None, uk=("sequencial",)),
+    # ── Senado — API administrativa (adm-dadosabertos, issue 08) ─────────────
+    # Bulk mensal nomeado (path ``{ano}/{mes}``): 1 arquivo por (ano, mês),
+    # chave por (``_source_url``, ``sequencial``, ``tipo_folha``) — o mesmo
+    # servidor pode aparecer em ``Normal`` e ``Suplementar`` no mesmo mês.
+    # NÃO estável (mesmo padrão da FOLHA_PAGAMENTO): o incremental re-extrai —
+    # a folha pode ser corrigida (ex: folha suplementar) e não há custo de
+    # saltar o snapshot. 404 (pré-2013) = ausência permanente; mês corrente não
+    # publicado = 200 com lista vazia (ausência temporária) — ver COVERAGE_GAPS.
+    DomainType.REMUNERACOES: _spec(
+        DomainType.REMUNERACOES,
+        None,
+        uk=("_source_url", "sequencial", "tipo_folha"),
+    ),
 }
 
 

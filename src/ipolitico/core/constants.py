@@ -182,6 +182,7 @@ class DomainType(str, Enum):
     ORIENTACAO_BANCADA = "orientacao_bancada"
     # ── Senado — API administrativa (adm-dadosabertos, issues 07-09) ──────────
     SERVIDORES = "servidores"
+    REMUNERACOES = "remuneracoes"
 
 
 class MedallionLayer(str, Enum):
@@ -370,6 +371,7 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.ORIENTACAO_BANCADA: EarliestDates.ORIENTACAO_BANCADA,
     # ── Senado — API administrativa (adm-dadosabertos) ───────────────────────
     DomainType.SERVIDORES: EarliestDates.SERVIDORES,
+    DomainType.REMUNERACOES: EarliestDates.REMUNERACOES,
 }
 
 
@@ -381,6 +383,13 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
 # passa a consumir esta entrada automaticamente.
 COVERAGE_GAPS: Dict[str, tuple[str, ...]] = {
     "folha_pagamento": ("2011, 2015 e 2022 não publicados (HTTP 404) — ausência, não erro",),
+    # Regra dupla de cobertura da remuneração do Senado (issue 08): 404 = mês
+    # anterior ao início da série (pré-2013, ausência PERMANENTE); 200 com lista
+    # vazia = mês corrente ainda não publicado (ausência TEMPORÁRIA, não 404).
+    "remuneracoes": (
+        "404 para 2012 e anteriores (início da série 2013-01) — ausência permanente; "
+        "mês corrente não publicado = HTTP 200 com lista vazia (ausência temporária)",
+    ),
 }
 
 
@@ -620,4 +629,5 @@ DOMAIN_LABELS: dict[DomainType, str] = {
     DomainType.ORIENTACAO_BANCADA: "Orientação de bancada nas votações do Senado",
     # ── Senado — API administrativa (adm-dadosabertos) ───────────────────────
     DomainType.SERVIDORES: "Servidores do Senado Federal (roster)",
+    DomainType.REMUNERACOES: "Remunerações individuais de servidores do Senado (mensal)",
 }
