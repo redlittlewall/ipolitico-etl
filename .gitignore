@@ -20,6 +20,9 @@ venv/
 .vscode/
 .idea/
 
+# macOS
+.DS_Store
+
 # Testes e Cobertura
 .pytest_cache/
 .coverage
@@ -57,6 +60,8 @@ scripts/*.log
 
 # Claude Code — skills (symlinks para Facehugger, pessoal de cada dev)
 .claude/skills/
+.agents/
+skills-lock.json
 
 # 🎭 Facehugger generated
 AGENT-SEED.md

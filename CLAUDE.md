@@ -103,8 +103,10 @@ Se o código editado **não tiver docstring** ou a docstring estiver **desatuali
 
 ## Comportamento do Agente
 
-1. **Antes de escrever código novo**, leia `CONTEXT.md` e verifique `core/`
-   e as classes base para não duplicar lógica existente.
+1. **Antes de escrever código novo**, leia `CONTEXT.md` **seletivamente**: liste os
+   headers com `grep -n '^## ' CONTEXT.md` e leia apenas a(s) seção(ões) relevante(s)
+   ao que está sendo feito — nunca o arquivo inteiro. Verifique `core/` e as classes
+   base para não duplicar lógica existente.
 2. **Sempre adicione/atualize docstrings** em qualquer classe ou função tocada.
 3. **TDD obrigatório:** escreva os testes antes do código (red → green → refactor).
    Testes novos acompanham código novo. Não commite sem `pytest -q` passando.
@@ -112,6 +114,25 @@ Se o código editado **não tiver docstring** ou a docstring estiver **desatuali
 5. **Nunca substitua append-only por upsert na ingestão** — a dedup é responsabilidade
    da camada Gold (`DataLakeOptimizer`), não da ingestão.
 6. **Mantenha este arquivo atualizado** conforme a arquitetura evolui.
+
+## Custo de Contexto e Tokens
+
+Cada token lido é reenviado ao modelo a cada turno da sessão — um único arquivo
+grande lido 1× pode custar milhões de tokens ao longo da conversa. Regras para não
+inflar o contexto:
+
+- **Nunca `Read` arquivos brutos/dumps** (bloqueados em `settings.local.json`):
+  `docs/camara_bulk.html`, `docs/camara_swagger.json`, `docs/swagger/*.json`,
+  `uv.lock`, `data/**` (parquet, db, log). Para consultar a API use
+  `python -m ipolitico.tools.swagger_codegen` ou `grep` no arquivo. Para inspecionar
+  dados, escreva um script Polars/DuckDB que imprima só schema, head e uma amostra
+  (padrão: scripts `validate_*.py` em `.scratch/`).
+- **Prefira ler trechos, não arquivos inteiros.** Use `offset`/`limit` no Read e
+  `grep` para localizar o que interessa. Arquivos > 20 KB raramente precisam de leitura
+  integral.
+- **Não despeje JSON/HTML/XML no contexto.** Processe via script e cite apenas o resultado.
+- **Higiene de sessão.** Comece sessão nova por tarefa; quando o contexto acumular,
+  use `/compact` ou `/clear` em vez de seguir empilhando.
 
 ## Skills
 
