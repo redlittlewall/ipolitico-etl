@@ -275,7 +275,7 @@ Consulte [CONTRIBUTING.md](CONTRIBUTING.md) para detalhes sobre arquitetura, con
 ## Proximos Passos
 
 - [x] API do Senado Federal
-- [ ] Portal da Transparencia
+- [ ] Portal da Transparencia (CGU — Poder Executivo Federal; consumo total dos modulos, PRD dedicado)
 - [x] Export automatico para SQLite e DuckDB
 - [ ] Dados do TSE (eleicoes)
 

@@ -34,6 +34,24 @@ SENADO_ADM_API_BASE_URL = os.getenv(
 )
 SENADO_ADM_HTTP_CONCURRENCY = int(os.getenv("SENADO_ADM_HTTP_CONCURRENCY", "10"))
 
+# --- Configurações do Portal da Transparência (CGU — Poder Executivo Federal) ---
+# Autenticação por chave gratuita do usuário (header ``chave-api-dados`` na API v3).
+# A chave real vive SÓ no .env local (gitignored) — nunca versionada. Cada usuário
+# gera a própria no portal; sem chave, o cliente loga um aviso e as chamadas falham
+# com 401 (PortalTransparenciaAuthError).
+PORTAL_API_BASE_URL = os.getenv("PORTAL_API_BASE_URL", "https://api.portaldatransparencia.gov.br")
+PORTAL_API_KEY = os.getenv("PORTAL_API_KEY", "")
+PORTAL_HTTP_CONCURRENCY = int(os.getenv("PORTAL_HTTP_CONCURRENCY", "10"))
+
+# Bulk /download-de-dados: base dos dumps ZIP/CSV (host público, sem chave) e
+# diretório persistente onde os dumps são guardados. Persistir (em vez de temp
+# descartável) permite ao ``PortalTransparenciaClient.download_file`` retomar
+# downloads interrompidos via Range header sem recomeçar do zero.
+PORTAL_BULK_BASE_URL = os.getenv(
+    "PORTAL_BULK_BASE_URL", "https://portaldatransparencia.gov.br/download-de-dados"
+)
+PORTAL_BULK_DIR = Path(os.getenv("PORTAL_BULK_DIR", str(DATA_DIR / "portal_dumps")))
+
 # --- Tuning de Performance ---
 MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", 10))
 # Limite de GETs simultâneos no CamaraClient (respeitar fair use da API).

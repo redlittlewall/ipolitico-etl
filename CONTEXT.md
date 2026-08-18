@@ -605,5 +605,6 @@ ipolitico-etl/
 | **Backpressure** | Mecanismo que trava workers se o sink não consegue acompanhar |
 | **CEAP** | Cota para Exercício da Atividade Parlamentar ("cotão") |
 | **Federation** | Orquestração de múltiplas fontes (Câmara + Senado futuro) |
+| **Portal da Transparência (CGU)** | Fonte do **Poder Executivo Federal** (não cobre Câmara/Senado — estes têm payroll próprio). Módulos: servidores/remuneração, PEP, viagens, cartões, imóveis funcionais, emendas parlamentares etc. Não confundir com os portais de transparência da Câmara e do Senado. |
 | **Swagger / OpenAPI** | Especificação padronizada dos endpoints da API Câmara |
 | **Smoke test** | Teste rápido de validação de imports e CLI (sem rede) |
