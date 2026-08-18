@@ -578,6 +578,19 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         None,
         uk=("_source_url", "sequencial", "tipo_folha"),
     ),
+    # ── Senado — API administrativa (adm-dadosabertos, issue 09) ─────────────
+    # Bulk ANUAL (path ``{ano}`` — 1 job por ano, sem mês no path), mas o
+    # payload carrega ``mes`` → granularidade efetiva mês via 1 request por ano.
+    # Chave por (``_source_url``, ``id``): o ``id`` é globalmente único na
+    # fonte (verificado em 2008 vs 2025) e ``_source_url`` (URL anual) escopa a
+    # chave para replay. NÃO estável (mesmo padrão da FOLHA_PAGAMENTO): o ano
+    # corrente cresce a cada mês e o incremental re-extrai — o Gold deduplica.
+    # 404 (pré-2008) = ausência permanente — ver COVERAGE_GAPS.
+    DomainType.DESPESAS_CEAPS: _spec(
+        DomainType.DESPESAS_CEAPS,
+        None,
+        uk=("_source_url", "id"),
+    ),
 }
 
 

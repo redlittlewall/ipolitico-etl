@@ -183,6 +183,7 @@ class DomainType(str, Enum):
     # ── Senado — API administrativa (adm-dadosabertos, issues 07-09) ──────────
     SERVIDORES = "servidores"
     REMUNERACOES = "remuneracoes"
+    DESPESAS_CEAPS = "despesas_ceaps"
 
 
 class MedallionLayer(str, Enum):
@@ -372,6 +373,7 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     # ── Senado — API administrativa (adm-dadosabertos) ───────────────────────
     DomainType.SERVIDORES: EarliestDates.SERVIDORES,
     DomainType.REMUNERACOES: EarliestDates.REMUNERACOES,
+    DomainType.DESPESAS_CEAPS: EarliestDates.DESPESAS_CEAPS,
 }
 
 
@@ -390,6 +392,9 @@ COVERAGE_GAPS: Dict[str, tuple[str, ...]] = {
         "404 para 2012 e anteriores (início da série 2013-01) — ausência permanente; "
         "mês corrente não publicado = HTTP 200 com lista vazia (ausência temporária)",
     ),
+    # Início da série 2008: anos anteriores (2007/2006/2005) respondem 404 —
+    # ausência permanente, não erro (issue 09).
+    "despesas_ceaps": ("404 para 2007 e anteriores (início da série 2008) — ausência permanente",),
 }
 
 
@@ -630,4 +635,5 @@ DOMAIN_LABELS: dict[DomainType, str] = {
     # ── Senado — API administrativa (adm-dadosabertos) ───────────────────────
     DomainType.SERVIDORES: "Servidores do Senado Federal (roster)",
     DomainType.REMUNERACOES: "Remunerações individuais de servidores do Senado (mensal)",
+    DomainType.DESPESAS_CEAPS: "Despesas de cotas parlamentares (CEAP) do Senado (anual)",
 }

@@ -25,3 +25,15 @@ domain_configs:
   remuneracoes:
     extractor: "ipolitico.extractors.senado.api.remuneracoes.SenadoRemuneracoesExtractor"
     transformer: "ipolitico.transformers.senado.remuneracoes_transformer.SenadoRemuneracoesTransformer"
+
+  # ── Issue 09 — DESPESAS_CEAPS (cotas parlamentares) ─────────────────────────
+  # Bulk anual: 1 chamada por ano a /senadores/despesas_ceaps/{ano} (a API
+  # devolve a lista top-level completa do ano, 2.449–26.055 registros, sem
+  # paginação; path {ano} mas payload com `mes` → granularidade efetiva mês).
+  # `_source_url` = URL da API com o ano (replayável). Cobertura: 404 (ex:
+  # 2007, pré-série 2008) = ausência permanente, lista vazia (não exceção).
+  # `valorReembolsado` vem como número (API real) ou string BR (survey) — o
+  # transformer converte ambos para Float64 via br_locale.
+  despesas_ceaps:
+    extractor: "ipolitico.extractors.senado.api.despesas_ceaps.SenadoDespesasCeapsExtractor"
+    transformer: "ipolitico.transformers.senado.despesas_ceaps_transformer.SenadoDespesasCeapsTransformer"

@@ -1284,4 +1284,27 @@ SILVER_SCHEMAS = {
         "auxilios": pl.Float64,
         "vantagens_indenizatorias": pl.Float64,
     },
+    # ── DESPESAS_CEAPS (Senado adm-dadosabertos, issue 09) ────────────────────
+    # Bulk anual (path ``{ano}``), payload com ``mes`` → granularidade efetiva
+    # mês. 14 colunas (_source_url + 13 campos). ``valorReembolsado`` vem como
+    # número (API real) ou string BR (survey) e vira Float64 via br_locale —
+    # número passa direto, string converte. ``data`` é ISO string preservada
+    # (pode ser nula em anos antigos, ex: 2008); ``codSenador``/``nomeSenador``
+    # preservados — join com o roster é downstream.
+    DomainType.DESPESAS_CEAPS.value: {
+        "_source_url": pl.String,
+        "id": pl.Int64,
+        "tipoDocumento": pl.String,
+        "ano": pl.Int64,
+        "mes": pl.Int64,
+        "codSenador": pl.Int64,
+        "nomeSenador": pl.String,
+        "tipoDespesa": pl.String,
+        "cpfCnpj": pl.String,
+        "fornecedor": pl.String,
+        "documento": pl.String,
+        "data": pl.String,
+        "detalhamento": pl.String,
+        "valorReembolsado": pl.Float64,
+    },
 }

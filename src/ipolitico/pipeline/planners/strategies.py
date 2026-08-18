@@ -1803,6 +1803,11 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     # Bulk mensal: 1 job por (ano, mês) — path {ano}/{mes} da API. Sem anos de
     # lacuna (série contínua 2013-01 → presente) — ver COVERAGE_GAPS/COVERAGE_GAP_YEARS.
     DomainType.REMUNERACOES: MonthlyBulkStrategy(),
+    # ── Senado — API administrativa adm-dadosabertos (Issue 09) ──────────────
+    # Bulk anual: 1 job por ano — path {ano} da API (payload carrega `mes` →
+    # granularidade efetiva mês). Série contínua 2008 → presente (sem anos de
+    # lacuna) — ver COVERAGE_GAPS.
+    DomainType.DESPESAS_CEAPS: AnnualWindowStrategy(),
 }
 
 
