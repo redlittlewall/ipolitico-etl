@@ -5,4 +5,35 @@
 # domain_configs vazio — o provider filtra por config e fica inerte. Os
 # domínios (servidores, remuneracoes, despesas_ceaps) são registrados aqui
 # nas fatias 07-09, cada um com seu extrator/transformer.
-domain_configs: {}
+domain_configs:
+  # ── Issue 07 — SERVIDORES (roster) ─────────────────────────────────────────
+  # Snapshot: 1 chamada a /servidores/servidores (a API ignora `pagina` e
+  # devolve o roster completo de ~22,9 mil registros). `_source_url` = URL da
+  # coleção. Filtros opcionais (tipoVinculoEquals etc.) são case-sensitive —
+  # não expostos nesta fatia.
+  servidores:
+    extractor: "ipolitico.extractors.senado.api.servidores.SenadoServidoresExtractor"
+    transformer: "ipolitico.transformers.senado.servidores_transformer.SenadoServidoresTransformer"
+
+  # ── Issue 08 — REMUNERACOES (folha mensal nomeada) ──────────────────────────
+  # Bulk mensal: 1 chamada por (ano, mês) a /servidores/remuneracoes/{ano}/{mes}
+  # (a API devolve a lista completa, ~10,7 mil registros em 2026-07, sem
+  # paginação). `_source_url` = URL da API com ano/mês (replayável). Regra de
+  # cobertura: 404 (ex: 2012-12) = ausência permanente; mês corrente não
+  # publicado = HTTP 200 com lista vazia (ausência temporária). Valores
+  # monetários convertidos de string BR pelo transformer (br_locale).
+  remuneracoes:
+    extractor: "ipolitico.extractors.senado.api.remuneracoes.SenadoRemuneracoesExtractor"
+    transformer: "ipolitico.transformers.senado.remuneracoes_transformer.SenadoRemuneracoesTransformer"
+
+  # ── Issue 09 — DESPESAS_CEAPS (cotas parlamentares) ─────────────────────────
+  # Bulk anual: 1 chamada por ano a /senadores/despesas_ceaps/{ano} (a API
+  # devolve a lista top-level completa do ano, 2.449–26.055 registros, sem
+  # paginação; path {ano} mas payload com `mes` → granularidade efetiva mês).
+  # `_source_url` = URL da API com o ano (replayável). Cobertura: 404 (ex:
+  # 2007, pré-série 2008) = ausência permanente, lista vazia (não exceção).
+  # `valorReembolsado` vem como número (API real) ou string BR (survey) — o
+  # transformer converte ambos para Float64 via br_locale.
+  despesas_ceaps:
+    extractor: "ipolitico.extractors.senado.api.despesas_ceaps.SenadoDespesasCeapsExtractor"
+    transformer: "ipolitico.transformers.senado.despesas_ceaps_transformer.SenadoDespesasCeapsTransformer"

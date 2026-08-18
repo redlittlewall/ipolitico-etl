@@ -50,8 +50,9 @@ _NO_GAPS = "—"
 # EarliestDates) em build_coverage_entries, nunca copiados.
 _DOCUMENTED_ONLY: tuple[tuple[str, str], ...] = (
     # NOTA: folha_pagamento removido — virou DomainType implementado (issue 04)
-    ("remuneracoes", "Remunerações do Senado (administrativo)"),
-    ("despesas_ceaps", "Despesas de CEAPs do Senado"),
+    # NOTA: remuneracoes removido — virou DomainType implementado (issue 08)
+    # NOTA: despesas_ceaps removido — virou DomainType implementado (issue 09).
+    # Vazio: todo domínio conhecido virou DomainType; manter vazio até novo survey.
 )
 
 

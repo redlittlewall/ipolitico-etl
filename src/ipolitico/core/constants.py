@@ -180,6 +180,10 @@ class DomainType(str, Enum):
     SENADORES_MANDATOS = "senadores_mandatos"
     SENADORES_FILIACOES = "senadores_filiacoes"
     ORIENTACAO_BANCADA = "orientacao_bancada"
+    # ── Senado — API administrativa (adm-dadosabertos, issues 07-09) ──────────
+    SERVIDORES = "servidores"
+    REMUNERACOES = "remuneracoes"
+    DESPESAS_CEAPS = "despesas_ceaps"
 
 
 class MedallionLayer(str, Enum):
@@ -252,6 +256,9 @@ class EarliestDates:
     SENADORES_MANDATOS = "1949-01-01"
     SENADORES_FILIACOES = "1949-01-01"
     ORIENTACAO_BANCADA = "1991-01-01"
+    # SERVIDORES (issue 07): snapshot do roster — disponibilidade = existência
+    # do órgão (mesma convenção de FUNCIONARIOS na Câmara), não série temporal.
+    SERVIDORES = "1826-04-29"
 
 
 # Facilita o acesso dinâmico: EarliestDateMap[DomainType.DESPESAS]
@@ -363,6 +370,10 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.SENADORES_MANDATOS: EarliestDates.SENADORES_MANDATOS,
     DomainType.SENADORES_FILIACOES: EarliestDates.SENADORES_FILIACOES,
     DomainType.ORIENTACAO_BANCADA: EarliestDates.ORIENTACAO_BANCADA,
+    # ── Senado — API administrativa (adm-dadosabertos) ───────────────────────
+    DomainType.SERVIDORES: EarliestDates.SERVIDORES,
+    DomainType.REMUNERACOES: EarliestDates.REMUNERACOES,
+    DomainType.DESPESAS_CEAPS: EarliestDates.DESPESAS_CEAPS,
 }
 
 
@@ -374,6 +385,16 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
 # passa a consumir esta entrada automaticamente.
 COVERAGE_GAPS: Dict[str, tuple[str, ...]] = {
     "folha_pagamento": ("2011, 2015 e 2022 não publicados (HTTP 404) — ausência, não erro",),
+    # Regra dupla de cobertura da remuneração do Senado (issue 08): 404 = mês
+    # anterior ao início da série (pré-2013, ausência PERMANENTE); 200 com lista
+    # vazia = mês corrente ainda não publicado (ausência TEMPORÁRIA, não 404).
+    "remuneracoes": (
+        "404 para 2012 e anteriores (início da série 2013-01) — ausência permanente; "
+        "mês corrente não publicado = HTTP 200 com lista vazia (ausência temporária)",
+    ),
+    # Início da série 2008: anos anteriores (2007/2006/2005) respondem 404 —
+    # ausência permanente, não erro (issue 09).
+    "despesas_ceaps": ("404 para 2007 e anteriores (início da série 2008) — ausência permanente",),
 }
 
 
@@ -490,6 +511,7 @@ DOMAIN_SOURCE_SYSTEM: Dict[str, SourceSystem] = {
     "senadores_mandatos": SourceSystem.SENADO,
     "senadores_filiacoes": SourceSystem.SENADO,
     "orientacao_bancada": SourceSystem.SENADO,
+    "servidores": SourceSystem.SENADO,
     # ── Domínios documentados no registry, ainda sem DomainType ─────────────
     "folha_pagamento": SourceSystem.CAMARA,
     "remuneracoes": SourceSystem.SENADO,
@@ -610,4 +632,8 @@ DOMAIN_LABELS: dict[DomainType, str] = {
     DomainType.SENADORES_MANDATOS: "Histórico de mandatos dos senadores",
     DomainType.SENADORES_FILIACOES: "Histórico de filiações partidárias dos senadores",
     DomainType.ORIENTACAO_BANCADA: "Orientação de bancada nas votações do Senado",
+    # ── Senado — API administrativa (adm-dadosabertos) ───────────────────────
+    DomainType.SERVIDORES: "Servidores do Senado Federal (roster)",
+    DomainType.REMUNERACOES: "Remunerações individuais de servidores do Senado (mensal)",
+    DomainType.DESPESAS_CEAPS: "Despesas de cotas parlamentares (CEAP) do Senado (anual)",
 }

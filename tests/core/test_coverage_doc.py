@@ -11,7 +11,6 @@ from ipolitico.core.constants import (
     DOMAIN_SOURCE_SYSTEM,
     EARLIEST_DATE_MAP,
     DomainType,
-    EarliestDates,
     SourceSystem,
 )
 from ipolitico.core.coverage_doc import (
@@ -178,7 +177,8 @@ class TestBuildCoverageEntries:
         implemented_names = {e.domain for e in entries if e.implemented}
         assert set(DomainType) == {DomainType(n) for n in implemented_names}
         planned_names = {e.domain for e in entries if not e.implemented}
-        assert planned_names == {"remuneracoes", "despesas_ceaps"}
+        # despesas_ceaps virou DomainType implementado (issue 09) — nada planeja.
+        assert planned_names == set()
 
     def test_usa_data_real_de_inicio(self):
         by_name = {e.domain: e for e in build_coverage_entries()}
@@ -196,14 +196,6 @@ class TestBuildCoverageEntries:
         by_name = {e.domain: e for e in build_coverage_entries()}
         assert by_name["despesas"].implemented is True
         assert by_name["folha_pagamento"].implemented is True
-
-    def test_documentados_leem_sistema_e_data_do_registry(self):
-        """Planejados não copiam valores: sistema/data vêm das fontes únicas."""
-        by_name = {e.domain: e for e in build_coverage_entries()}
-        for name in ("remuneracoes", "despesas_ceaps"):
-            entry = by_name[name]
-            assert entry.source_system == DOMAIN_SOURCE_SYSTEM[name]
-            assert entry.earliest_iso == getattr(EarliestDates, name.upper())
 
     def test_entradas_em_ordem_canonica_da_pipeline(self):
         from ipolitico.pipeline.domain_order import FULL_PIPELINE

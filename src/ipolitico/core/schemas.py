@@ -1232,4 +1232,79 @@ SILVER_SCHEMAS = {
         "orientacao": pl.String,
         "data_sessao": pl.String,
     },
+    # ── Senado — API administrativa (adm-dadosabertos, issue 07) ──────────────
+    # Roster: 12 campos JSON com aninhamentos achatados no mesmo conjunto do
+    # subpath CSV (16 cols). ``sequencial``/``nome`` preservados — join
+    # roster↔remuneração por nome é downstream, não responsabilidade do ETL.
+    DomainType.SERVIDORES.value: {
+        "_source_url": pl.String,
+        "sequencial": pl.Int64,
+        "nome": pl.String,
+        "vinculo": pl.String,
+        "situacao": pl.String,
+        "ano_admissao": pl.Int64,
+        "padrao": pl.String,
+        "especialidade": pl.String,
+        "cargo": pl.String,
+        "funcao": pl.String,
+        "lotacao_sigla": pl.String,
+        "lotacao_nome": pl.String,
+        "categoria_codigo": pl.String,
+        "categoria_nome": pl.String,
+        "tipo_cessao": pl.String,
+        "orgao_origem": pl.String,
+        "orgao_destino": pl.String,
+    },
+    # ── Senado — API administrativa (adm-dadosabertos, issue 08) ──────────────
+    # Folha mensal: 20 campos top-level (sem envelope nem aninhamento). Os 15
+    # campos monetários vêm como string BR (``"1.234,56"``, ``"-9.463,65"``) e
+    # são convertidos para Float64 pelo transformer via br_locale.
+    # ``sequencial``/``nome`` preservados — join roster↔remuneração por nome é
+    # downstream. ``tipo_folha`` (``Normal`` + ``Suplementar``) é dado real.
+    DomainType.REMUNERACOES.value: {
+        "_source_url": pl.String,
+        "sequencial": pl.Int64,
+        "nome": pl.String,
+        "mes": pl.Int64,
+        "ano": pl.Int64,
+        "tipo_folha": pl.String,
+        "remuneracao_basica": pl.Float64,
+        "vantagens_pessoais": pl.Float64,
+        "funcao_comissionada": pl.Float64,
+        "gratificacao_natalina": pl.Float64,
+        "horas_extras": pl.Float64,
+        "outras_eventuais": pl.Float64,
+        "abono_permanencia": pl.Float64,
+        "reversao_teto_constitucional": pl.Float64,
+        "imposto_renda": pl.Float64,
+        "previdencia": pl.Float64,
+        "faltas": pl.Float64,
+        "remuneracao_liquida": pl.Float64,
+        "diarias": pl.Float64,
+        "auxilios": pl.Float64,
+        "vantagens_indenizatorias": pl.Float64,
+    },
+    # ── DESPESAS_CEAPS (Senado adm-dadosabertos, issue 09) ────────────────────
+    # Bulk anual (path ``{ano}``), payload com ``mes`` → granularidade efetiva
+    # mês. 14 colunas (_source_url + 13 campos). ``valorReembolsado`` vem como
+    # número (API real) ou string BR (survey) e vira Float64 via br_locale —
+    # número passa direto, string converte. ``data`` é ISO string preservada
+    # (pode ser nula em anos antigos, ex: 2008); ``codSenador``/``nomeSenador``
+    # preservados — join com o roster é downstream.
+    DomainType.DESPESAS_CEAPS.value: {
+        "_source_url": pl.String,
+        "id": pl.Int64,
+        "tipoDocumento": pl.String,
+        "ano": pl.Int64,
+        "mes": pl.Int64,
+        "codSenador": pl.Int64,
+        "nomeSenador": pl.String,
+        "tipoDespesa": pl.String,
+        "cpfCnpj": pl.String,
+        "fornecedor": pl.String,
+        "documento": pl.String,
+        "data": pl.String,
+        "detalhamento": pl.String,
+        "valorReembolsado": pl.Float64,
+    },
 }
