@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import patch
 from urllib.error import HTTPError
 
@@ -153,6 +154,41 @@ async def test_camara_client_close_method():
     """
     client = CamaraClient()
     await client.close()
+
+
+@pytest.mark.asyncio
+@patch("ipolitico.core.camara_client.asyncio.sleep")
+async def test_camara_client_network_error_recovered_logs_debug(mock_sleep, caplog):
+    """
+    Erro de rede transitório que se recupera nas retentativas é DEBUG, não ERROR.
+
+    Eram ~158 linhas de ERROR por tentativa-que-recobra no run, poluindo o log
+    sem falha real (a falha final já é surfada pelo runner com "Erro fatal").
+    A mensagem inclui o tipo da exceção (ex: ConnectError) para diagnóstico —
+    no run, a maioria aparecia com a mensagem vazia, impossibilitando saber
+    que tipo de falha era.
+    """
+    caplog.set_level(logging.DEBUG, logger="ipolitico.core.camara_client")
+    client = CamaraClient(max_retries=3)
+
+    with respx.mock:
+        route = respx.get("https://dadosabertos.camara.leg.br/api/v2/deputados")
+        route.side_effect = [
+            httpx.ConnectError("O servidor do governo sumiu do mapa"),
+            httpx.Response(200, json={"dados": [{"id": 1}], "links": []}),
+        ]
+
+        resultado = await client.fetch("deputados")
+
+    assert len(resultado) == 1
+    assert route.call_count == 2
+
+    network_debug = [
+        r for r in caplog.records if r.levelname == "DEBUG" and "Erro de rede" in r.getMessage()
+    ]
+    assert len(network_debug) == 1
+    assert "ConnectError" in network_debug[0].getMessage()
+    assert not any(r.levelname == "ERROR" for r in caplog.records)
 
 
 @pytest.mark.asyncio

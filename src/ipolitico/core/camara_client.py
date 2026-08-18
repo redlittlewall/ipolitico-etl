@@ -180,8 +180,13 @@ class CamaraClient:
                         return payload
 
                     except httpx.RequestError as e:
-                        logger.error(
-                            f"Erro de rede ao conectar com a infraestrutura governamental: {e}"
+                        # Erro transitório que se recupera nas retentativas:
+                        # DEBUG (com o tipo da exceção para diagnóstico), não ERROR.
+                        # A falha final já é logada pelo runner ("Erro fatal"). Sem
+                        # isso, cada tentativa-que-recobra poluía o log com ERROR.
+                        logger.debug(
+                            f"Erro de rede ({type(e).__name__}) ao conectar "
+                            f"com a infraestrutura governamental: {e}"
                         )
                         await self._backoff(attempt)
 
