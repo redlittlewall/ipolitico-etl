@@ -77,7 +77,23 @@ class DataLakeOptimizer:
         table_name: str,
         source_layer: str = MedallionLayer.SILVER,
         target_layer: str = MedallionLayer.GOLD,
-    ):
+        pk_cols: str | None = None,
+    ) -> None:
+        """Consolida e deduplica uma tabela Parquet entre camadas (out-of-core).
+
+        Args:
+            table_name: Nome da tabela/entidade (diretório da camada origem).
+            source_layer: Camada de leitura (``silver``, ``bronze`` ou ``gold``).
+            target_layer: Camada de escrita do arquivo deduplicado.
+            pk_cols: Cláusula ``PARTITION BY`` explícita (ex.: ``"politico_id"``
+                ou ``"fonte, id_natural"``). Quando fornecida, ignora a introspecção
+                de chave. Quando ``None``, resolve por introspecção
+                (``_resolve_pk_cols`` / caso especial ``despesas``).
+
+        Returns:
+            None. Escreve ``{target_layer}/{table_name}/{table_name}.parquet``
+            deduplicado, ou loga aviso sem criar nada se a origem estiver vazia.
+        """
         source_dir = self.base_dir / source_layer / table_name
         if not source_dir.exists() or not list(source_dir.glob("*.parquet")):
             logger.warning(
@@ -96,10 +112,12 @@ class DataLakeOptimizer:
         logger.info(f"[{table_name.upper()}] Iniciando compactação e deduplicação Out-of-Core...")
 
         try:
-            if table_name == "despesas":
-                pk_cols = despesas_optimizer_partition_sql()
+            if pk_cols is not None:
+                partition_cols = pk_cols
+            elif table_name == "despesas":
+                partition_cols = despesas_optimizer_partition_sql()
             else:
-                pk_cols = self._resolve_pk_cols(source_path)
+                partition_cols = self._resolve_pk_cols(source_path)
 
             query = f"""
             COPY (
@@ -107,7 +125,7 @@ class DataLakeOptimizer:
                     SELECT
                         *,
                         ROW_NUMBER() OVER (
-                            PARTITION BY {pk_cols}
+                            PARTITION BY {partition_cols}
                             ORDER BY captured_at DESC
                         ) as rn
                     FROM read_parquet('{source_path}')
