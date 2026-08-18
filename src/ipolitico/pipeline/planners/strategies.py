@@ -854,6 +854,18 @@ class ParentBatchedStrategy(DomainJobStrategy):
 class DetailStrategy(DomainJobStrategy):
     """Estratégia para domínios de detalhe (*_detalhe), com batch entity_ids."""
 
+    # Coluna do pai na tabela filha (Silver/Gold) usada no filtro de
+    # materialização. Câmara grava ``id``; Senado grava ``codigo`` — e
+    # ``comissoes_membros`` grava ``codigo_comissao``. Sem o mapeamento
+    # correto, o dedup de filhos quebrava (com ``id``/``codigo`` ausentes,
+    # todas as entidades eram re-buscadas a cada run).
+    _CHILD_PARENT_COL: dict[str, str] = {
+        DomainType.SENADORES_DETALHE.value: "codigo",
+        DomainType.VETOS_DETALHE.value: "codigo",
+        DomainType.COMISSOES_DETALHE.value: "codigo",
+        DomainType.COMISSOES_MEMBROS.value: "codigo_comissao",
+    }
+
     def build(
         self,
         domain: DomainType,
@@ -879,7 +891,8 @@ class DetailStrategy(DomainJobStrategy):
             return [], lambda x: {}
 
         if lake is not None:
-            covered = lake.list_entity_ids_with_child_materialized(domain_val, "id")
+            parent_col = self._CHILD_PARENT_COL.get(domain_val, "id")
+            covered = lake.list_entity_ids_with_child_materialized(domain_val, parent_col)
             entity_ids = filter_entity_ids_pending_child(
                 entity_ids, covered, domain_val, "entidades"
             )
