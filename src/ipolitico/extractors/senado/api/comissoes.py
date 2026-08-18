@@ -100,7 +100,7 @@ class SenadoComissoesDetalheExtractor(SenadoBaseExtractor):
         if not ids:
             return pl.DataFrame()
 
-        all_dfs: list[pl.DataFrame] = []
+        batches: list[tuple[str, list[dict[str, Any]], dict[str, Any] | None]] = []
         for codigo in ids:
             raw = await self.fetch_flat(f"comissao/{codigo}")
             records = self.flatten_response(
@@ -109,14 +109,12 @@ class SenadoComissoesDetalheExtractor(SenadoBaseExtractor):
             if not records:
                 continue
             _serialize_structs(records)
-            df = pl.DataFrame(records, infer_schema_length=None)
-            df = self._inject_source_url(df, f"comissao/{codigo}")
-            all_dfs.append(df)
+            batches.append((f"comissao/{codigo}", records, None))
 
-        if not all_dfs:
-            return pl.DataFrame()
-
-        return pl.concat(all_dfs)
+        # DataFrame único com todas as comissões do lote: comissões com campos
+        # diferentes são unificadas (o concat por-comissão falhava com
+        # SchemaError de largura).
+        return self._build_batch_dataframe(batches)
 
 
 class SenadoComissoesReunioesExtractor(SenadoBaseExtractor):
@@ -213,7 +211,7 @@ class SenadoComissoesMembrosExtractor(SenadoBaseExtractor):
         if not ids:
             return pl.DataFrame()
 
-        all_dfs: list[pl.DataFrame] = []
+        batches: list[tuple[str, list[dict[str, Any]], dict[str, Any] | None]] = []
         for codigo in ids:
             endpoint = f"composicao/comissao/{codigo}"
             raw = await self.fetch_flat(endpoint, params={"ativas": "S"})
@@ -238,11 +236,9 @@ class SenadoComissoesMembrosExtractor(SenadoBaseExtractor):
                 m["SiglaComissao"] = identificacao.get("SiglaComissao")
                 m["NomeComissao"] = identificacao.get("NomeComissao")
 
-            df = pl.DataFrame(membros, infer_schema_length=None)
-            df = self._inject_source_url(df, endpoint, params={"ativas": "S"})
-            all_dfs.append(df)
+            batches.append((endpoint, membros, {"ativas": "S"}))
 
-        if not all_dfs:
-            return pl.DataFrame()
-
-        return pl.concat(all_dfs)
+        # DataFrame único com os membros de todas as comissões do lote: membros
+        # com campos diferentes são unificados (o concat por-comissão falhava
+        # com SchemaError de largura).
+        return self._build_batch_dataframe(batches)
