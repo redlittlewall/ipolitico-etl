@@ -181,6 +181,44 @@ async def test_detalhe_extract_404_skipped():
         assert df.height == 1
 
 
+@pytest.mark.asyncio
+async def test_detalhe_heterogeneous_schema_unifies():
+    """
+    Processos com campos diferentes (schemas heterogêneos) são unificados em
+    um único DataFrame. O concat por-entidade falhava com SchemaError de
+    largura ("unable to append to a DataFrame of width 3 with a DataFrame of
+    width 4"); o DataFrame único preenche com null os campos ausentes.
+    """
+    from ipolitico.extractors.senado.api.processos import SenadoProcessosDetalheExtractor
+
+    client = SenadoClient()
+    extractor = SenadoProcessosDetalheExtractor(client)
+
+    processo_a = {"id": 1, "identificacao": "PL 1", "situacaoAtual": "TRAMITANDO"}
+    processo_b = {
+        "id": 2,
+        "identificacao": "PL 2",
+        "autoria": "Senado Federal",
+        "conteudo": {"ementa": "Texto B"},
+    }
+
+    with respx.mock:
+        respx.get("https://legis.senado.leg.br/dadosabertos/processo/1.json").respond(
+            status_code=200, json=processo_a
+        )
+        respx.get("https://legis.senado.leg.br/dadosabertos/processo/2.json").respond(
+            status_code=200, json=processo_b
+        )
+
+        df = await extractor.extract(entity_ids=[1, 2])
+
+        assert df.height == 2
+        assert "autoria" in df.columns
+        assert df["autoria"].to_list()[0] is None
+        assert df["autoria"].to_list()[1] == "Senado Federal"
+        assert df["conteudo"].to_list()[0] is None
+
+
 # ── PROCESSOS_EMENDAS ─────────────────────────────────────────────────────────
 @pytest.mark.asyncio
 async def test_emendas_extract_returns_dataframe():

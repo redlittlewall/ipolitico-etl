@@ -275,6 +275,34 @@ class TestDiscursosTextoExtractor:
 
             assert df.is_empty()
 
+    @pytest.mark.asyncio
+    async def test_extract_heterogeneous_schema_unifies(self):
+        """
+        Discursos com campos diferentes (ex: um com ``Fase``, outro com
+        ``Publicacao`` aninhada) são unificados em um único DataFrame.
+        O concat por-discurso falhava com SchemaError.
+        """
+        client = SenadoClient()
+        extractor = DiscursosTextoExtractor(client)
+
+        discurso_a = {"Codigo": 1, "Texto": "Discurso A", "Fase": "Ordem do Dia"}
+        discurso_b = {"Codigo": 2, "Texto": "Discurso B", "Publicacao": {"data": "2025-01-01"}}
+
+        with respx.mock:
+            respx.get(
+                "https://legis.senado.leg.br/dadosabertos/discurso/texto-integral/1.json"
+            ).respond(status_code=200, json=discurso_a)
+            respx.get(
+                "https://legis.senado.leg.br/dadosabertos/discurso/texto-integral/2.json"
+            ).respond(status_code=200, json=discurso_b)
+
+            df = await extractor.extract(entity_ids=[1, 2])
+
+            assert df.height == 2
+            assert "Publicacao" in df.columns
+            assert df["Publicacao"].to_list()[0] is None
+            assert df["Fase"].to_list()[1] is None
+
 
 # ── NotasTaquigrafiaSessaoExtractor ───────────────────────────────────────────
 
@@ -325,6 +353,33 @@ class TestNotasTaquigrafiaSessaoExtractor:
 
             assert df.is_empty()
 
+    @pytest.mark.asyncio
+    async def test_extract_heterogeneous_schema_unifies(self):
+        """
+        Sessões com campos diferentes são unificadas em um único DataFrame.
+        O concat por-sessão falhava com SchemaError.
+        """
+        client = SenadoClient()
+        extractor = NotasTaquigrafiaSessaoExtractor(client)
+
+        sessao_a = {"IdSessao": 1, "Texto": "Notas A", "OrdemDia": {"item": "1"}}
+        sessao_b = {"IdSessao": 2, "Texto": "Notas B", "Local": "Plenário"}
+
+        with respx.mock:
+            respx.get(
+                "https://legis.senado.leg.br/dadosabertos/taquigrafia/notas/sessao/1.json"
+            ).respond(status_code=200, json=sessao_a)
+            respx.get(
+                "https://legis.senado.leg.br/dadosabertos/taquigrafia/notas/sessao/2.json"
+            ).respond(status_code=200, json=sessao_b)
+
+            df = await extractor.extract(entity_ids=[1, 2])
+
+            assert df.height == 2
+            assert "Local" in df.columns
+            assert df["Local"].to_list()[0] is None
+            assert df["OrdemDia"].to_list()[1] is None
+
 
 # ── NotasTaquigrafiaReuniaoExtractor ──────────────────────────────────────────
 
@@ -374,3 +429,30 @@ class TestNotasTaquigrafiaReuniaoExtractor:
             df = await extractor.extract(entity_ids=[99999])
 
             assert df.is_empty()
+
+    @pytest.mark.asyncio
+    async def test_extract_heterogeneous_schema_unifies(self):
+        """
+        Reuniões com campos diferentes são unificadas em um único DataFrame.
+        O concat por-reunião falhava com SchemaError.
+        """
+        client = SenadoClient()
+        extractor = NotasTaquigrafiaReuniaoExtractor(client)
+
+        reuniao_a = {"IdReuniao": 1, "Texto": "Notas A", "Comissao": {"sigla": "CAE"}}
+        reuniao_b = {"IdReuniao": 2, "Texto": "Notas B", "Situacao": "Realizada"}
+
+        with respx.mock:
+            respx.get(
+                "https://legis.senado.leg.br/dadosabertos/taquigrafia/notas/reuniao/1.json"
+            ).respond(status_code=200, json=reuniao_a)
+            respx.get(
+                "https://legis.senado.leg.br/dadosabertos/taquigrafia/notas/reuniao/2.json"
+            ).respond(status_code=200, json=reuniao_b)
+
+            df = await extractor.extract(entity_ids=[1, 2])
+
+            assert df.height == 2
+            assert "Situacao" in df.columns
+            assert df["Situacao"].to_list()[0] is None
+            assert df["Comissao"].to_list()[1] is None

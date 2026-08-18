@@ -10,7 +10,13 @@ import logging
 from typing import Any
 
 import httpx
-from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
+from tenacity import (
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+    wait_random,
+)
 
 from ipolitico.core.config import SENADO_API_BASE_URL, SENADO_HTTP_CONCURRENCY
 
@@ -34,6 +40,31 @@ def _is_transient_error(exception: BaseException) -> bool:
     if isinstance(exception, SenadoAPIError):
         return True
     return False
+
+
+def _log_final_failure(retry_state: Any) -> Any:
+    """
+    Registra 1 WARNING na exaustão final do retry e re-lança a exceção.
+
+    As tentativas intermediárias são DEBUG (ruído); apenas a falha definitiva
+    vira WARNING, informando a URL e o total de tentativas.
+
+    Args:
+        retry_state: Estado da retentativa (tenacity ``RetryCallState``).
+
+    Returns:
+        Não retorna — re-lança a exceção da última tentativa.
+    """
+    exception = retry_state.outcome.exception()
+    # Método decorado: args = (self, url, params) — a URL é o 2º argumento.
+    url = retry_state.args[1] if len(retry_state.args) > 1 else "?"
+    logger.warning(
+        "Falha definitiva ao acessar %s após %d tentativas: %s",
+        url,
+        retry_state.attempt_number,
+        exception,
+    )
+    raise exception
 
 
 class SenadoClient:
@@ -106,9 +137,9 @@ class SenadoClient:
 
     @retry(
         stop=stop_after_attempt(5),
-        wait=wait_exponential(multiplier=1, min=2, max=30),
+        wait=wait_exponential(multiplier=1, min=2, max=30) + wait_random(0, 1),
         retry=retry_if_exception(_is_transient_error),
-        reraise=True,
+        retry_error_callback=_log_final_failure,
     )
     async def _fetch_with_retry(self, url: str, params: dict[str, Any] | None) -> Any:
         """Método interno que carrega o decorator @retry (separado do fetch público)."""
@@ -130,9 +161,11 @@ class SenadoClient:
                 if response.status_code == 200:
                     return response.json()
 
-                # 429/5xx: raise SenadoAPIError para o @retry tentar novamente
+                # 429/5xx: raise SenadoAPIError para o @retry tentar novamente.
+                # Nível DEBUG por tentativa — a exaustão final é 1 WARNING
+                # via _log_final_failure (ruído dominava o log do ETL).
                 if response.status_code in (429, 500, 502, 503, 504):
-                    logger.warning(
+                    logger.debug(
                         "Erro transitório (%d) em %s. Retry via tenacity.",
                         response.status_code,
                         url,

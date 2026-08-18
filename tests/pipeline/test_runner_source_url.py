@@ -174,3 +174,32 @@ async def test_runner_fills_empty_source_url_via_template():
     df = _captured_silver_df(components.sink)
     expected = SOURCE_URL_TEMPLATES[DomainType.DEPUTADOS].format(base=_CAMARA_BASE, id=1)
     assert df["_source_url"].to_list() == [expected, "https://exemplo/ja/preenchida"]
+
+
+@pytest.mark.asyncio
+async def test_runner_fails_fast_on_schema_error():
+    """
+    SchemaError é um erro determinístico de shape dos dados — retentar 5× não
+    muda o resultado e só queima chamadas à API (e provoca 429). O runner deve
+    falhar rápido, chamando o extrator uma única vez.
+    """
+    extractor = MagicMock()
+    extractor.extract = AsyncMock(side_effect=pl.exceptions.SchemaError("schema diff"))
+
+    transformer = MagicMock()
+    sink = MagicMock()
+    sink.save = AsyncMock()
+    sink.flush = AsyncMock()
+
+    components = PipelineComponents(extractor=extractor, transformer=transformer, sink=sink)
+    runner = PipelineRunner(max_workers=1)
+
+    await runner.execute(
+        components=components,
+        items=[1],
+        extract_kwargs_mapper=lambda item: {},
+        table_name=DomainType.PROCESSOS_DETALHE.value,
+        layer=MedallionLayer.SILVER,
+    )
+
+    assert extractor.extract.await_count == 1

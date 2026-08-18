@@ -2,6 +2,8 @@ import asyncio
 import logging
 from typing import Any, Callable, Dict, List, Optional, Union
 
+import polars as pl
+
 from ipolitico.core.config import MAX_CONCURRENT_REQUESTS
 from ipolitico.core.constants import DomainType, MedallionLayer
 from ipolitico.core.source_urls import finalize_source_url
@@ -100,6 +102,17 @@ class PipelineRunner:
                         except ValueError:
                             pass  # domínio desconhecido — segue sem _source_url
                         return clean_df
+                    return None
+                except pl.exceptions.SchemaError as e:
+                    # Erro determinístico de shape dos dados (ex: structs com
+                    # campos diferentes entre entidades): retentar 5× não muda
+                    # o resultado e só queima chamadas à API (e provoca 429).
+                    logger.error(
+                        "[%s] Erro fatal de schema em %s (sem retry): %s",
+                        table_name,
+                        extract_args,
+                        e,
+                    )
                     return None
                 except Exception as e:
                     if attempt < 4:

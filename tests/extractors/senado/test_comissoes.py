@@ -132,6 +132,56 @@ class TestSenadoComissoesDetalheExtractor:
             df = await extractor.extract(codigo_comissao=999)
             assert df.is_empty()
 
+    @pytest.mark.asyncio
+    async def test_extract_heterogeneous_schema_unifies(self, extractor):
+        """
+        Comissões com campos diferentes (ex: uma com ``Cargos``, outra com
+        ``Composicao``) são unificadas em um único DataFrame. O concat
+        por-comissão falhava com SchemaError; o DataFrame único preenche com
+        null os campos ausentes.
+        """
+        comissao_a = {
+            "ComissoesCongressoNacional": {
+                "Colegiados": {
+                    "Colegiado": [
+                        {
+                            "CodigoColegiado": "38",
+                            "NomeColegiado": "CAE",
+                            "Cargos": {"Cargo": [{"TipoCargo": "PRESIDENTE"}]},
+                        }
+                    ]
+                }
+            }
+        }
+        comissao_b = {
+            "ComissoesCongressoNacional": {
+                "Colegiados": {
+                    "Colegiado": [
+                        {
+                            "CodigoColegiado": "1",
+                            "NomeColegiado": "CCJ",
+                            "Composicao": [{"Cargo": "Membro"}],
+                        }
+                    ]
+                }
+            }
+        }
+
+        with respx.mock:
+            respx.get("https://legis.senado.leg.br/dadosabertos/comissao/38.json").respond(
+                status_code=200, json=comissao_a
+            )
+            respx.get("https://legis.senado.leg.br/dadosabertos/comissao/1.json").respond(
+                status_code=200, json=comissao_b
+            )
+
+            df = await extractor.extract(entity_ids=[38, 1])
+
+            assert df.height == 2
+            assert "Composicao" in df.columns
+            assert df["Composicao"].to_list()[0] is None
+            assert df["Cargos"].to_list()[1] is None
+
 
 class TestSenadoComissoesReunioesExtractor:
     """Extrator de agenda de reuniões — /comissao/agenda/{inicio}/{fim}."""
@@ -305,3 +355,46 @@ class TestSenadoComissoesMembrosExtractor:
 
             df = await extractor.extract(codigo_comissao=999)
             assert df.is_empty()
+
+    @pytest.mark.asyncio
+    async def test_extract_membros_heterogeneous_schema_unifies(self, extractor):
+        """
+        Membros de comissões diferentes com campos distintos são unificados
+        em um único DataFrame (ex: um com ``TipoVaga``, outro com
+        ``DataFimMembroVaga``). O concat por-comissão falhava com SchemaError.
+        """
+        def _composicao(codigo: str, membros: list[dict]) -> dict:
+            return {
+                "ComposicaoAtivaComissaoSf": {
+                    "ComposicaoComissao": {
+                        "IdentificacaoComissao": [
+                            {
+                                "CodigoComissao": codigo,
+                                "SiglaComissao": f"S{codigo}",
+                                "NomeComissao": f"Comissão {codigo}",
+                            }
+                        ],
+                        "Membros": {"Membro": membros},
+                    }
+                }
+            }
+
+        membros_a = [{"NomeMembro": "Alan Rick", "CodigoMembro": "5672", "TipoVaga": "Titular"}]
+        membros_b = [{"NomeMembro": "Marcio Bittar", "CodigoMembro": "1000", "DataFimMembroVaga": "2027-01-01"}]
+
+        with respx.mock:
+            respx.get(
+                "https://legis.senado.leg.br/dadosabertos/composicao/comissao/38.json",
+                params={"ativas": "S"},
+            ).respond(status_code=200, json=_composicao("38", membros_a))
+            respx.get(
+                "https://legis.senado.leg.br/dadosabertos/composicao/comissao/1.json",
+                params={"ativas": "S"},
+            ).respond(status_code=200, json=_composicao("1", membros_b))
+
+            df = await extractor.extract(entity_ids=[38, 1])
+
+            assert df.height == 2
+            assert "DataFimMembroVaga" in df.columns
+            assert df["DataFimMembroVaga"].to_list()[0] is None
+            assert df["TipoVaga"].to_list()[1] is None

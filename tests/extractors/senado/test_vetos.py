@@ -251,3 +251,32 @@ class TestVetosDetalheExtractor:
             df = await extractor.extract(entity_ids=[17011, 999])
 
             assert df.height == 1
+
+    @pytest.mark.asyncio
+    async def test_extract_heterogeneous_schema_unifies(self):
+        """
+        Vetos com objetos aninhados diferentes (ex: um sem ``Mensagem``) são
+        unificados em um único DataFrame. O concat por-entidade falhava com
+        SchemaError de largura; o DataFrame único preenche com null os campos
+        de ``Mensagem_*`` ausentes.
+        """
+        client = SenadoClient()
+        extractor = VetosDetalheExtractor(client)
+
+        veto_com_mensagem = _make_detail_veto(codigo=17011, ano=2024)
+        veto_sem_mensagem = _make_detail_veto(codigo=17010, ano=2024)
+        veto_sem_mensagem.pop("Mensagem")
+
+        with respx.mock:
+            for codigo, payload in [(17011, veto_com_mensagem), (17010, veto_sem_mensagem)]:
+                respx.get(f"{self.API_BASE}/plenario/resultado/veto/{codigo}.json").respond(
+                    status_code=200,
+                    json={"ResultadoVetoItemCN": {"Metadados": {}, "Veto": payload}},
+                )
+
+            df = await extractor.extract(entity_ids=[17011, 17010])
+
+            assert df.height == 2
+            assert sorted(df["Codigo"].cast(pl.Int64).to_list()) == [17010, 17011]
+            assert "Mensagem_Sigla" in df.columns
+            assert df["Mensagem_Sigla"].to_list()[1] is None
