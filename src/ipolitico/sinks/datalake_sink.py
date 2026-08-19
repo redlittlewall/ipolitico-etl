@@ -11,6 +11,39 @@ import polars as pl
 logger = logging.getLogger(__name__)
 
 
+def inject_captured_at(df: pl.DataFrame) -> pl.DataFrame:
+    """Adiciona a coluna de auditoria ``captured_at`` (carimbo de escrita).
+
+    Compartilhado com a camada Gold (``gold._datalake``) para manter a mesma
+    convenção de auditoria em todas as camadas — nunca duplicar a lógica.
+
+    Args:
+        df: DataFrame de destino (qualquer schema).
+
+    Returns:
+        ``df`` com a coluna ``captured_at`` (ISO-8601 local) à direita.
+    """
+    return df.with_columns(pl.lit(datetime.now().isoformat()).alias("captured_at"))
+
+
+def lote_parquet_path(layer_dir: Path) -> Path:
+    """Gera o caminho de um lote append-only ``lote_{ts}_{uuid}.parquet``.
+
+    Cria ``layer_dir`` se necessário. Nome único por flush evita colisões de
+    concorrência e preserva a ordenação lexical por timestamp.
+
+    Args:
+        layer_dir: Diretório da tabela na camada (ex.: ``data/datalake/gold/foo``).
+
+    Returns:
+        Caminho completo do arquivo Parquet do lote.
+    """
+    layer_dir.mkdir(parents=True, exist_ok=True)
+    batch_id = uuid.uuid4().hex[:8]
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    return layer_dir / f"lote_{timestamp}_{batch_id}.parquet"
+
+
 class DataLakeSink:
     """
     Destino de dados orientado a Analytics (OLAP).
@@ -68,7 +101,7 @@ class DataLakeSink:
             return
 
         # Injeção de auditoria por chunk (antes do buffer)
-        df = df.with_columns(pl.lit(datetime.now().isoformat()).alias("captured_at"))
+        df = inject_captured_at(df)
 
         key = self._buffer_key(table_name, layer)
 
@@ -118,13 +151,7 @@ class DataLakeSink:
         Gera um caminho único de arquivo Parquet por flush.
         Evita colisões de concorrência assíncrona.
         """
-        layer_dir = self.base_dir / layer / table_name
-        layer_dir.mkdir(parents=True, exist_ok=True)
-
-        batch_id = uuid.uuid4().hex[:8]
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-
-        return layer_dir / f"lote_{timestamp}_{batch_id}.parquet"
+        return lote_parquet_path(self.base_dir / layer / table_name)
 
     def _write_parquet(self, df: pl.DataFrame, table_name: str, layer: str) -> None:
         """Escreve 1 arquivo Parquet consolidado a partir do buffer."""

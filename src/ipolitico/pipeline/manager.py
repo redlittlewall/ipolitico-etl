@@ -11,6 +11,7 @@ from ipolitico.core.constants import (
     SourceType,
 )
 from ipolitico.core.domain_spec import spec_for
+from ipolitico.core.exceptions import ResourceQuarantinedError
 from ipolitico.core.legislature import legislature_anchor_year_from_iso
 from ipolitico.pipeline.builder import PipelineBuilder
 from ipolitico.pipeline.planners.camara_jobs import JobPlanner
@@ -103,8 +104,20 @@ class PipelineManager:
                 )
                 return
 
-        current_leg = await self._metadata.get_current_legislature_id()
-        legis_start = await self._metadata.get_legislature_start_date(current_leg)
+        try:
+            current_leg = await self._metadata.get_current_legislature_id()
+            legis_start = await self._metadata.get_legislature_start_date(current_leg)
+        except ResourceQuarantinedError as e:
+            # Recurso de metadados (ex: /legislaturas) em quarentena: sem janela
+            # não há como resolver a extração. Falha o domínio com mensagem clara
+            # em vez de "Falha catastrófica no ETL" genérica (mesmo efeito de hoje
+            # para CamaraAPIError, porém identificável).
+            logger.error(
+                "[%s] Recurso de metadados em quarentena (%s). Abortando domínio.",
+                domain.value.upper(),
+                e,
+            )
+            raise
         anchor_year = legislature_anchor_year_from_iso(legis_start, datetime.now().year)
         logger.debug(
             "[%s] Legislatura atual=%s dataInicio=%s ano_ancora=%s",

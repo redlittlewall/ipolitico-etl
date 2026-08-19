@@ -10,8 +10,14 @@ from typing import Any
 
 import httpx
 
-from ipolitico.core.config import CAMARA_API_BASE_URL, CAMARA_HTTP_CONCURRENCY
-from ipolitico.core.constants import DomainType
+from ipolitico.core.config import (
+    CAMARA_API_BASE_URL,
+    CAMARA_HTTP_CONCURRENCY,
+    CAMARA_MAX_BACKOFF_S,
+    CAMARA_QUARANTINE_THRESHOLD,
+)
+from ipolitico.core.constants import ApiParams, DomainType
+from ipolitico.core.exceptions import ResourceQuarantinedError
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +46,30 @@ class CamaraClient:
     # ou quando o mesmo domínio roda múltiplas vezes.
     _warmed_urls: set[str] | None = None  # class-level sentinel
 
-    def __init__(self, max_retries: int = 10):
+    def __init__(
+        self,
+        max_retries: int = 10,
+        max_backoff_s: int | None = None,
+        quarantine_threshold: int | None = None,
+    ):
+        """
+        Inicializa o cliente com resiliência configurável.
+
+        Args:
+            max_retries: Nº máximo de tentativas por chamada HTTP.
+            max_backoff_s: Teto (em segundos) do backoff exponencial
+                ``2**attempt``. Se None, usa ``CAMARA_MAX_BACKOFF_S`` da config.
+            quarantine_threshold: Nº de falhas 5xx CONSECUTIVAS em um mesmo
+                recurso que o coloca em quarentena (pulado instantâneo). Se
+                None, usa ``CAMARA_QUARANTINE_THRESHOLD`` da config. Os
+                parâmetros explícitos permitem que testes fixem valores sem
+                depender de variáveis de ambiente.
+        """
         self.max_retries = max_retries
+        self.max_backoff_s = CAMARA_MAX_BACKOFF_S if max_backoff_s is None else max_backoff_s
+        self.quarantine_threshold = (
+            CAMARA_QUARANTINE_THRESHOLD if quarantine_threshold is None else quarantine_threshold
+        )
         self.headers = {
             "Accept": "application/json",
             "User-Agent": "iPolitico-ETL-OpenSource/1.0",
@@ -51,6 +79,11 @@ class CamaraClient:
         # Inicializa o cache de warmup como atributo de instância.
         # O sentinel class-level (None) nunca é usado diretamente.
         self._warmed_urls: set[str] = set()
+        # Estado da quarentena por recurso (path + params estáveis), em memória.
+        # Falhas CONSECUTIVAS por recurso; recurso entra em _quarantined ao
+        # atingir quarantine_threshold e passa a ser pulado sem chamada HTTP.
+        self._resource_failures: dict[str, int] = {}
+        self._quarantined: set[str] = set()
 
     def _init_telemetry(self):
         """Inicializa um banco SQLite super leve apenas para logs de requisições."""
@@ -134,8 +167,12 @@ class CamaraClient:
 
         Raises:
             CamaraAPIError: Se esgotar as tentativas de conexão ou receber erros de servidor.
+            ResourceQuarantinedError: Se o recurso acumular ``quarantine_threshold``
+                falhas 5xx consecutivas — e em toda chamada seguinte ao mesmo
+                recurso, que é pulado sem chamada HTTP até o fim da execução.
         """
         url = f"{self.BASE_URL}/{endpoint.lstrip('/')}"
+        resource_key = self._resource_key(endpoint, params)
 
         # Pré-resolve DNS para isolar falhas de resolução de nome
         from urllib.parse import urlparse
@@ -144,15 +181,51 @@ class CamaraClient:
         if hostname:
             await self._resolve_host_with_retries(hostname)
         async with self._semaphore:
+            # Re-checagem após adquirir o semáforo: o check pré-semáforo seria
+            # uma corrida TOCTOU benigna; aqui o estado já está serializado.
+            if resource_key in self._quarantined:
+                raise ResourceQuarantinedError(
+                    f"Recurso em quarentena (pulado sem chamada HTTP): {url}"
+                )
             async with httpx.AsyncClient(timeout=30.0, headers=self.headers) as client:
                 for attempt in range(1, self.max_retries + 1):
                     try:
                         response = await client.get(url, params=params)
 
-                        # Defesa contra Throttling (Erros Transientes)
-                        if response.status_code in (429, 500, 502, 503, 504):
+                        # Erros de Servidor (500/502/503/504): incrementa o
+                        # contador de falhas CONSECUTIVAS do recurso. Ao atingir
+                        # o threshold, o recurso entra em quarentena e passa a
+                        # ser pulado instantâneo — é a "maçã podre" que não cede
+                        # com backoff (ex: /deputados/{id}/discursos persistente).
+                        if response.status_code in (500, 502, 503, 504):
+                            self._resource_failures[resource_key] = (
+                                self._resource_failures.get(resource_key, 0) + 1
+                            )
+                            if self._resource_failures[resource_key] >= self.quarantine_threshold:
+                                self._quarantined.add(resource_key)
+                                logger.warning(
+                                    f"[QUARENTENA] Recurso em quarentena após "
+                                    f"{self.quarantine_threshold} falhas 5xx "
+                                    f"consecutivas: {url}"
+                                )
+                                raise ResourceQuarantinedError(
+                                    f"Recurso em quarentena após "
+                                    f"{self.quarantine_threshold} falhas 5xx "
+                                    f"consecutivas: {url}"
+                                )
                             logger.warning(
-                                f"Throttling detectado ({response.status_code}) em {url}. "
+                                f"Erro de servidor ({response.status_code}) em {url}. "
+                                f"Tentativa {attempt}/{self.max_retries}."
+                            )
+                            await self._backoff(attempt)
+                            continue
+
+                        # Defesa contra Throttling (HTTP 429). NÃO entra em
+                        # quarentena: é sinal global de rate-limit que cede com
+                        # backoff — e o teto de backoff já limita o custo.
+                        if response.status_code == 429:
+                            logger.warning(
+                                f"Throttling detectado (429) em {url}. "
                                 f"Tentativa {attempt}/{self.max_retries}."
                             )
                             await self._backoff(attempt)
@@ -164,6 +237,7 @@ class CamaraClient:
                         # (ex: /partidos/{id}/lideres para partidos extintos,
                         # /deputados/{id}/discursos para deputados históricos).
                         if response.status_code in (400, 404):
+                            self._reset_resource(resource_key)
                             logger.debug(
                                 f"Recurso inexistente ({response.status_code}) em {url}. "
                                 "Assumindo lista vazia."
@@ -173,6 +247,9 @@ class CamaraClient:
                         response.raise_for_status()
                         payload = response.json()
 
+                        # Sucesso: zera o contador de falhas do recurso.
+                        self._reset_resource(resource_key)
+
                         # Isola os dados úteis da casca de metadados da Câmara
                         if "dados" in payload:
                             return payload["dados"]
@@ -180,8 +257,13 @@ class CamaraClient:
                         return payload
 
                     except httpx.RequestError as e:
-                        logger.error(
-                            f"Erro de rede ao conectar com a infraestrutura governamental: {e}"
+                        # Erro transitório que se recupera nas retentativas:
+                        # DEBUG (com o tipo da exceção para diagnóstico), não ERROR.
+                        # A falha final já é logada pelo runner ("Erro fatal"). Sem
+                        # isso, cada tentativa-que-recobra poluía o log com ERROR.
+                        logger.debug(
+                            f"Erro de rede ({type(e).__name__}) ao conectar "
+                            f"com a infraestrutura governamental: {e}"
                         )
                         await self._backoff(attempt)
 
@@ -190,6 +272,53 @@ class CamaraClient:
                     f"Falha catastrófica ao acessar {url} após "
                     f"{self.max_retries} tentativas com backoff."
                 )
+
+    def _resource_key(self, endpoint: str, params: dict[str, Any] | None) -> str:
+        """
+        Chave de quarentena de um recurso: path + parâmetros estáveis.
+
+        Parâmetros de paginação/ordenação (``pagina``, ``itens``, ``ordem``,
+        ``ordenarPor``) ficam de fora: páginas da MESMA janela compartilham o
+        contador de falhas. Parâmetros de filtro (ex: ``ano``, ``mes``,
+        ``dataInicio``, ``dataFim``) participam, isolando um recurso podre sem
+        quarentenar o domínio inteiro.
+
+        Args:
+            endpoint: Caminho da API (nunca traz query string).
+            params: Parâmetros da query string (pode ser None).
+
+        Returns:
+            str: Chave estável do recurso, serializada de forma determinística.
+        """
+        if not params:
+            return endpoint
+        excluded = {
+            ApiParams.PAGINA.value,
+            ApiParams.ITENS.value,
+            ApiParams.ORDEM.value,
+            ApiParams.ORDENAR_POR.value,
+        }
+        stable = {k: v for k, v in params.items() if k not in excluded}
+        if not stable:
+            return endpoint
+        query = "&".join(f"{k}={v}" for k, v in sorted(stable.items()))
+        return f"{endpoint}?{query}"
+
+    def _reset_resource(self, resource_key: str) -> None:
+        """
+        Zera o contador de falhas consecutivas de um recurso.
+
+        Chamado em resposta 2xx e em 400/404 (falso positivo = recurso válido,
+        apenas sem dados). Limpa o dicionário sem levantar — a falha precisa ser
+        CONSECUTIVA para contar para quarentena.
+
+        Args:
+            resource_key: Chave de quarentena do recurso.
+
+        Returns:
+            N/A (muta estado interno do client).
+        """
+        self._resource_failures.pop(resource_key, None)
 
     async def download_file(self, url: str, dest_path: str) -> bool:
         """
@@ -260,9 +389,25 @@ class CamaraClient:
 
     async def close(self) -> None:
         """
-        Garante a compatibilidade com a interface do orquestrador.
+        Finaliza o client e reporta o resumo da quarentena da execução.
+
+        O resumo é uma conveniência de observabilidade — o sinal autoritativo
+        por recurso é o WARNING ``[QUARENTENA]`` emitido no momento em que o
+        recurso entra em quarentena (sobrevive até a SIGKILL).
+
+        Returns:
+            N/A.
         """
-        pass
+        if not self._quarantined:
+            logger.info("[QUARENTENA] Nenhum recurso em quarentena nesta execução.")
+            return
+        listing = "\n  ".join(sorted(f"{self.BASE_URL}/{k}" for k in self._quarantined))
+        logger.warning(
+            "[QUARENTENA] Resumo da execução — %d recurso(s) em quarentena (pulados "
+            "sem chamada HTTP; re-testados na próxima execução):\n  %s",
+            len(self._quarantined),
+            listing,
+        )
 
     async def warmup_for_domain(
         self,
@@ -356,8 +501,20 @@ class CamaraClient:
         )
 
     async def _backoff(self, attempt: int) -> None:
-        """Pausa a execução usando Crescimento Exponencial (2s, 4s, 8s...)"""
-        sleep_time = 2**attempt
+        """
+        Pausa a execução com backoff exponencial, com teto.
+
+        Crescimento 2s, 4s, 8s, 16s... mas limitado a ``self.max_backoff_s``
+        (padrão 30s). Sem o teto, a tentativa 10 dormiria 1024s (~17min) — o
+        cenário que fez uma execução com poucos recursos 5xx demorar horas.
+
+        Args:
+            attempt: Número da tentativa atual (1-based).
+
+        Returns:
+            N/A (só espera).
+        """
+        sleep_time = min(2**attempt, self.max_backoff_s)
         logger.info(
             f"Recuo tático. Aguardando {sleep_time} segundos antes da próxima requisição..."
         )

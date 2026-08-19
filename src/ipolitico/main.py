@@ -7,7 +7,26 @@ from pathlib import Path
 import yaml
 
 from ipolitico.core.camara_client import CamaraClient
-from ipolitico.core.constants import DOMAIN_LABELS, DomainType, LoadStrategy, SinkType
+from ipolitico.core.constants import (
+    DOMAIN_LABELS,
+    DomainType,
+    LoadStrategy,
+    MedallionLayer,
+    SinkType,
+)
+from ipolitico.gold.custo_erario import (
+    CUSTO_PK,
+    OBS_PK,
+    CoberturaCustoErario,
+    CustoErarioBuilder,
+)
+from ipolitico.gold.entidade_canonica import (
+    ALIASES_PK,
+    POLITICOS_PK,
+    RESOLUCOES_PK,
+    CoberturaEntidadeCanonica,
+    EntidadeCanonicaBuilder,
+)
 from ipolitico.pipeline.builder import PipelineBuilder
 from ipolitico.pipeline.domain_order import (
     FULL_PIPELINE,
@@ -266,6 +285,22 @@ async def main():
         default=None,
         help="Exporta a camada Gold para banco SQL (sqlite ou duckdb) após a ingestão.",
     )
+    parser.add_argument(
+        "--build-entidade-canonica",
+        action="store_true",
+        help=(
+            "Constrói as tabelas Gold de identidade (politicos, politicos_aliases, "
+            "resolucoes) a partir dos Silver ingeridos e deduplica (issue 01)."
+        ),
+    )
+    parser.add_argument(
+        "--build-custo-erario",
+        action="store_true",
+        help=(
+            "Constrói as Gold de custo ao erário (custo_erario, observacoes_metricas) "
+            "a partir dos Silver + aliases e deduplica (issue 02)."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -283,6 +318,12 @@ async def main():
         output = Path(args.coverage_doc_output)
         generate_coverage_doc(output)
         print(f"Documento de cobertura gerado em: {output}")
+        return
+
+    # Modo somente-build: sem ingestão, só Gold (issues 01/02). Com ``--domains``
+    # o build roda após a ingestão (ver fluxo principal).
+    if (args.build_entidade_canonica or args.build_custo_erario) and args.domains is None:
+        _run_gold_builds(args)
         return
 
     if args.domains is None:
@@ -399,6 +440,9 @@ async def main():
                 logger.info(f"=== Otimizando Camada Gold para {domain.value.upper()} ===")
                 DataLakeOptimizer().compact_and_deduplicate(domain.value)
 
+        if args.build_entidade_canonica or args.build_custo_erario:
+            _run_gold_builds(args)
+
         if args.export_gold:
             fmt = ExportFormat(args.export_gold)
             ext = "db" if fmt == ExportFormat.SQLITE else "duckdb"
@@ -418,6 +462,78 @@ async def main():
                 if hasattr(maybe_client, "close"):
                     await maybe_client.close()
         logger.info(f"Tempo total de execução: {time.perf_counter() - start_time:.2f}s")
+
+
+def _run_gold_builds(args: argparse.Namespace) -> None:
+    """Executa os builders Gold (issues 01/02) e a dedup das tabelas novas.
+
+    Roda os builders contra os Silver/Gold já persistidos (não faz ingestão),
+    imprime o relatório de cobertura e deduplica as tabelas Gold produzidas com
+    ``pk_cols`` explícito (a dedup é responsabilidade da camada Gold).
+
+    Args:
+        args: Namespace do argparse com as flags ``--build-*``.
+    """
+    optimizer = DataLakeOptimizer()
+    if args.build_entidade_canonica:
+        logger.info("=== Construindo entidade canônica (Gold, issue 01) ===")
+        builder = EntidadeCanonicaBuilder()
+        builder.build()
+        _imprimir_cov_entidade(builder.cobertura())
+        for tabela, pk in (
+            ("politicos", POLITICOS_PK),
+            ("politicos_aliases", ALIASES_PK),
+            ("resolucoes", RESOLUCOES_PK),
+        ):
+            logger.info("=== Deduplicando Gold %s ===", tabela.upper())
+            optimizer.compact_and_deduplicate(
+                tabela,
+                source_layer=MedallionLayer.GOLD,
+                target_layer=MedallionLayer.GOLD,
+                pk_cols=", ".join(pk),
+            )
+    if args.build_custo_erario:
+        logger.info("=== Construindo custo ao erário (Gold, issue 02) ===")
+        builder = CustoErarioBuilder()
+        builder.build()
+        _imprimir_cov_custo(builder.cobertura())
+        for tabela, pk in (
+            ("custo_erario", CUSTO_PK),
+            ("observacoes_metricas", OBS_PK),
+        ):
+            logger.info("=== Deduplicando Gold %s ===", tabela.upper())
+            optimizer.compact_and_deduplicate(
+                tabela,
+                source_layer=MedallionLayer.GOLD,
+                target_layer=MedallionLayer.GOLD,
+                pk_cols=", ".join(pk),
+            )
+
+
+def _imprimir_cov_entidade(cov: CoberturaEntidadeCanonica) -> None:
+    """Imprime o relatório de cobertura da entidade canônica (issue 01).
+
+    Args:
+        cov: Relatório de cobertura do ``EntidadeCanonicaBuilder``.
+    """
+    print(f"  políticos únicos: {cov.total_politicos}")
+    print(f"  aliases: {cov.total_aliases} por fonte: {cov.aliases_por_fonte}")
+    print(f"  âncoras camara: {cov.ancoras_camara} | senado: {cov.ancoras_senado}")
+    print(
+        f"  resoluções confirmadas: {cov.resolucoes_confirmadas} | "
+        f"candidatas a revisão: {cov.resolucoes_candidatas_revisao}"
+    )
+
+
+def _imprimir_cov_custo(cov: CoberturaCustoErario) -> None:
+    """Imprime o relatório de cobertura do custo ao erário (issue 02).
+
+    Args:
+        cov: Relatório de cobertura do ``CustoErarioBuilder``.
+    """
+    print(f"  linhas custo_erario: {cov.total_linhas} por componente: {cov.total_por_componente}")
+    print(f"  por casa: {cov.total_por_casa}")
+    print(f"  observações registradas: {cov.total_observacoes}")
 
 
 def main_cli():

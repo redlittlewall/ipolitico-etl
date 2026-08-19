@@ -7,6 +7,8 @@ XML-heritage (objeto-único vs array, aninhamento de envelopes).
 import logging
 from typing import Any
 
+import polars as pl
+
 from ipolitico.core.senado_client import SenadoClient
 from ipolitico.extractors.base import BaseExtractor
 
@@ -96,6 +98,47 @@ class SenadoBaseExtractor(BaseExtractor):
         if isinstance(item, list):
             return item
         return [item]
+
+    def _build_batch_dataframe(
+        self,
+        batches: list[tuple[str, list[dict[str, Any]], dict[str, Any] | None]],
+    ) -> pl.DataFrame:
+        """
+        Constrói um único DataFrame para um lote de entidades, unificando o schema.
+
+        Substitui o anti-padrão "DataFrame por entidade + ``pl.concat``", que
+        falhava com ``SchemaError`` quando entidades do mesmo domínio tinham
+        colunas (ou structs aninhadas) diferentes — ex: senador em exercício
+        vs. histórico, veto com vs. sem ``Mensagem``. Um único DataFrame
+        construído com ``infer_schema_length=None`` a partir da lista de
+        registros unifica colunas e structs recursivamente, preenchendo com
+        null os campos ausentes.
+
+        Args:
+            batches: Lista de tuplas ``(endpoint, records, params)``. Cada
+                     registro recebe ``_source_url`` como primeira chave,
+                     derivada de ``endpoint`` (e ``params``) via
+                     ``build_source_url``.
+
+        Returns:
+            DataFrame único com todos os registros do lote (``_source_url``
+            como primeira coluna), ou DataFrame vazio sem colunas se nenhum
+            registro existir.
+        """
+        all_records: list[dict[str, Any]] = []
+        for endpoint, records, params in batches:
+            if not records:
+                continue
+            source_url = self.build_source_url(endpoint, params=params)
+            for record in records:
+                # _source_url como primeira chave preserva a convenção de
+                # _inject_source_url ("primeira coluna do DataFrame").
+                all_records.append({"_source_url": source_url, **record})
+
+        if not all_records:
+            return pl.DataFrame()
+
+        return pl.DataFrame(all_records, infer_schema_length=None)
 
     async def extract(self, **kwargs: Any) -> Any:
         """Implementação abstrata de BaseExtractor — delega para fetch_flat."""

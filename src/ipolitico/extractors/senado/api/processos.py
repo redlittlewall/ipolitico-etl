@@ -67,18 +67,16 @@ class SenadoProcessosDetalheExtractor(SenadoBaseExtractor):
         if not entity_ids:
             return pl.DataFrame()
 
-        all_dfs: list[pl.DataFrame] = []
+        batches: list[tuple[str, list[dict[str, Any]], dict[str, Any] | None]] = []
         for pid in entity_ids:
             raw = await self.fetch_flat(f"processo/{pid}")
             if isinstance(raw, dict):
-                df = pl.DataFrame([raw], infer_schema_length=None)
-                df = self._inject_source_url(df, f"processo/{pid}")
-                all_dfs.append(df)
+                batches.append((f"processo/{pid}", [raw], None))
 
-        if not all_dfs:
-            return pl.DataFrame()
-
-        return pl.concat(all_dfs)
+        # DataFrame único com todos os processos do lote: processos com campos
+        # diferentes são unificados (o concat por-processo falhava com
+        # SchemaError de largura).
+        return self._build_batch_dataframe(batches)
 
 
 class SenadoProcessosEmendasExtractor(SenadoBaseExtractor):

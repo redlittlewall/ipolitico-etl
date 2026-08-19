@@ -2,8 +2,11 @@ import asyncio
 import logging
 from typing import Any, Callable, Dict, List, Optional, Union
 
+import polars as pl
+
 from ipolitico.core.config import MAX_CONCURRENT_REQUESTS
 from ipolitico.core.constants import DomainType, MedallionLayer
+from ipolitico.core.exceptions import ResourceQuarantinedError
 from ipolitico.core.source_urls import finalize_source_url
 from ipolitico.pipeline.builder import PipelineComponents
 
@@ -100,6 +103,28 @@ class PipelineRunner:
                         except ValueError:
                             pass  # domínio desconhecido — segue sem _source_url
                         return clean_df
+                    return None
+                except ResourceQuarantinedError as e:
+                    # Recurso em quarentena (5xx persistentes no CamaraClient):
+                    # pula o job IMEDIATAMENTE, sem as 5 tentativas externas.
+                    # O job conta como processado para o progresso andar.
+                    logger.warning(
+                        "[%s] Recurso em quarentena, pulando job %s: %s",
+                        table_name,
+                        extract_args,
+                        e,
+                    )
+                    return None
+                except pl.exceptions.SchemaError as e:
+                    # Erro determinístico de shape dos dados (ex: structs com
+                    # campos diferentes entre entidades): retentar 5× não muda
+                    # o resultado e só queima chamadas à API (e provoca 429).
+                    logger.error(
+                        "[%s] Erro fatal de schema em %s (sem retry): %s",
+                        table_name,
+                        extract_args,
+                        e,
+                    )
                     return None
                 except Exception as e:
                     if attempt < 4:

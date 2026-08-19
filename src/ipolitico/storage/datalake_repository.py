@@ -58,10 +58,10 @@ class DataLakeRepository(StateStore):
             )
             con = duckdb.connect(database=":memory:")
             try:
-                df = con.execute(query).df()
+                rows = con.execute(query).fetchall()
             finally:
                 con.close()
-            ids = df["id"].tolist() if not df.empty else []
+            ids = [r[0] for r in rows]
             logger.info(
                 "[DataLakeRepository] DuckDB: %s deputados (leg %s..%s).",
                 len(ids),
@@ -127,12 +127,10 @@ class DataLakeRepository(StateStore):
         gold_file = layer_dir / f"{table_name}.parquet"
         if gold_file.exists():
             try:
-                series = (
-                    pl.scan_parquet(gold_file, extra_columns="ignore")
-                    .select(column)
-                    .unique()
-                    .collect()[column]
-                )
+                lazy = pl.scan_parquet(gold_file, extra_columns="ignore")
+                if column not in lazy.collect_schema().names():
+                    return []
+                series = lazy.select(column).unique().collect()[column]
                 return [v for v in series.drop_nulls().to_list() if v is not None and v != ""]
             except Exception as e:
                 logger.error(
@@ -147,12 +145,10 @@ class DataLakeRepository(StateStore):
             return []
 
         try:
-            series = (
-                pl.scan_parquet(layer_dir / "*.parquet", extra_columns="ignore")
-                .select(column)
-                .unique()
-                .collect()[column]
-            )
+            lazy = pl.scan_parquet(layer_dir / "*.parquet", extra_columns="ignore")
+            if column not in lazy.collect_schema().names():
+                return []
+            series = lazy.select(column).unique().collect()[column]
             return [v for v in series.drop_nulls().to_list() if v is not None and v != ""]
         except Exception as e:
             logger.error(
@@ -418,8 +414,8 @@ class DataLakeRepository(StateStore):
                     f"AND (d.dataFim IS NULL OR CAST(d.dataFim AS VARCHAR) >= '{lo}') "
                     f"ORDER BY o.id"
                 )
-                result = con.execute(sql).df()
-                ids = result["id"].tolist() if not result.empty else []
+                rows = con.execute(sql).fetchall()
+                ids = [r[0] for r in rows]
                 logger.info(
                     "[DataLakeRepository] DuckDB Gold: %s orgaos ativos (%s..%s).",
                     len(ids),
@@ -441,8 +437,8 @@ class DataLakeRepository(StateStore):
                     f"AND (d.dataFim IS NULL OR CAST(d.dataFim AS VARCHAR) >= '{lo}') "
                     f"ORDER BY o.id"
                 )
-                result = con.execute(sql).df()
-                ids = result["id"].tolist() if not result.empty else []
+                rows = con.execute(sql).fetchall()
+                ids = [r[0] for r in rows]
                 logger.info(
                     "[DataLakeRepository] DuckDB Silver: %s orgaos ativos (%s..%s).",
                     len(ids),
