@@ -1,0 +1,25 @@
+# Mapeamento dinâmico de dependências para o Portal da Transparência (CGU) —
+# Poder Executivo Federal. Consumo total decidido no survey de 18/08 (spec em
+# .scratch/portal-transparencia/SPEC.md); as fatias verticais chegam uma a uma,
+# cada uma registrando aqui seu domínio.
+#
+# Ticket 02 (tracer bullet): cg_orgaos. CORREÇÃO DE FONTE da validação real:
+# não existe módulo bulk de órgãos no portal (/download-de-dados/orgaos →
+# HTTP 500). O domínio é consumido pela API v3 `/api-de-dados/orgaos-siape` via
+# `PortalOrgaosApiExtractor` (sem `extractor_kwargs` — o endpoint é fixo).
+#
+# Módulos bulk reais (ex: servidores, viagens) chegam em tickets futuros usando
+# `extractor_bulk` + `extractor_kwargs: {module: <segmento>}` — o builder injeta
+# `domain_name` do runner e mergea os kwargs do YAML (padrão ticket 02).
+#
+# A chave da API v3 (`PORTAL_API_KEY`) vive apenas no .env (gitignored) — cada
+# usuário gera a própria; os dumps bulk (/download-de-dados) não exigem chave.
+domain_configs:
+  # ── Ticket 02 — CG_ORGAOS (snapshot de órgãos do SIAPE, API v3) ────────────
+  # Snapshot: 1 job sem parâmetros; página todas as páginas de orgaos-siape
+  # (page_size fixo 15). `_source_url` = URL da página (auditoria replayável).
+  # Chave Silver/Gold: `codigo`. Contrato real da API confirmado na validação
+  # real do ticket 02 (640 registros, codigo/descricao).
+  cg_orgaos:
+    extractor: "ipolitico.extractors.portal_transparencia.api.orgaos_extractor.PortalOrgaosApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.orgaos_transformer.PortalOrgaosTransformer"

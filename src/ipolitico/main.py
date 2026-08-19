@@ -202,9 +202,12 @@ async def main():
     parser.add_argument(
         "--source",
         type=str,
-        choices=["camara", "senado", "senado-adm", "all"],
+        choices=["camara", "senado", "senado-adm", "portaldatransparencia", "all"],
         default="all",
-        help="Fonte de dados: camara, senado, senado-adm, ou all (todas em paralelo).",
+        help=(
+            "Fonte de dados: camara, senado, senado-adm, portaldatransparencia, "
+            "ou all (todas em paralelo)."
+        ),
     )
     parser.add_argument(
         "--list-domains",
@@ -298,8 +301,10 @@ async def main():
         providers_configs = ["senado"]
     elif source_name == "senado-adm":
         providers_configs = ["senado-adm"]
+    elif source_name == "portaldatransparencia":
+        providers_configs = ["portaldatransparencia"]
     else:  # all
-        providers_configs = ["camara", "senado", "senado-adm"]
+        providers_configs = ["camara", "senado", "senado-adm", "portaldatransparencia"]
     logger.info("=" * 60)
     logger.info(
         f" iPolitico ETL (Ingestão) | Destino: DATALAKE  |"
@@ -312,6 +317,7 @@ async def main():
     camara_config = load_config(base_dir / "camara_pipeline.yaml")
     senado_config = load_config(base_dir / "senado_pipeline.yaml")
     senado_adm_config = load_config(base_dir / "senado_adm_pipeline.yaml")
+    portal_config = load_config(base_dir / "portal_transparencia_pipeline.yaml")
 
     runner = PipelineRunner()
     state_store = DataLakeSink()
@@ -355,6 +361,26 @@ async def main():
             senado_adm_builder, runner, senado_adm_config, state_store, senado_adm_metadata
         )
         providers.append(SenadoAdmSourceProvider(senado_adm_manager))
+
+    if "portaldatransparencia" in providers_configs:
+        from ipolitico.core.config import PORTAL_API_KEY
+        from ipolitico.core.portal_transparencia_client import PortalTransparenciaClient
+        from ipolitico.services.portal_transparencia_metadata import (
+            PortalTransparenciaMetadataService,
+        )
+        from ipolitico.sources.portal_transparencia_provider import (
+            PortalTransparenciaSourceProvider,
+        )
+
+        # A chave da API v3 é por usuário (PORTAL_API_KEY no .env, nunca
+        # versionada); o bulk /download-de-dados não a exige.
+        portal_client = PortalTransparenciaClient(api_key=PORTAL_API_KEY)
+        portal_builder = PipelineBuilder(portal_client)
+        portal_metadata = PortalTransparenciaMetadataService()
+        portal_manager = PipelineManager(
+            portal_builder, runner, portal_config, state_store, portal_metadata
+        )
+        providers.append(PortalTransparenciaSourceProvider(portal_manager))
 
     federation = FederationOrchestrator(providers)
 

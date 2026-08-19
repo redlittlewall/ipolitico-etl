@@ -1808,6 +1808,9 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     # granularidade efetiva mês). Série contínua 2008 → presente (sem anos de
     # lacuna) — ver COVERAGE_GAPS.
     DomainType.DESPESAS_CEAPS: AnnualWindowStrategy(),
+    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 02) ──────────
+    # Snapshot: 1 job vazio — órgãos SIAPE via API v3 /orgaos-siape (sem janela).
+    DomainType.CG_ORGAOS: SnapshotWindowStrategy(),
 }
 
 

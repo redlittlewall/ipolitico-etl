@@ -1307,4 +1307,15 @@ SILVER_SCHEMAS = {
         "detalhamento": pl.String,
         "valorReembolsado": pl.Float64,
     },
+    # ── CG_ORGAOS (Portal da Transparência — Executivo, ticket 02) ─────────────
+    # Snapshot de órgãos SIAPE via API v3 ``/api-de-dados/orgaos-siape`` (a
+    # validação real do ticket 02 corrigiu a fonte: NÃO existe módulo bulk
+    # ``/download-de-dados/orgaos``). Contrato real da API: ``codigo`` (String —
+    # preserva zeros à esquerda, ex: "00001") e ``descricao``. Join com o hub
+    # CPF / id_servidor_cgu é downstream, não responsabilidade do ETL.
+    DomainType.CG_ORGAOS.value: {
+        "_source_url": pl.String,
+        "codigo": pl.String,
+        "descricao": pl.String,
+    },
 }

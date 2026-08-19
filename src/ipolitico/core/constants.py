@@ -23,7 +23,7 @@ class SinkType(str, Enum):
 
 
 class SourceSystem(str, Enum):
-    """Sistemas de origem dos dados (casas do Congresso Nacional).
+    """Sistemas de origem dos dados (casas do Congresso Nacional e órgãos do Executivo).
 
     Usado como fonte única da coluna "sistema/API de origem" do documento de
     cobertura de dados (issue 03) — nunca derivar do nome do domínio.
@@ -31,6 +31,9 @@ class SourceSystem(str, Enum):
 
     CAMARA = "camara"
     SENADO = "senado"
+    # Poder Executivo Federal via Portal da Transparência (CGU) — ticket 02
+    # (tracer bullet cg_orgaos). Consumo total decidido no survey de 18/08.
+    PORTAL_TRANSPARENCIA = "portal_transparencia"
 
 
 class ApiRoutes(str, Enum):
@@ -184,6 +187,10 @@ class DomainType(str, Enum):
     SERVIDORES = "servidores"
     REMUNERACOES = "remuneracoes"
     DESPESAS_CEAPS = "despesas_ceaps"
+    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 02) ──────────
+    # Domínios com prefixo ``cg_`` (namespace próprio) — não colidem com os
+    # homônimos da Câmara (``orgaos``). O tracer bullet é o primeiro.
+    CG_ORGAOS = "cg_orgaos"
 
 
 class MedallionLayer(str, Enum):
@@ -259,6 +266,10 @@ class EarliestDates:
     # SERVIDORES (issue 07): snapshot do roster — disponibilidade = existência
     # do órgão (mesma convenção de FUNCIONARIOS na Câmara), não série temporal.
     SERVIDORES = "1826-04-29"
+    # CG_ORGAOS (ticket 02): snapshot de órgãos do SIAPE — disponibilidade =
+    # existência do órgão (mesma convenção de SERVIDORES), não série temporal.
+    # Fonte: API v3 /api-de-dados/orgaos-siape (não existe bulk de órgãos).
+    CG_ORGAOS = "1826-04-29"
 
 
 # Facilita o acesso dinâmico: EarliestDateMap[DomainType.DESPESAS]
@@ -374,6 +385,8 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.SERVIDORES: EarliestDates.SERVIDORES,
     DomainType.REMUNERACOES: EarliestDates.REMUNERACOES,
     DomainType.DESPESAS_CEAPS: EarliestDates.DESPESAS_CEAPS,
+    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 02) ──────────
+    DomainType.CG_ORGAOS: EarliestDates.CG_ORGAOS,
 }
 
 
@@ -512,6 +525,8 @@ DOMAIN_SOURCE_SYSTEM: Dict[str, SourceSystem] = {
     "senadores_filiacoes": SourceSystem.SENADO,
     "orientacao_bancada": SourceSystem.SENADO,
     "servidores": SourceSystem.SENADO,
+    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 02) ──────────
+    "cg_orgaos": SourceSystem.PORTAL_TRANSPARENCIA,
     # ── Domínios documentados no registry, ainda sem DomainType ─────────────
     "folha_pagamento": SourceSystem.CAMARA,
     "remuneracoes": SourceSystem.SENADO,
@@ -636,4 +651,6 @@ DOMAIN_LABELS: dict[DomainType, str] = {
     DomainType.SERVIDORES: "Servidores do Senado Federal (roster)",
     DomainType.REMUNERACOES: "Remunerações individuais de servidores do Senado (mensal)",
     DomainType.DESPESAS_CEAPS: "Despesas de cotas parlamentares (CEAP) do Senado (anual)",
+    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 02) ──────────
+    DomainType.CG_ORGAOS: "Órgãos do Poder Executivo (SIAPE, snapshot do portal)",
 }

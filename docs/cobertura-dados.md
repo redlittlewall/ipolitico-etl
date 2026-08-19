@@ -15,6 +15,7 @@ conhecidas no meio da série (a fonte responde vazio/404 para o período).
 |---|---|
 | Câmara dos Deputados | https://dadosabertos.camara.leg.br |
 | Senado Federal | https://legis.senado.leg.br |
+| Portal da Transparência (CGU) | https://portaldatransparencia.gov.br |
 
 ## Câmara dos Deputados
 
@@ -129,3 +130,11 @@ API: https://legis.senado.leg.br
 | `servidores` | 1826-04-29 | — |
 | `remuneracoes` | 2013-01-01 | 404 para 2012 e anteriores (início da série 2013-01) — ausência permanente; mês corrente não publicado = HTTP 200 com lista vazia (ausência temporária) |
 | `despesas_ceaps` | 2008-01-01 | 404 para 2007 e anteriores (início da série 2008) — ausência permanente |
+
+## Portal da Transparência (CGU)
+
+API: https://portaldatransparencia.gov.br
+
+| Domínio | Início dos dados | Lacunas no meio da série |
+|---|---|---|
+| `cg_orgaos` | 1826-04-29 | — |

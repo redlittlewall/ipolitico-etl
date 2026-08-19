@@ -74,6 +74,17 @@ def test_build_url_rejects_invalid_month():
         ext._build_url(year=2024, month=13)
 
 
+def test_domain_name_fallback_para_module():
+    """Sem ``domain_name`` explícito, o cache usa o module (ticket 02).
+
+    O builder injeta ``domain_name`` (ex: ``cg_servidores``) separado do
+    ``module`` (segmento da URL, ex: ``servidores``); este teste cobre o
+    fallback do construtor quando apenas o module é passado.
+    """
+    ext = PortalTransparenciaBulkExtractor(None, module="servidores")
+    assert ext.domain_name == "servidores"
+
+
 # ── extract: download → CSV → _source_url ────────────────────────────────────
 
 

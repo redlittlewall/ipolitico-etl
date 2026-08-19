@@ -396,4 +396,12 @@ BULK_REGISTRY: dict[str, dict] = {
         "schema_overrides": {},
         "bulk_only": True,
     },
+    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 02) ──────────
+    # NOTA: cg_orgaos NÃO entra no BULK_REGISTRY. A validação real do ticket 02
+    # corrigiu a premissa do ticket: não existe módulo bulk ``/download-de-dados/
+    # orgaos`` (o serviço responde 500 para módulo inexistente). O domínio é
+    # consumido pela API v3 ``/api-de-dados/orgaos-siape`` via
+    # ``PortalOrgaosApiExtractor`` (sem bulk_only → SourceRouter retorna API).
+    # Futuros módulos bulk reais do portal (ex: servidores, viagens, ceis)
+    # entram aqui com url_template por convenção de segmento.
 }

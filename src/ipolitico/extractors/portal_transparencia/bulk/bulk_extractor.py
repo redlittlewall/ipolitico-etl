@@ -44,21 +44,32 @@ class PortalTransparenciaBulkExtractor(BaseBulkExtractor):
         self,
         client: PortalTransparenciaClient,
         module: str = "",
+        domain_name: Optional[str] = None,
         bulk_dir: Optional[Path | str] = None,
     ):
         """
         Inicializa o extrator do módulo bulk do portal.
 
+        ``domain_name`` e ``module`` são desacoplados: o runner injeta o domínio
+        do pipeline (``cg_servidores``) enquanto a URL usa o segmento do portal
+        (``servidores``) — a convenção de segmento pode diferir do nome do domínio
+        (ex: ``cg_imoveis_funcionais`` → ``imoveis-funcionais``). O ``module`` é
+        o segmento da URL; o ``domain_name`` é a chave do cache do
+        ``BaseBulkExtractor`` (fallback para ``module`` quando ausente).
+
         Args:
             client: Cliente HTTP do portal (o mesmo ``PortalTransparenciaClient``
                 da API v3 — ``download_file`` faz o resume via Range).
-            module: Módulo do portal (ex: ``"servidores"``, ``"orgaos"``). Vira o
-                ``domain_name`` do ``BaseBulkExtractor`` (chave do cache).
+            module: Segmento do módulo no URL (ex: ``"servidores"``,
+                ``"ceis"``). Usado em ``_build_url``.
+            domain_name: Nome do domínio do pipeline (ex: ``"cg_servidores"``) —
+                vira o ``domain_name`` do ``BaseBulkExtractor`` (chave do cache).
+                Default: o próprio ``module`` (compat com a fundação do ticket 01).
             bulk_dir: Diretório persistente dos dumps. Default: ``PORTAL_BULK_DIR``
                 do config (``data/portal_dumps``). O arquivo baixado sobrevive
                 entre execuções para o resume via Range header.
         """
-        super().__init__(client, domain_name=module)
+        super().__init__(client, domain_name=domain_name or module)
         self.module = module
         self.download_dir = Path(bulk_dir) if bulk_dir else Path(PORTAL_BULK_DIR)
 
@@ -103,7 +114,7 @@ class PortalTransparenciaBulkExtractor(BaseBulkExtractor):
         Delega o fluxo ao ``BaseBulkExtractor.extract`` — o registro do portal
         não existe no ``BULK_REGISTRY``, então a leitura do CSV usa os defaults
         (``utf8-lossy``, sem ``schema_overrides``); os contratos por módulo são
-        travados nas fatias verticais (tracer bullet ``cg_orgaos``, etc.).
+        travados nas fatias verticais (ex: ``cg_servidores``, ``cg_viagens``).
 
         Args:
             year: Ano de referência (opcional).

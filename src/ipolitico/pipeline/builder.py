@@ -76,7 +76,11 @@ class PipelineBuilder:
 
         Args:
             domain_config (Dict[str, str]): Dicionário com os paths mapeados do YAML.
-                Ex: {"extractor": "path.to.Ext", "transformer": "path.to.Trans"}
+                Ex: {"extractor": "path.to.Ext", "transformer": "path.to.Trans"}.
+                Pode conter ``extractor_kwargs`` (dict opcional de kwargs do
+                construtor do extrator — ex: ``{"module": "servidores"}`` no
+                portal da transparência, onde o segmento da URL difere do
+                domain_name do pipeline).
             sink_type (SinkType): O destino escolhido pelo usuário (DataLake).
             source_type (SourceType): Fonte de extração (API ou Bulk).
             domain_name (str, optional): Nome do domínio para extratores Bulk.
@@ -96,6 +100,10 @@ class PipelineBuilder:
         extractor_kwargs: dict[str, Any] = {"client": self.client}
         if domain_name and source_type == SourceType.BULK:
             extractor_kwargs["domain_name"] = domain_name
+        # Merge dos kwargs declarados no YAML (ex: ``extractor_kwargs: {module: servidores}``
+        # no portal da transparência — o segmento da URL difere do domain_name do
+        # pipeline, ex: ``cg_imoveis_funcionais`` → ``imoveis-funcionais``).
+        extractor_kwargs.update(domain_config.get("extractor_kwargs", {}))
         extractor_instance = extractor_class(**extractor_kwargs)
 
         # Instancia o Transformer (Puro, sem dependências de I/O)

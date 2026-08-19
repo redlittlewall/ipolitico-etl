@@ -591,6 +591,17 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         None,
         uk=("_source_url", "id"),
     ),
+    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 02) ─────────────
+    # Snapshot de órgãos SIAPE via API v3 ``/api-de-dados/orgaos-siape`` (a
+    # validação real corrigiu a fonte: não existe bulk de órgãos no portal).
+    # Chave por ``codigo`` (único na fonte). NÃO estável (mesmo padrão de
+    # SERVIDORES): a estrutura do Executivo muda (novos órgãos), então o
+    # incremental re-extrai o snapshot — o Gold deduplica.
+    DomainType.CG_ORGAOS: _spec(
+        DomainType.CG_ORGAOS,
+        None,
+        uk=("codigo",),
+    ),
 }
 
 

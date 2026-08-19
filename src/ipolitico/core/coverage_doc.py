@@ -30,15 +30,24 @@ from ipolitico.pipeline.domain_order import FULL_PIPELINE
 SOURCE_SYSTEM_LABELS: Mapping[SourceSystem, str] = {
     SourceSystem.CAMARA: "Câmara dos Deputados",
     SourceSystem.SENADO: "Senado Federal",
+    # Poder Executivo Federal via Portal da Transparência (CGU) — ticket 02.
+    # Os dumps bulk (/download-de-dados) não exigem chave; a API v3 exige a
+    # chave gratuita do usuário (PORTAL_API_KEY no .env, nunca versionada).
+    SourceSystem.PORTAL_TRANSPARENCIA: "Portal da Transparência (CGU)",
 }
 
 SOURCE_API_URLS: Mapping[SourceSystem, str] = {
     SourceSystem.CAMARA: "https://dadosabertos.camara.leg.br",
     SourceSystem.SENADO: "https://legis.senado.leg.br",
+    SourceSystem.PORTAL_TRANSPARENCIA: "https://portaldatransparencia.gov.br",
 }
 
 # Ordem canônica das seções no documento.
-_SYSTEMS_IN_ORDER: tuple[SourceSystem, ...] = (SourceSystem.CAMARA, SourceSystem.SENADO)
+_SYSTEMS_IN_ORDER: tuple[SourceSystem, ...] = (
+    SourceSystem.CAMARA,
+    SourceSystem.SENADO,
+    SourceSystem.PORTAL_TRANSPARENCIA,
+)
 
 # Marca de ausência de lacunas nas tabelas.
 _NO_GAPS = "—"
