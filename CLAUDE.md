@@ -30,6 +30,11 @@
   protege a API da Câmara. Nunca faça requisições fora do semáforo.
 - **Exponential Backoff (tenacity).** Todo worker de extração usa
   `@retry(wait=wait_exponential, stop=stop_after_attempt(5))`.
+- **Backoff com teto + quarentena no `CamaraClient`.** O backoff exponencial
+  (`2^attempt`) é limitado a `CAMARA_MAX_BACKOFF_S` (padrão 30s) e falhas 5xx
+  **consecutivas** em um mesmo recurso o colocam em quarentena
+  (`CAMARA_QUARANTINE_THRESHOLD`, padrão 3) — o recurso é pulado até o fim da
+  execução (`ResourceQuarantinedError`). Nunca reintroduza backoff sem teto.
 - **Falsos 404 são lista vazia.** A API retorna 404 para recursos sem dados —
   não para erros. Trate como `[]`, não como exceção.
 - **Range header em downloads bulk.** Retome downloads interrompidos, não recomece
