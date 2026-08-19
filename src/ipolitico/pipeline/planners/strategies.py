@@ -1824,6 +1824,13 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     # ── Portal da Transparência (CGU) — Poder Executivo (ticket 02) ──────────
     # Snapshot: 1 job vazio — órgãos SIAPE via API v3 /orgaos-siape (sem janela).
     DomainType.CG_ORGAOS: SnapshotWindowStrategy(),
+    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 03) ──────────
+    # Snapshot: 1 job vazio — agregado por-orgao via API v3 (sem janela).
+    DomainType.CG_SERVIDORES: SnapshotWindowStrategy(),
+    # Bulk mensal: 1 job por (ano, mês) — path {YYYYMM} do portal. Ingestão
+    # BLOQUEADA pelo WAF/CAPTCHA na validação real (ticket 03) — os jobs ficam
+    # prontos e WAF-graciosos (o extrator devolve vazio, o job não cai).
+    DomainType.CG_REMUNERACOES: MonthlyBulkStrategy(),
 }
 
 

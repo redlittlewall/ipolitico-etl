@@ -138,3 +138,5 @@ API: https://portaldatransparencia.gov.br
 | Domínio | Início dos dados | Lacunas no meio da série |
 |---|---|---|
 | `cg_orgaos` | 1826-04-29 | — |
+| `cg_servidores` | 1826-04-29 | — |
+| `cg_remuneracoes` | 2017-01-01 | — |

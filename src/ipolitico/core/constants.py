@@ -187,10 +187,14 @@ class DomainType(str, Enum):
     SERVIDORES = "servidores"
     REMUNERACOES = "remuneracoes"
     DESPESAS_CEAPS = "despesas_ceaps"
-    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 02) ──────────
+    # ── Portal da Transparência (CGU) — Poder Executivo (tickets 02/03) ─────
     # Domínios com prefixo ``cg_`` (namespace próprio) — não colidem com os
     # homônimos da Câmara (``orgaos``). O tracer bullet é o primeiro.
     CG_ORGAOS = "cg_orgaos"
+    # Ticket 03: snapshot agregado por órgão (API v3, validado real) +
+    # remunerações mensais (bulk, WAF bloqueado na validação real).
+    CG_SERVIDORES = "cg_servidores"
+    CG_REMUNERACOES = "cg_remuneracoes"
 
 
 class MedallionLayer(str, Enum):
@@ -270,6 +274,13 @@ class EarliestDates:
     # existência do órgão (mesma convenção de SERVIDORES), não série temporal.
     # Fonte: API v3 /api-de-dados/orgaos-siape (não existe bulk de órgãos).
     CG_ORGAOS = "1826-04-29"
+    # CG_SERVIDORES (ticket 03): snapshot do agregado /servidores/por-orgao —
+    # disponibilidade = existência do órgão (mesma convenção de CG_ORGAOS).
+    CG_SERVIDORES = "1826-04-29"
+    # CG_REMUNERACOES (ticket 03): PLACEHOLDER documentado (2017-01-01). O dump
+    # mensal está BLOQUEADO pelo WAF/CAPTCHA (validação real) — validar quando
+    # o WAF liberar (a CGU publica remunerações do Executivo desde ~2017).
+    CG_REMUNERACOES = "2017-01-01"
 
 
 # Facilita o acesso dinâmico: EarliestDateMap[DomainType.DESPESAS]
@@ -385,8 +396,10 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.SERVIDORES: EarliestDates.SERVIDORES,
     DomainType.REMUNERACOES: EarliestDates.REMUNERACOES,
     DomainType.DESPESAS_CEAPS: EarliestDates.DESPESAS_CEAPS,
-    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 02) ──────────
+    # ── Portal da Transparência (CGU) — Poder Executivo (tickets 02/03) ─────
     DomainType.CG_ORGAOS: EarliestDates.CG_ORGAOS,
+    DomainType.CG_SERVIDORES: EarliestDates.CG_SERVIDORES,
+    DomainType.CG_REMUNERACOES: EarliestDates.CG_REMUNERACOES,
 }
 
 
@@ -525,8 +538,10 @@ DOMAIN_SOURCE_SYSTEM: Dict[str, SourceSystem] = {
     "senadores_filiacoes": SourceSystem.SENADO,
     "orientacao_bancada": SourceSystem.SENADO,
     "servidores": SourceSystem.SENADO,
-    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 02) ──────────
+    # ── Portal da Transparência (CGU) — Poder Executivo (tickets 02/03) ─────
     "cg_orgaos": SourceSystem.PORTAL_TRANSPARENCIA,
+    "cg_servidores": SourceSystem.PORTAL_TRANSPARENCIA,
+    "cg_remuneracoes": SourceSystem.PORTAL_TRANSPARENCIA,
     # ── Domínios documentados no registry, ainda sem DomainType ─────────────
     "folha_pagamento": SourceSystem.CAMARA,
     "remuneracoes": SourceSystem.SENADO,
@@ -651,6 +666,9 @@ DOMAIN_LABELS: dict[DomainType, str] = {
     DomainType.SERVIDORES: "Servidores do Senado Federal (roster)",
     DomainType.REMUNERACOES: "Remunerações individuais de servidores do Senado (mensal)",
     DomainType.DESPESAS_CEAPS: "Despesas de cotas parlamentares (CEAP) do Senado (anual)",
-    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 02) ──────────
+    # ── Portal da Transparência (CGU) — Poder Executivo (tickets 02/03) ─────
     DomainType.CG_ORGAOS: "Órgãos do Poder Executivo (SIAPE, snapshot do portal)",
+    DomainType.CG_SERVIDORES: "Servidores do Poder Executivo (SIAPE, agregado por órgão)",
+    DomainType.CG_REMUNERACOES: "Remunerações individuais de servidores do Executivo "
+    "(mensal, WAF bloqueado)",
 }

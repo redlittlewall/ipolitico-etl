@@ -23,3 +23,28 @@ domain_configs:
   cg_orgaos:
     extractor: "ipolitico.extractors.portal_transparencia.api.orgaos_extractor.PortalOrgaosApiExtractor"
     transformer: "ipolitico.transformers.portal_transparencia.orgaos_transformer.PortalOrgaosTransformer"
+
+  # ── Ticket 03 — CG_SERVIDORES (agregado por órgão, API v3) ─────────────────
+  # CORREÇÃO DE FONTE da validação real do ticket 03: o roster completo
+  # `/servidores` exige filtro de órgão (HTTP 400 sem codOrgao) e a remuneração
+  # individual exige CPF por servidor — inviável enumerar. O snapshot real é o
+  # agregado `/api-de-dados/servidores/por-orgao` (página a página, 13 campos).
+  # Snapshot: 1 job sem parâmetros. Sem `extractor_bulk` — a fonte é a API v3,
+  # não um módulo de download-de-dados (SourceRouter retorna API).
+  cg_servidores:
+    extractor: "ipolitico.extractors.portal_transparencia.api.servidores_por_orgao_extractor.PortalServidoresPorOrgaoApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.servidores_por_orgao_transformer.PortalServidoresPorOrgaoTransformer"
+
+  # ── Ticket 03 — CG_REMUNERACOES (dump mensal do módulo servidores, bulk) ──
+  # Fonte real: `/download-de-dados/servidores/{YYYYMM}` — ZIP multi-CSV (um por
+  # órgão). INGESTÃO BLOQUEADA pelo AWS WAF/CAPTCHA (403 + desafio JS no host de
+  # dumps, verificado real no ticket 03): o extrator devolve vazio sem cair (job
+  # WAF-gracioso) e a validação real reabre quando o host liberar. Contrato Silver
+  # provisório (25 campos: identidade + 15 rubricas monetárias BR).
+  # `extractor_kwargs.module` = segmento do módulo no URL (não `url_template` —
+  # o `PortalTransparenciaBulkExtractor` constrói por convenção de segmento).
+  cg_remuneracoes:
+    extractor_bulk: "ipolitico.extractors.portal_transparencia.bulk.bulk_extractor.PortalTransparenciaBulkExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.remuneracoes_bulk_transformer.PortalRemuneracoesBulkTransformer"
+    extractor_kwargs:
+      module: "servidores"

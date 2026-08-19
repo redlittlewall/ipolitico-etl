@@ -396,12 +396,28 @@ BULK_REGISTRY: dict[str, dict] = {
         "schema_overrides": {},
         "bulk_only": True,
     },
-    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 02) ──────────
-    # NOTA: cg_orgaos NÃO entra no BULK_REGISTRY. A validação real do ticket 02
-    # corrigiu a premissa do ticket: não existe módulo bulk ``/download-de-dados/
-    # orgaos`` (o serviço responde 500 para módulo inexistente). O domínio é
-    # consumido pela API v3 ``/api-de-dados/orgaos-siape`` via
-    # ``PortalOrgaosApiExtractor`` (sem bulk_only → SourceRouter retorna API).
-    # Futuros módulos bulk reais do portal (ex: servidores, viagens, ceis)
-    # entram aqui com url_template por convenção de segmento.
+    # ── Portal da Transparência (CGU) — Poder Executivo (tickets 02/03) ─────
+    # NOTA: cg_orgaos/cg_servidores NÃO entram no BULK_REGISTRY. As validações
+    # reais dos tickets 02/03 corrigiram a premissa: não existe módulo bulk de
+    # órgãos (HTTP 500) e o roster completo de servidores exige filtro de órgão
+    # na API v3 (HTTP 400 sem ele). Ambos são consumidos pela API v3 via
+    # ``PortalOrgaosApiExtractor`` / ``PortalServidoresPorOrgaoApiExtractor``
+    # (sem bulk_only → SourceRouter retorna API).
+    #
+    # cg_remuneracoes (ticket 03): dump mensal do módulo ``servidores``
+    # (``/download-de-dados/servidores/{YYYYMM}``). A URL NÃO usa ``url_template``
+    # — o ``PortalTransparenciaBulkExtractor`` constrói por convenção de segmento
+    # (a Câmara é que usa templates). A entrada existe para o SourceRouter rotar
+    # bulk_only e o ``BaseBulkExtractor`` ler encoding/schema_overrides. Ingestão
+    # BLOQUEADA pelo WAF/CAPTCHA (validação real) — machinery testada, job
+    # WAF-gracioso (o extrator devolve vazio, não cai).
+    "cg_remuneracoes": {
+        "requires_year": True,
+        "requires_month": True,
+        "bulk_granularity": "month",
+        "bulk_filter_date_column": None,
+        "encoding": "utf8-lossy",
+        "schema_overrides": {},
+        "bulk_only": True,
+    },
 }

@@ -36,6 +36,15 @@ class BaseBulkExtractor(BaseExtractor):
     classe; cada entrada contém uma tupla (DataFrame, config_registry) para
     detectar mudanças de schema. Use ``clear_cache()`` para resetar entre
     execuções.
+
+    Dois seams de carregamento permitem que subclasses (ex: portal da
+    transparência) estendam o pipeline sem reescrever ``extract``:
+
+    - ``_load_raw_df``: resolve o arquivo baixado (ZIP de um CSV, corpo não-ZIP
+      nomeado ``.zip``, CSV direto) e devolve o DataFrame bruto. Subclasses que
+      precisam de ZIP multi-CSV (portal) o sobrescrevem.
+    - ``_read_single_csv``: lê UM CSV com ``schema_overrides``/``encoding`` do
+      registry, limpa BOM/aspas, aplica ``rename_map`` e injeta ``_source_url``.
     """
 
     # Cache compartilhado: {(domain_name, year, month): (DataFrame, config_hash)}
@@ -213,59 +222,11 @@ class BaseBulkExtractor(BaseExtractor):
                 logger.warning(f"Dump de {self.domain_name} para {ref} não existe no servidor.")
                 return pl.DataFrame()
 
-            # Detecta ZIP pelo magic byte, não pela extensão: o portal da
-            # transparência baixa dumps cujo nome é só o segmento (ex: "202401",
-            # sem ".zip").
-            if zipfile.is_zipfile(dest_path):
-                try:
-                    with zipfile.ZipFile(dest_path, "r") as zip_ref:
-                        csv_filename = zip_ref.namelist()[0]
-                        zip_ref.extract(csv_filename, workdir)
-                        dest_path = os.path.join(workdir, csv_filename)
-                except zipfile.BadZipFile:
-                    logger.error(f"Arquivo ZIP corrompido baixado de {url}. Abortando.")
-                    return pl.DataFrame()
-            # URL terminada em ".zip" mas com corpo não-ZIP (ex: página de erro do
-            # servidor): loga a origem e devolve vazio — não deixa o corpo vazar
-            # para o read_csv (evita linhas-lixo em vez de lista vazia).
-            elif dest_path.endswith(".zip"):
-                with open(dest_path, "r", encoding="utf-8", errors="ignore") as f:
-                    fake_content = f.read(150).replace("\n", " ")
-                logger.error(f"Arquivo corrompido recebido em vez de ZIP: '{fake_content}...'")
-                return pl.DataFrame()
-
             try:
-                config_registry = BULK_REGISTRY.get(self.domain_name, {})
-                df = pl.read_csv(
-                    dest_path,
-                    separator=";",
-                    ignore_errors=True,
-                    infer_schema_length=0,
-                    encoding=config_registry.get("encoding", "utf8-lossy"),
-                    truncate_ragged_lines=True,
-                    quote_char=None,
-                    schema_overrides=config_registry.get("schema_overrides"),
-                )
-
-                df = df.rename(
-                    {
-                        c: c.replace("ï»¿", "").replace("\ufeff", "").replace('"', "").strip()
-                        for c in df.columns
-                    }
-                )
-                df = df.with_columns(cs.string().str.replace_all('"', "").str.strip_chars())
-
-                rename_map = config_registry.get("rename_map", {})
-                if rename_map:
-                    existing = {k: v for k, v in rename_map.items() if k in df.columns}
-                    if existing:
-                        df = df.rename(existing)
-
-                # ── _source_url: URL de download do CSV (audit trail) ─────
-                df = df.with_columns(pl.lit(url).alias("_source_url").cast(pl.String))
-                df = df.select(["_source_url"] + [c for c in df.columns if c != "_source_url"])
+                df = self._load_raw_df(dest_path, workdir, url)
 
                 # ── Popula cache antes de retornar ────────────────────────
+                config_registry = BULK_REGISTRY.get(self.domain_name, {})
                 config_hash = hash(str(config_registry))
                 self._bulk_cache[cache_key] = (df.clone(), config_hash)
                 logger.debug(
@@ -277,3 +238,93 @@ class BaseBulkExtractor(BaseExtractor):
             except Exception as e:
                 logger.error(f"Falha crítica ao realizar o parse do CSV de {self.domain_name}: {e}")
                 return pl.DataFrame()
+
+    def _load_raw_df(self, dest_path: str, workdir: str, url: str) -> pl.DataFrame:
+        """
+        Carrega o DataFrame bruto a partir do arquivo baixado (CSV ou ZIP).
+
+        Detecta o ZIP pelo magic byte, não pela extensão (o portal da
+        transparência baixa dumps cujo nome é só o segmento, ex: "202401").
+        Arquivos nomeados ``.zip`` com corpo não-ZIP (ex: página de erro do
+        servidor) são tratados como corrupção e devolvem DataFrame vazio — não
+        deixa o corpo vazar para o read_csv (evita linhas-lixo). A leitura do
+        CSV único delega a ``_read_single_csv``.
+
+        Args:
+            dest_path: Caminho do arquivo baixado (pode ser ZIP ou CSV).
+            workdir: Diretório de trabalho do download (para extração do ZIP).
+            url: URL de origem do dump (vira ``_source_url`` no DataFrame).
+
+        Returns:
+            DataFrame bruto com ``_source_url`` como primeira coluna, ou
+            DataFrame vazio em caso de ZIP corrompido ou corpo não-ZIP.
+        """
+        if zipfile.is_zipfile(dest_path):
+            try:
+                with zipfile.ZipFile(dest_path, "r") as zip_ref:
+                    csv_filename = zip_ref.namelist()[0]
+                    zip_ref.extract(csv_filename, workdir)
+                    dest_path = os.path.join(workdir, csv_filename)
+            except zipfile.BadZipFile:
+                logger.error(f"Arquivo ZIP corrompido baixado de {url}. Abortando.")
+                return pl.DataFrame()
+        elif dest_path.endswith(".zip"):
+            with open(dest_path, "r", encoding="utf-8", errors="ignore") as f:
+                fake_content = f.read(150).replace("\n", " ")
+            logger.error(f"Arquivo corrompido recebido em vez de ZIP: '{fake_content}...'")
+            return pl.DataFrame()
+        return self._read_single_csv(dest_path, url)
+
+    def _read_single_csv(self, dest_path: str, url: str) -> pl.DataFrame:
+        """
+        Lê um único CSV do dump com a tipagem do registry e injeta _source_url.
+
+        Aplica ``schema_overrides`` e ``encoding`` do ``BULK_REGISTRY``,
+        limpa BOM/aspas do cabeçalho e dos valores, aplica o ``rename_map``
+        (se houver) e coloca ``_source_url`` como primeira coluna (audit trail
+        replayável por linha).
+
+        Args:
+            dest_path: Caminho do arquivo CSV extraído/baixado.
+            url: URL de origem do dump (vira ``_source_url`` por linha).
+
+        Returns:
+            DataFrame bruto com ``_source_url`` como primeira coluna.
+
+        Raises:
+            Exception: Repassa falhas de leitura/parse ao chamador
+                (``extract`` as trata com log e retorno de DataFrame vazio,
+                sem popular o cache).
+        """
+        config_registry = BULK_REGISTRY.get(self.domain_name, {})
+        df = pl.read_csv(
+            dest_path,
+            separator=";",
+            ignore_errors=True,
+            infer_schema_length=0,
+            encoding=config_registry.get("encoding", "utf8-lossy"),
+            truncate_ragged_lines=True,
+            quote_char=None,
+            schema_overrides=config_registry.get("schema_overrides"),
+        )
+
+        df = df.rename(
+            {
+                # Remove BOM (mojibake "ï»¿" e o caractere U+FEFF literal) e
+                # aspas duplas do cabeçalho, além de espaços nas bordas.
+                c: c.replace("ï»¿", "").replace("﻿", "").replace('"', "").strip()
+                for c in df.columns
+            }
+        )
+        df = df.with_columns(cs.string().str.replace_all('"', "").str.strip_chars())
+
+        rename_map = config_registry.get("rename_map", {})
+        if rename_map:
+            existing = {k: v for k, v in rename_map.items() if k in df.columns}
+            if existing:
+                df = df.rename(existing)
+
+        # ── _source_url: URL de download do CSV (audit trail) ─────
+        df = df.with_columns(pl.lit(url).alias("_source_url").cast(pl.String))
+        df = df.select(["_source_url"] + [c for c in df.columns if c != "_source_url"])
+        return df

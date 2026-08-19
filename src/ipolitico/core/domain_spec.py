@@ -602,6 +602,28 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         None,
         uk=("codigo",),
     ),
+    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 03) ─────────────
+    # Snapshot do agregado ``/servidores/por-orgao`` (API v3 — validado real no
+    # ticket 03). Chave por (órgão, situação, tipo de servidor, tipo de vínculo,
+    # licença): o agregado tem UMA linha por combinação dessas dimensões
+    # (contagens ``qntPessoas``/``qntVinculos``). NÃO estável (mesmo padrão de
+    # CG_ORGAOS): as contagens mudam a cada snapshot — o Gold deduplica.
+    DomainType.CG_SERVIDORES: _spec(
+        DomainType.CG_SERVIDORES,
+        None,
+        uk=("codOrgaoExercicioSiape", "skSituacao", "skTipoServidor", "skTipoVinculo", "licenca"),
+    ),
+    # Bulk mensal ``/download-de-dados/servidores/{YYYYMM}`` — ingestão
+    # REGISTRADA mas BLOQUEADA pelo WAF/CAPTCHA (validação real do ticket 03).
+    # Chave por (``_source_url``, ``id_servidor``, ``mes_ano``) — ``_source_url``
+    # escopa o replay para o mês do dump. NÃO estável (mesmo padrão de
+    # FOLHA_PAGAMENTO): o mês corrente cresce e o incremental re-extrai — o Gold
+    # deduplica. Earliest é placeholder (2017-01) a validar na liberação do WAF.
+    DomainType.CG_REMUNERACOES: _spec(
+        DomainType.CG_REMUNERACOES,
+        None,
+        uk=("_source_url", "id_servidor", "mes_ano"),
+    ),
 }
 
 

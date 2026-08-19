@@ -65,6 +65,21 @@ class PortalTransparenciaTransientError(PortalTransparenciaAPIError):
     pass
 
 
+class PortalTransparenciaWAFError(PortalTransparenciaAPIError):
+    """O host de dumps bloqueou o download via AWS WAF (403 + desafio JS).
+
+    Verificado real no ticket 03: ``portaldatransparencia.gov.br`` /
+    ``dadosabertos-download.cgu.gov.br`` responde 403 com desafio JS (CAPTCHA
+    ``awswaf``) a clientes não-browser — um agente HTTP puro não resolve. NÃO é
+    transitório (re-tentar com a mesma assinatura não muda o resultado), então
+    não é retentado pelo tenacity. O ``PortalTransparenciaBulkExtractor`` captura
+    este erro e devolve lista vazia — o job não cai; quando o WAF liberar, o
+    mesmo job passa a baixar sem mudança de código.
+    """
+
+    pass
+
+
 def _is_transient_error(exception: BaseException) -> bool:
     """
     Decide se uma exceção é transitória (deve tentar novamente).
@@ -84,6 +99,45 @@ def _is_transient_error(exception: BaseException) -> bool:
     if isinstance(exception, httpx.TransportError):
         return True
     return False
+
+
+# Headers que o AWS WAF injeta na resposta de bloqueio (desafio JS/CAPTCHA).
+# SÓ os específicos do WAF (``x-amzn-waf-*``): os genéricos do AWS
+# (``x-amzn-requestid``, ``x-amzn-trace-id``) também aparecem em 403 de S3/
+# CloudFront — inclui-los faria um 403 fatal ser engolido como "WAF gracioso".
+_WAF_HEADER_MARKERS = (
+    "x-amzn-waf-action",
+    "x-amzn-waf-request-id",
+    "x-amzn-waf-rule-id",
+)
+# Marca de corpo da página de bloqueio do WAF (Challenge JS / CAPTCHA) — o
+# "awswaf" identifica o desafio (observado real no ticket 03). "AccessDenied"
+# é genérico de AWS (S3/IAM) e NÃO entra aqui pelo mesmo motivo dos headers.
+_WAF_BODY_MARKERS = ("awswaf",)
+
+
+def _is_waf_block(response: httpx.Response) -> bool:
+    """
+    Detecta um bloqueio do AWS WAF (desafio JS) numa resposta HTTP 403.
+
+    O host de dumps responde 403 com header ``x-amzn-waf-*`` (ação/regra do
+    WAF) e/ou corpo com ``awswaf`` (desafio JS/CAPTCHA) quando bloqueia
+    clientes não-browser (validado real no ticket 03). Distingue de um 403
+    genérico do host (S3/CloudFront) — que é erro fatal
+    ``PortalTransparenciaAPIError``, não WAF. Só assinaturas específicas do
+    WAF contam; headers/corpo genéricos do AWS ficam de fora para não engolir
+    um 403 fatal como "WAF-gracioso".
+
+    Args:
+        response: Resposta HTTP do host de dumps (já com o corpo lido).
+
+    Returns:
+        True se a resposta carrega a assinatura do WAF; False caso contrário.
+    """
+    if any(marker in response.headers for marker in _WAF_HEADER_MARKERS):
+        return True
+    body = response.text[:2000].lower()
+    return any(marker in body for marker in _WAF_BODY_MARKERS)
 
 
 class PortalTransparenciaClient:
@@ -327,6 +381,21 @@ class PortalTransparenciaClient:
                         raise PortalTransparenciaTransientError(
                             f"Erro transitório HTTP {response.status_code} em {url}"
                         )
+                    # 403 com assinatura do AWS WAF (desafio JS/CAPTCHA) no host
+                    # de dumps: não é transitório (re-tentar não resolve o
+                    # desafio) → WAFError distinto, sem retry. O extrator bulk
+                    # captura e devolve vazio (job WAF-gracioso).
+                    if response.status_code == 403:
+                        # A assinatura do WAF pode estar só no corpo (ex:
+                        # "awswaf"); num response em streaming o corpo ainda não
+                        # foi lido — aread() antes de inspecionar (403 é página
+                        # de erro pequena, sem custo relevante).
+                        await response.aread()
+                        if _is_waf_block(response):
+                            raise PortalTransparenciaWAFError(
+                                f"Bloco AWS WAF (desafio JS) ao baixar {url} — o host "
+                                "exige um navegador para o download."
+                            )
                     if not response.is_success:
                         raise PortalTransparenciaAPIError(
                             f"Erro HTTP {response.status_code} ao baixar {url}"

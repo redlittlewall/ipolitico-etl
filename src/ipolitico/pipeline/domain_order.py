@@ -110,6 +110,8 @@ FULL_PIPELINE: tuple[DomainType, ...] = (
     DomainType.DESPESAS_CEAPS,
     # ── Portal da Transparência (CGU) — Poder Executivo ────────────────────
     DomainType.CG_ORGAOS,
+    DomainType.CG_SERVIDORES,
+    DomainType.CG_REMUNERACOES,
 )
 
 # Dependências obrigatórias (silver/gold já populado antes do domínio)

@@ -1318,4 +1318,59 @@ SILVER_SCHEMAS = {
         "codigo": pl.String,
         "descricao": pl.String,
     },
+    # ── CG_SERVIDORES (Portal da Transparência — Executivo, ticket 03) ─────────
+    # Snapshot agregado da API v3 ``/servidores/por-orgao`` (validado real no
+    # ticket 03): contagens por (órgão, situação, tipo de vínculo, tipo de
+    # servidor, licença). O código do órgão SIAPE é String (zeros à esquerda,
+    # ex: "081300"); as chaves SK e contagens são Int.
+    DomainType.CG_SERVIDORES.value: {
+        "_source_url": pl.String,
+        "qntPessoas": pl.Int64,
+        "qntVinculos": pl.Int64,
+        "skSituacao": pl.Int64,
+        "descSituacao": pl.String,
+        "skTipoVinculo": pl.Int64,
+        "descTipoVinculo": pl.String,
+        "skTipoServidor": pl.Int64,
+        "descTipoServidor": pl.String,
+        "licenca": pl.Int64,
+        "codOrgaoExercicioSiape": pl.String,
+        "nomOrgaoExercicioSiape": pl.String,
+        "codOrgaoSuperiorExercicioSiape": pl.String,
+        "nomOrgaoSuperiorExercicioSiape": pl.String,
+    },
+    # ── CG_REMUNERACOES (Portal da Transparência — Executivo, ticket 03) ───────
+    # Contrato PROVISIONAL (dump mensal BLOQUEADO pelo WAF/CAPTCHA na validação
+    # real): identidade do servidor + buckets do ``RemuneracaoDTO`` da API v3.
+    # Linhas pré-2020 não publicam o detalhe pós-2020 (gratificação natalina,
+    # férias, pensão militar, verbas indenizatórias detalhadas etc.) → nulo via
+    # transformer (compatibilidade retroativa). Renomeação real das colunas do
+    # CSV a travar quando o WAF liberar (ticket 03 reabre).
+    DomainType.CG_REMUNERACOES.value: {
+        "_source_url": pl.String,
+        "id_servidor": pl.Int64,
+        "nome": pl.String,
+        "cpf": pl.String,
+        "matricula": pl.String,
+        "cod_orgao_lotacao": pl.String,
+        "nome_orgao_lotacao": pl.String,
+        "cod_orgao_exercicio": pl.String,
+        "nome_orgao_exercicio": pl.String,
+        "mes_ano": pl.String,
+        "remuneracao_basica": pl.Float64,
+        "gratificacao_natalina": pl.Float64,
+        "ferias": pl.Float64,
+        "outras_remuneracoes_eventuais": pl.Float64,
+        "imposto_retido_na_fonte": pl.Float64,
+        "previdencia_oficial": pl.Float64,
+        "outras_deducoes_obrigatorias": pl.Float64,
+        "pensao_militar": pl.Float64,
+        "fundo_saude": pl.Float64,
+        "taxa_ocupacao_imovel_funcional": pl.Float64,
+        "verbas_indenizatorias": pl.Float64,
+        "verbas_indenizatorias_civil": pl.Float64,
+        "verbas_indenizatorias_militar": pl.Float64,
+        "verbas_indenizatorias_referentes_pdv": pl.Float64,
+        "remuneracao_apos_deducoes": pl.Float64,
+    },
 }
