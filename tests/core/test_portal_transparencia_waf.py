@@ -17,7 +17,6 @@ transitório (re-tentar não resolve o desafio JS), então:
 
 from unittest.mock import AsyncMock
 
-import httpx
 import pytest
 import respx
 
@@ -42,9 +41,7 @@ async def test_download_waf_403_por_header_levanta_waf_error(tmp_path):
     dest = tmp_path / "202401"
 
     with respx.mock:
-        route = respx.get(BULK_URL).respond(
-            403, headers={"x-amzn-waf-action": "block"}
-        )
+        route = respx.get(BULK_URL).respond(403, headers={"x-amzn-waf-action": "block"})
         with pytest.raises(PortalTransparenciaWAFError):
             await client.download_file(BULK_URL, str(dest))
 
@@ -76,10 +73,13 @@ async def test_download_403_sem_assinatura_waf_e_api_error_fatal(tmp_path):
 
     with respx.mock:
         route = respx.get(BULK_URL).respond(403, text="Forbidden")
-        with pytest.raises(PortalTransparenciaAPIError):
+        with pytest.raises(PortalTransparenciaAPIError) as exc:
             await client.download_file(BULK_URL, str(dest))
 
     assert route.call_count == 1  # erro fatal, sem retry
+    # status_code exposto: o extrator bulk multi-módulo distingue o 403 do módulo
+    # indisponível (pulado) de outros erros fatais via esse atributo.
+    assert exc.value.status_code == 403
 
 
 @pytest.mark.asyncio
@@ -100,10 +100,38 @@ async def test_download_403_header_aws_generico_e_api_error_fatal(tmp_path):
             headers={"x-amzn-requestid": "abc", "x-amzn-trace-id": "root=1-2-3"},
             text="AccessDenied",
         )
-        with pytest.raises(PortalTransparenciaAPIError):
+        with pytest.raises(PortalTransparenciaAPIError) as exc:
             await client.download_file(BULK_URL, str(dest))
 
     assert route.call_count == 1  # erro fatal, sem retry
+    assert exc.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_download_403_accessdenied_xml_do_s3_e_ausencia(tmp_path):
+    """403 do S3 anônimo com envelope XML <Code>AccessDenied</Code> → False.
+
+    Ticket 04: o host de dumps é S3 anônimo — objeto ausente responde 403 com o
+    envelope XML ``<Error><Code>AccessDenied</Code>`` (listing negado → nunca
+    chega a 404). Isso é AUSÊNCIA (análogo ao 404), não erro fatal: o job deve
+    devolver vazio sem cair (pep/imoveis não publicados, cpcc sem mês).
+    """
+    client = PortalTransparenciaClient(api_key=API_KEY, max_retries=3)
+    dest = tmp_path / "202401"
+
+    with respx.mock:
+        route = respx.get(BULK_URL).respond(
+            403,
+            headers={"content-type": "application/xml"},
+            text=(
+                "<Error><Code>AccessDenied</Code><Message>Access Denied</Message>"
+                "<RequestId>abc</RequestId><HostId>xyz</HostId></Error>"
+            ),
+        )
+        ok = await client.download_file(BULK_URL, str(dest))
+
+    assert ok is False
+    assert route.call_count == 1  # ausência: sem retry (análogo ao 404)
 
 
 @pytest.mark.asyncio

@@ -436,9 +436,16 @@ async def main():
         )
 
         if args.optimize:
+            optimizer = DataLakeOptimizer()
             for domain in args.domains:
                 logger.info(f"=== Otimizando Camada Gold para {domain.value.upper()} ===")
-                DataLakeOptimizer().compact_and_deduplicate(domain.value)
+                # Domínios do Portal usam a UK declarada no spec (cg_cartoes na
+                # rota dupla: bulk id nulo + API id → a introspecção por `id`
+                # colapsaria o bulk numa única partição). Câmara: introspecção.
+                optimizer.compact_and_deduplicate(
+                    domain.value,
+                    pk_cols=DataLakeOptimizer.resolve_pk_cols_for(domain),
+                )
 
         if args.build_entidade_canonica or args.build_custo_erario:
             _run_gold_builds(args)

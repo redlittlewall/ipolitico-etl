@@ -3,7 +3,13 @@ from pathlib import Path
 
 import duckdb
 
-from ipolitico.core.constants import MedallionLayer
+from ipolitico.core.constants import (
+    DOMAIN_SOURCE_SYSTEM,
+    DomainType,
+    MedallionLayer,
+    SourceSystem,
+)
+from ipolitico.core.domain_spec import spec_for
 from ipolitico.core.schemas import despesas_optimizer_partition_sql
 
 logger = logging.getLogger(__name__)
@@ -71,6 +77,34 @@ class DataLakeOptimizer:
             return ", ".join(cols)
         finally:
             conn.close()
+
+    @staticmethod
+    def resolve_pk_cols_for(domain: DomainType) -> str | None:
+        """UK declarada no spec para domínios do Portal da Transparência.
+
+        A introspecção (``_resolve_pk_cols``) resolve por regra genérica
+        (``id`` não-nulo → PARTITION BY id), mas falha para cg_cartoes na rota
+        dupla: as linhas bulk têm ``id`` nulo e as da API não-nulo → a
+        introspecção faria PARTITION BY id e colapsaria TODO o bulk numa única
+        partição. A UK declarada no spec (composta + ``id``) é a chave
+        verificada na validação real. Domínios Câmara mantêm a introspecção
+        (domínios com ``id`` fantasma — deputados_orgaos etc. — não podem usar
+        a UK declarada cegamente).
+
+        Args:
+            domain: Domínio a resolver.
+
+        Returns:
+            Cláusula ``PARTITION BY`` declarada (ex.: ``"tipoCartao_codigo, ...
+            , id"``) para domínios do Portal; ``None`` para os demais
+            (introspecção genérica).
+        """
+        spec = spec_for(domain)
+        if spec is None:
+            return None
+        if DOMAIN_SOURCE_SYSTEM.get(domain.value) != SourceSystem.PORTAL_TRANSPARENCIA:
+            return None
+        return ", ".join(spec.unique_keys)
 
     def compact_and_deduplicate(
         self,

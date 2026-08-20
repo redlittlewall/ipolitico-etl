@@ -1373,4 +1373,149 @@ SILVER_SCHEMAS = {
         "verbas_indenizatorias_referentes_pdv": pl.Float64,
         "remuneracao_apos_deducoes": pl.Float64,
     },
+    # ── CG_PEP (Portal da Transparência — Executivo, ticket 04) ───────────────
+    # Contrato PROVISIONAL derivado do JSON da API v3 ``/api-de-dados/peps``
+    # (validação real): PEPs = Pessoas Expostas Politicamente — ocupantes de
+    # cargo público (MINISTRO, SECRETARIO, VEREADOR), NÃO patrimônio. A API
+    # exige ≥1 filtro e o dump bulk ``pep`` está INDISPONÍVEL hoje (403) →
+    # renomeação real das colunas do CSV a travar quando o dump publicar
+    # (ticket 04 reabre). Todos String (datas ISO, CPF mascarado, códigos com
+    # zeros à esquerda); nomes/órgãos com padding fixo — o transformer aplica
+    # `.str.strip()`.
+    DomainType.CG_PEP.value: {
+        "_source_url": pl.String,
+        "cpf": pl.String,
+        "nome": pl.String,
+        "sigla_funcao": pl.String,
+        "descricao_funcao": pl.String,
+        "nivel_funcao": pl.String,
+        "cod_orgao": pl.String,
+        "nome_orgao": pl.String,
+        "dt_inicio_exercicio": pl.String,
+        "dt_fim_exercicio": pl.String,
+        "dt_fim_carencia": pl.String,
+    },
+    # ── CG_VIAGENS (Portal da Transparência — Executivo, ticket 04) ───────────
+    # Contrato do dump ANUAL ``viagens`` CAPTURADO do CSV real (validação real
+    # confirmou: não há dumps mensais; o ZIP anual tem 4 CSVs heterogêneos —
+    # Pagamento/Passagem/Trecho/Viagem — e a entidade-pai é ``*_Viagem.csv`,
+    # 22 colunas, latin-1, ponto-e-vírgula, 855.805 linhas em 2016). NÃO há
+    # ``id`` numérico: a chave é o ``identificador_processo_viagem`` (único no
+    # dump, verificado real), escopado por ``_source_url`` no replay anual.
+    # Datas "DD/MM/AAAA" e CPF mascarado permanecem String; valores monetários
+    # vírgula-decimal → Float64; sentinels reais → nulo no transformer
+    # (``funcao`` = ``-1``/``-11`` — 99,9% das 855.805 linhas em 2016 — e
+    # strings vazias); o texto "Informações protegidas por sigilo…" permanece
+    # como
+    # valor (status real da linha). A renomeação coluna-do-CSV → contrato vive
+    # no ``rename_map`` do BULK_REGISTRY (aplicado no ``_read_single_csv``).
+    DomainType.CG_VIAGENS.value: {
+        "_source_url": pl.String,
+        "identificador_processo_viagem": pl.String,
+        "numero_pcdp": pl.String,
+        "situacao": pl.String,
+        "viagem_urgente": pl.String,
+        "justificativa_urgencia_viagem": pl.String,
+        "cod_orgao_superior": pl.String,
+        "nome_orgao_superior": pl.String,
+        "cod_orgao_solicitante": pl.String,
+        "nome_orgao_solicitante": pl.String,
+        "cpf_viajante": pl.String,
+        "nome_viajante": pl.String,
+        "cargo": pl.String,
+        "funcao": pl.String,
+        "descricao_funcao": pl.String,
+        "data_inicio": pl.String,
+        "data_fim": pl.String,
+        "destinos": pl.String,
+        "motivo": pl.String,
+        "valor_diarias": pl.Float64,
+        "valor_passagens": pl.Float64,
+        "valor_devolucao": pl.Float64,
+        "valor_outros_gastos": pl.Float64,
+    },
+    # ── CG_CARTOES (Portal da Transparência — Executivo, ticket 04) ───────────
+    # Contrato UNIÃO das duas rotas (validação real): a API v3 (JSON aninhado,
+    # ``valorTransacao`` string vírgula-decimal) e o dump bulk mensal (CSV flat
+    # latin-1 com colunas diferentes — ``CÓDIGO ÓRGÃO SUPERIOR`` etc.). Campos
+    # exclusivos de cada rota viram nulo na outra (id/estabelecimento só na API;
+    # favorecido/transação só no bulk). Chave = identidade da transação
+    # (determinística nas duas rotas — o dump não tem id). CPF/CNPJ normalizados
+    # sem pontuação no transformer.
+    DomainType.CG_CARTOES.value: {
+        "_source_url": pl.String,
+        "id": pl.Int64,
+        "mesExtrato": pl.String,
+        "dataTransacao": pl.String,
+        "valorTransacao": pl.Float64,
+        "tipoCartao_id": pl.Int64,
+        "tipoCartao_codigo": pl.String,
+        "tipoCartao_descricao": pl.String,
+        "estabelecimento_id": pl.Int64,
+        "estabelecimento_cpfFormatado": pl.String,
+        "estabelecimento_cnpjFormatado": pl.String,
+        "estabelecimento_numeroInscricaoSocial": pl.String,
+        "estabelecimento_nome": pl.String,
+        "estabelecimento_razaoSocialReceita": pl.String,
+        "estabelecimento_nomeFantasiaReceita": pl.String,
+        "estabelecimento_tipo": pl.String,
+        "unidadeGestora_codigo": pl.String,
+        "unidadeGestora_nome": pl.String,
+        "unidadeGestora_descricaoPoder": pl.String,
+        "unidadeGestora_orgaoVinculado_codigoSIAFI": pl.String,
+        "unidadeGestora_orgaoVinculado_cnpj": pl.String,
+        "unidadeGestora_orgaoVinculado_sigla": pl.String,
+        "unidadeGestora_orgaoVinculado_nome": pl.String,
+        "unidadeGestora_orgaoMaximo_codigo": pl.String,
+        "unidadeGestora_orgaoMaximo_sigla": pl.String,
+        "unidadeGestora_orgaoMaximo_nome": pl.String,
+        "portador_cpfFormatado": pl.String,
+        "portador_nis": pl.String,
+        "portador_nome": pl.String,
+        "favorecido_cpfCnpj": pl.String,
+        "favorecido_nome": pl.String,
+        "transacao_descricao": pl.String,
+    },
+    # ── CG_IMOVEIS_FUNCIONAIS (Portal da Transparência — Executivo, ticket 04) ─
+    # Snapshot via API v3 ``/api-de-dados/imoveis`` (walk livre com pagina —
+    # validado real). Achata os objetos ``orgaoResponsavel``/``situacao``/
+    # ``regiao``. O dump bulk ``imoveis-funcionais`` está indisponível hoje
+    # (403) → fonte única é a API.
+    DomainType.CG_IMOVEIS_FUNCIONAIS.value: {
+        "_source_url": pl.String,
+        "id": pl.Int64,
+        "dataReferencia": pl.String,
+        "orgaoResponsavel_nome": pl.String,
+        "orgaoResponsavel_codigoSIAFI": pl.String,
+        "situacao_id": pl.Int64,
+        "situacao_descricao": pl.String,
+        "regiao_id": pl.Int64,
+        "regiao_descricao": pl.String,
+        "endereco": pl.String,
+        "cep": pl.String,
+    },
+    # ── CG_EMENDAS (Portal da Transparência — Executivo, ticket 04) ───────────
+    # API v3 ``/api-de-dados/emendas`` POR ANO (param ``ano`` — "respeita a
+    # janela da API por ano" do ticket; validado real). Flat: ``codigoEmenda``
+    # String (embute o ano), ``ano`` Int64, ``valor*`` string vírgula-decimal
+    # com separador de milhar → Float64 via br_locale. Sem rota bulk (dump único
+    # re-publica o histórico — conflita com append-only).
+    DomainType.CG_EMENDAS.value: {
+        "_source_url": pl.String,
+        "codigoEmenda": pl.String,
+        "ano": pl.Int64,
+        "tipoEmenda": pl.String,
+        "autor": pl.String,
+        "nomeAutor": pl.String,
+        "numeroEmenda": pl.String,
+        "localidadeDoGasto": pl.String,
+        "funcao": pl.String,
+        "subfuncao": pl.String,
+        "valorEmpenhado": pl.Float64,
+        "valorLiquidado": pl.Float64,
+        "valorPago": pl.Float64,
+        "valorRestoInscrito": pl.Float64,
+        "valorRestoCancelado": pl.Float64,
+        "valorRestoPago": pl.Float64,
+    },
 }

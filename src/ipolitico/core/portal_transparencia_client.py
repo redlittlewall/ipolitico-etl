@@ -40,9 +40,20 @@ _BROWSER_USER_AGENT = (
 
 
 class PortalTransparenciaAPIError(Exception):
-    """Exceção base para falhas na API v3 do Portal da Transparência."""
+    """Exceção base para falhas na API v3 do Portal da Transparência.
 
-    pass
+    Args:
+        message: Descrição do erro (inclusive o status HTTP quando houver).
+        status_code: Status HTTP que originou o erro, quando ele veio de um
+            response (403 do host de dumps, 400 da API, etc.); ``None`` quando
+            o erro não tem status (ex: falha de rede). Usado pelo extrator bulk
+            multi-módulo de cartões para distinguir o 403 do módulo
+            indisponível (pulado) de um erro de autorização real.
+    """
+
+    def __init__(self, message: str, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
 
 
 class PortalTransparenciaAuthError(PortalTransparenciaAPIError):
@@ -313,7 +324,8 @@ class PortalTransparenciaClient:
 
                 # Demais erros HTTP: fatal, não tenta novamente
                 raise PortalTransparenciaAPIError(
-                    f"Erro HTTP {response.status_code} em {url}: {response.text[:200]}"
+                    f"Erro HTTP {response.status_code} em {url}: {response.text[:200]}",
+                    status_code=response.status_code,
                 )
 
     async def download_file(self, url: str, dest_path: str | Path) -> bool:
@@ -396,9 +408,22 @@ class PortalTransparenciaClient:
                                 f"Bloco AWS WAF (desafio JS) ao baixar {url} — o host "
                                 "exige um navegador para o download."
                             )
+                        # 403 do S3 anônimo com o envelope XML do objeto ausente
+                        # (<Error><Code>AccessDenied</Code>… — validado real no
+                        # ticket 04): listing negado → nunca chega a 404.
+                        # Ausência análoga ao 404 → False, sem retry. Necessário
+                        # para pep/imoveis (dump não publicado) e cpgf/cpcc/cpdc
+                        # (mês sem arquivo). O marcador é o envelope `<Code>Access
+                        # Denied</Code>`: o texto "AccessDenied" NU (sem o XML)
+                        # num 403 não distingue o S3 de um 403 real do host →
+                        # permanece fatal abaixo (não engole erro de autorização).
+                        if "<code>accessdenied</code>" in response.text[:2000].lower():
+                            logger.debug("Dump inexistente (403 AccessDenied do S3) em %s.", url)
+                            return False
                     if not response.is_success:
                         raise PortalTransparenciaAPIError(
-                            f"Erro HTTP {response.status_code} ao baixar {url}"
+                            f"Erro HTTP {response.status_code} ao baixar {url}",
+                            status_code=response.status_code,
                         )
 
                     # 206 com parcial já baixado → anexa ao que existe; 200 (servidor

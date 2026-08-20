@@ -140,3 +140,8 @@ API: https://portaldatransparencia.gov.br
 | `cg_orgaos` | 1826-04-29 | — |
 | `cg_servidores` | 1826-04-29 | — |
 | `cg_remuneracoes` | 2017-01-01 | — |
+| `cg_pep` | 2013-01-01 | — |
+| `cg_viagens` | 2013-01-01 | — |
+| `cg_cartoes` | 2014-01-01 | — |
+| `cg_imoveis_funcionais` | 1826-04-29 | — |
+| `cg_emendas` | 2012-01-01 | — |

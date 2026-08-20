@@ -195,6 +195,18 @@ class DomainType(str, Enum):
     # remunerações mensais (bulk, WAF bloqueado na validação real).
     CG_SERVIDORES = "cg_servidores"
     CG_REMUNERACOES = "cg_remuneracoes"
+    # Ticket 04 — Onda 1 restante (validação real corrigiu premissas):
+    #   cg_pep  → PEPs = Pessoas Expostas Politicamente (ocupantes de cargo
+    #             público — NÃO patrimônio; a API exige filtro, bulk anual).
+    #   cg_viagens → bulk ANUAL (o ticket previa mensal; não há dumps {YYYYMM}).
+    #   cg_cartoes → rota dupla: bulk mensal (cpgf/cpcc/cpdc) + API ≤12 meses.
+    #   cg_imoveis_funcionais → API snapshot (dump indisponível hoje).
+    #   cg_emendas → API por ano (dump único re-publica o histórico inteiro).
+    CG_PEP = "cg_pep"
+    CG_VIAGENS = "cg_viagens"
+    CG_CARTOES = "cg_cartoes"
+    CG_IMOVEIS_FUNCIONAIS = "cg_imoveis_funcionais"
+    CG_EMENDAS = "cg_emendas"
 
 
 class MedallionLayer(str, Enum):
@@ -281,6 +293,24 @@ class EarliestDates:
     # mensal está BLOQUEADO pelo WAF/CAPTCHA (validação real) — validar quando
     # o WAF liberar (a CGU publica remunerações do Executivo desde ~2017).
     CG_REMUNERACOES = "2017-01-01"
+    # CG_PEP (ticket 04): PLACEHOLDER (2013-01-01). Dump `pep` indisponível hoje
+    # (403 AccessDenied no host S3) — validar quando o arquivo publicar (o portal
+    # expõe PEPs do Executivo desde ~2013).
+    CG_PEP = "2013-01-01"
+    # CG_VIAGENS (ticket 04): 2013-01-01 CONFIRMADO — arquivos anuais do módulo
+    # `viagens` existem de 2013 em diante (nomes {YYYY}_{data}_Viagens.zip).
+    CG_VIAGENS = "2013-01-01"
+    # CG_CARTOES (ticket 04): PLACEHOLDER (2014-01-01). Validar pelo mesExtrato
+    # mais antigo na validação real (cartões de pagamento do Executivo desde
+    # ~2013/2014 — a probe encontrou dados de 2016).
+    CG_CARTOES = "2014-01-01"
+    # CG_IMOVEIS_FUNCIONAIS (ticket 04): snapshot (relação de imóveis funcionais
+    # via API v3) — disponibilidade = existência do órgão (convenção CG_ORGAOS).
+    CG_IMOVEIS_FUNCIONAIS = "1826-04-29"
+    # CG_EMENDAS (ticket 04): PLACEHOLDER (2012-01-01). API por ano — validar
+    # pelo ano mais antigo na validação real (emendas parlamentares no portal
+    # desde ~2012).
+    CG_EMENDAS = "2012-01-01"
 
 
 # Facilita o acesso dinâmico: EarliestDateMap[DomainType.DESPESAS]
@@ -400,6 +430,12 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.CG_ORGAOS: EarliestDates.CG_ORGAOS,
     DomainType.CG_SERVIDORES: EarliestDates.CG_SERVIDORES,
     DomainType.CG_REMUNERACOES: EarliestDates.CG_REMUNERACOES,
+    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 04) ───────────
+    DomainType.CG_PEP: EarliestDates.CG_PEP,
+    DomainType.CG_VIAGENS: EarliestDates.CG_VIAGENS,
+    DomainType.CG_CARTOES: EarliestDates.CG_CARTOES,
+    DomainType.CG_IMOVEIS_FUNCIONAIS: EarliestDates.CG_IMOVEIS_FUNCIONAIS,
+    DomainType.CG_EMENDAS: EarliestDates.CG_EMENDAS,
 }
 
 
@@ -542,6 +578,11 @@ DOMAIN_SOURCE_SYSTEM: Dict[str, SourceSystem] = {
     "cg_orgaos": SourceSystem.PORTAL_TRANSPARENCIA,
     "cg_servidores": SourceSystem.PORTAL_TRANSPARENCIA,
     "cg_remuneracoes": SourceSystem.PORTAL_TRANSPARENCIA,
+    "cg_pep": SourceSystem.PORTAL_TRANSPARENCIA,
+    "cg_viagens": SourceSystem.PORTAL_TRANSPARENCIA,
+    "cg_cartoes": SourceSystem.PORTAL_TRANSPARENCIA,
+    "cg_imoveis_funcionais": SourceSystem.PORTAL_TRANSPARENCIA,
+    "cg_emendas": SourceSystem.PORTAL_TRANSPARENCIA,
     # ── Domínios documentados no registry, ainda sem DomainType ─────────────
     "folha_pagamento": SourceSystem.CAMARA,
     "remuneracoes": SourceSystem.SENADO,
@@ -671,4 +712,11 @@ DOMAIN_LABELS: dict[DomainType, str] = {
     DomainType.CG_SERVIDORES: "Servidores do Poder Executivo (SIAPE, agregado por órgão)",
     DomainType.CG_REMUNERACOES: "Remunerações individuais de servidores do Executivo "
     "(mensal, WAF bloqueado)",
+    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 04) ──────────
+    DomainType.CG_PEP: "Pessoas Expostas Politicamente do Executivo (cargos públicos, bulk anual)",
+    DomainType.CG_VIAGENS: "Viagens de servidores do Executivo (bulk anual)",
+    DomainType.CG_CARTOES: "Cartões de pagamento do Executivo (CPGF/CPCC/CPDC — "
+    "bulk mensal + API ≤12 meses)",
+    DomainType.CG_IMOVEIS_FUNCIONAIS: "Imóveis funcionais da União (API v3, snapshot)",
+    DomainType.CG_EMENDAS: "Emendas parlamentares (API v3, por ano)",
 }

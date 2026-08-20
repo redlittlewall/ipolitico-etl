@@ -420,4 +420,85 @@ BULK_REGISTRY: dict[str, dict] = {
         "schema_overrides": {},
         "bulk_only": True,
     },
+    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 04) ─────────
+    # NOTA (ticket 04): cg_imoveis_funcionais e cg_emendas NÃO entram no
+    # registry. Validação real: o dump de imóveis está indisponível (403
+    # AccessDenied) e o de emendas é um arquivo único que re-publica o histórico
+    # inteiro (conflita com o append-only) — ambos são consumidos pela API v3
+    # (walk livre / por ano), como cg_orgaos/cg_servidores.
+    #
+    # cg_pep (ticket 04): dump ANUAL do módulo ``pep`` (Pessoas Expostas
+    # Politicamente — ocupantes de cargo público, não patrimônio). A API exige
+    # ≥1 filtro (impossível enumerar) → bulk_only. Dump INDISPONÍVEL hoje
+    # (403 AccessDenied no host S3 — tratado como ausência, job devolve vazio
+    # sem cair); contrato Silver provisório derivado do JSON da API.
+    "cg_pep": {
+        "requires_year": True,
+        "requires_month": False,
+        "bulk_granularity": "year",
+        "bulk_filter_date_column": None,
+        "encoding": "latin-1",
+        "schema_overrides": {},
+        "bulk_only": True,
+    },
+    # cg_viagens (ticket 04): dump ANUAL do módulo ``viagens``
+    # (``/download-de-dados/viagens/{YYYY}`` → ``{YYYY}_{data}_Viagens.zip``).
+    # Validação real corrigiu a premissa: NÃO existem dumps mensais {YYYYMM}
+    # (HTTP 404) — o ticket previa janela mensal, é anual. A API exige
+    # codigoOrgao+4 datas (inviável enumerar) → bulk_only. encoding latin-1
+    # CONFIRMADO no CSV capturado (passo 0 — 2016: 22 colunas, 855.805 linhas,
+    # separador ";"). O ZIP anual tem 4 CSVs heterogêneos (Pagamento/Passagem/
+    # Trecho/Viagem) e a entidade-pai é ``*_Viagem.csv`` — o
+    # ``PortalViagensBulkExtractor`` a seleciona sozinha (o base concatenaria
+    # os 4, quebrando a unicidade do ``identificador_processo_viagem``).
+    # ``rename_map``: coluna do CSV → contrato Silver (aplicado no
+    # ``_read_single_csv`` antes do transformer).
+    "cg_viagens": {
+        "requires_year": True,
+        "requires_month": False,
+        "bulk_granularity": "year",
+        "bulk_filter_date_column": None,
+        "encoding": "latin-1",
+        "schema_overrides": {},
+        "bulk_only": True,
+        "rename_map": {
+            "Identificador do processo de viagem": "identificador_processo_viagem",
+            "Número da Proposta (PCDP)": "numero_pcdp",
+            "Situação": "situacao",
+            "Viagem Urgente": "viagem_urgente",
+            "Justificativa Urgência Viagem": "justificativa_urgencia_viagem",
+            "Código do órgão superior": "cod_orgao_superior",
+            "Nome do órgão superior": "nome_orgao_superior",
+            "Código órgão solicitante": "cod_orgao_solicitante",
+            "Nome órgão solicitante": "nome_orgao_solicitante",
+            "CPF viajante": "cpf_viajante",
+            "Nome": "nome_viajante",
+            "Cargo": "cargo",
+            "Função": "funcao",
+            "Descrição Função": "descricao_funcao",
+            "Período - Data de início": "data_inicio",
+            "Período - Data de fim": "data_fim",
+            "Destinos": "destinos",
+            "Motivo": "motivo",
+            "Valor diárias": "valor_diarias",
+            "Valor passagens": "valor_passagens",
+            "Valor devolução": "valor_devolucao",
+            "Valor outros gastos": "valor_outros_gastos",
+        },
+    },
+    # cg_cartoes (ticket 04): ROTA DUPLA. Bulk MENSAL dos módulos
+    # ``cpgf``/``cpcc``/``cpdc`` (CSVs latin-1 — encoding CONFIRMADO na
+    # validação real; ``cpgf``/``cpdc`` baixam, ``cpcc`` às vezes 403 → o
+    # ``PortalCartoesBulkExtractor`` pula o módulo faltante) + API v3 em blocos
+    # mensais (≤12 meses, consulta pontual). NÃO bulk_only: FULL_LOAD → bulk,
+    # INCREMENTAL → API (branch nova no SourceRouter).
+    "cg_cartoes": {
+        "requires_year": True,
+        "requires_month": True,
+        "bulk_granularity": "month",
+        "bulk_filter_date_column": None,
+        "encoding": "latin-1",
+        "schema_overrides": {},
+        "bulk_only": False,
+    },
 }

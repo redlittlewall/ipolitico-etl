@@ -275,7 +275,9 @@ class BaseBulkExtractor(BaseExtractor):
             return pl.DataFrame()
         return self._read_single_csv(dest_path, url)
 
-    def _read_single_csv(self, dest_path: str, url: str) -> pl.DataFrame:
+    def _read_single_csv(
+        self, dest_path: str, url: str, quote_char: str | None = None
+    ) -> pl.DataFrame:
         """
         Lê um único CSV do dump com a tipagem do registry e injeta _source_url.
 
@@ -284,9 +286,19 @@ class BaseBulkExtractor(BaseExtractor):
         (se houver) e coloca ``_source_url`` como primeira coluna (audit trail
         replayável por linha).
 
+        ``quote_char`` padrão é ``None`` (comportamento da Câmara: campos citados
+        tratados como texto literal, aspas removidas depois). Módulos do portal
+        com ``;`` DENTRO de campos citados (ex: o campo Motivo do dump anual de
+        viagens) passam ``quote_char='"'`` — sem o parse quote-aware, a linha
+        vira N+1 campos e o ``truncate_ragged_lines`` corta colunas monetárias
+        reais (corrupção validada real no ticket 04).
+
         Args:
             dest_path: Caminho do arquivo CSV extraído/baixado.
             url: URL de origem do dump (vira ``_source_url`` por linha).
+            quote_char: Caractere de citação (RFC-4180) do CSV; ``None`` = sem
+                parsing de aspas (padrão Câmara). Passar ``'"'`` para CSVs com
+                ``;`` dentro de campos citados.
 
         Returns:
             DataFrame bruto com ``_source_url`` como primeira coluna.
@@ -304,7 +316,7 @@ class BaseBulkExtractor(BaseExtractor):
             infer_schema_length=0,
             encoding=config_registry.get("encoding", "utf8-lossy"),
             truncate_ragged_lines=True,
-            quote_char=None,
+            quote_char=quote_char,
             schema_overrides=config_registry.get("schema_overrides"),
         )
 

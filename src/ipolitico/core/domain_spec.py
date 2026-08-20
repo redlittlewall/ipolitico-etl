@@ -624,6 +624,81 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         None,
         uk=("_source_url", "id_servidor", "mes_ano"),
     ),
+    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 04) ─────────────
+    # PEPs (Pessoas Expostas Politicamente) — bulk anual `pep`. Validação real:
+    # a API exige ≥1 filtro (impossível enumerar) e o dump está INDISPONÍVEL
+    # hoje (403 AccessDenied) → contrato provisório derivado do JSON da API.
+    # Chave por (cpf, órgão, função, início) — CPF mascarado é estável por
+    # pessoa; `_source_url` escopa o replay anual. NÃO estável (mesmo padrão de
+    # CG_REMUNERACOES).
+    DomainType.CG_PEP: _spec(
+        DomainType.CG_PEP,
+        None,
+        uk=("_source_url", "cpf", "cod_orgao", "sigla_funcao", "dt_inicio_exercicio"),
+    ),
+    # Viagens de servidores — bulk ANUAL `viagens` (validação real: não há
+    # dumps mensais {YYYYMM}; a API exige codigoOrgao+4 datas, inviável
+    # enumerar). O CSV real capturado NÃO tem `id` numérico — a chave é o
+    # ``identificador_processo_viagem`` (único no dump verificado: 855.805
+    # linhas = 855.805 identificadores distintos em 2016), escopada por
+    # ``_source_url`` no replay anual. NÃO estável (mesmo padrão de
+    # CG_REMUNERACOES).
+    DomainType.CG_VIAGENS: _spec(
+        DomainType.CG_VIAGENS,
+        None,
+        uk=("_source_url", "identificador_processo_viagem"),
+    ),
+    # Cartões de pagamento (CPGF/CPCC/CPDC) — rota dupla (ticket 04): bulk
+    # mensal + API v3 em blocos mensais (≤12 meses). O dump bulk NÃO tem `id`.
+    # Chave = identidade composta (tipoCartao, mês, data, valor, CPF portador,
+    # CNPJ/CPF favorecido, UG) + `id` da API.
+    #
+    # CORREÇÃO DA VALIDAÇÃO REAL (19/08): a premissa do ticket "risco de
+    # colisão ≈ zero (7 campos)" estava errada. Na API, ~5% das linhas/mês (645
+    # linhas, 197 grupos em 06/2025) são transações DISTINTAS com documentos
+    # mascarados ("SEM INFORMACAO", "NAO SE APLICA", beneficiários CPDC) — a
+    # composta sozinha as fundiria, perdendo valor monetário no Gold. O `id` da
+    # API é o único discriminador dessas linhas. Com `id` na UK:
+    #   - rota API: nunca funde transações distintas (id único);
+    #   - rota bulk: id nulo → a composta deduplica os duplicados exatos de
+    #     fonte (linhas "Sigiloso" re-publicadas N vezes pelo governo);
+    #   - overlap bulk×API NÃO deduplica (id nulo vs real) — limitação
+    #     documentada: rodar as duas rotas no mesmo mês duplica no Gold; o
+    #     usuário escolhe a estratégia por janela. NÃO estável (CG_SERVIDORES).
+    DomainType.CG_CARTOES: _spec(
+        DomainType.CG_CARTOES,
+        None,
+        uk=(
+            "tipoCartao_codigo",
+            "mesExtrato",
+            "dataTransacao",
+            "valorTransacao",
+            "portador_cpfFormatado",
+            "favorecido_cpfCnpj",
+            "unidadeGestora_codigo",
+            "id",
+        ),
+    ),
+    # Imóveis funcionais da União — snapshot via API v3 (walk livre com pagina;
+    # o dump bulk `imoveis-funcionais` está indisponível hoje — 403). Chave por
+    # `id` (único na fonte). NÃO estável (mesmo padrão de CG_ORGAOS: a situação
+    # do imóvel muda entre snapshots — o Gold deduplica).
+    DomainType.CG_IMOVEIS_FUNCIONAIS: _spec(
+        DomainType.CG_IMOVEIS_FUNCIONAIS,
+        None,
+        uk=("id",),
+    ),
+    # Emendas parlamentares — API v3 POR ANO (param `ano`; "respeita a janela
+    # da API por ano" do ticket). O dump bulk `emendas-parlamentares` é um
+    # arquivo único que re-publica o histórico inteiro a cada geração — conflita
+    # com o append-only → sem rota bulk (padrão CG_SERVIDORES). Chave por
+    # `codigoEmenda` (único na fonte — embute o ano). NÃO estável (mesmo padrão
+    # de CG_ORGAOS: valores executados mudam — o Gold deduplica).
+    DomainType.CG_EMENDAS: _spec(
+        DomainType.CG_EMENDAS,
+        None,
+        uk=("codigoEmenda",),
+    ),
 }
 
 
