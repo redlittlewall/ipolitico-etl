@@ -42,14 +42,24 @@ class PortalContratosApiExtractor(PortalTransparenciaBaseExtractor):
             DataFrame bruto com _source_url injetado ou vazio se a API não retornar dados.
         """
         params: dict[str, Any] = {}
-        if codigoOrgao:
-            params["codigoOrgao"] = codigoOrgao
-        if dataInicial:
-            params["dataInicial"] = dataInicial
-        if dataFinal:
-            params["dataFinal"] = dataFinal
+        # A API v3 exige codigoOrgao (ex: 26000 - MEC, 36000 - MS).
+        params["codigoOrgao"] = codigoOrgao or "26000"
 
-        query_params = params if params else None
-        data = await self.fetch_paginated(self.ENDPOINT, params=query_params)
+        # Converte ISO YYYY-MM-DD para DD/MM/AAAA se necessário
+        dt_ini = dataInicial or kwargs.get("start_date")
+        if dt_ini:
+            if "-" in str(dt_ini):
+                parts = str(dt_ini).split("-")
+                dt_ini = f"{parts[2]}/{parts[1]}/{parts[0]}" if len(parts) == 3 else dt_ini
+            params["dataInicial"] = dt_ini
+
+        dt_fim = dataFinal or kwargs.get("end_date")
+        if dt_fim:
+            if "-" in str(dt_fim):
+                parts = str(dt_fim).split("-")
+                dt_fim = f"{parts[2]}/{parts[1]}/{parts[0]}" if len(parts) == 3 else dt_fim
+            params["dataFinal"] = dt_fim
+
+        data = await self.fetch_paginated(self.ENDPOINT, params=params)
         df = pl.DataFrame(data, infer_schema_length=None) if data else pl.DataFrame()
-        return self._inject_source_url(df, self.ENDPOINT, params=query_params)
+        return self._inject_source_url(df, self.ENDPOINT, params=params)

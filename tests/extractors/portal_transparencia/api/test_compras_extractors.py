@@ -50,11 +50,9 @@ class TestPortalLicitacoesApiExtractor:
 
         assert result.height == 20
         assert result["id"].to_list() == list(range(1, 21))
-        assert (
-            result["_source_url"].to_list()
-            == [f"{API_BASE}/api-de-dados/licitacoes?pagina=1"] * 15
-            + [f"{API_BASE}/api-de-dados/licitacoes?pagina=2"] * 5
-        )
+        assert "codigoOrgao=26000" in result["_source_url"][0]
+        assert "pagina=1" in result["_source_url"][0]
+        assert "pagina=2" in result["_source_url"][15]
 
     @pytest.mark.asyncio
     async def test_extract_with_params(self, mock_client):

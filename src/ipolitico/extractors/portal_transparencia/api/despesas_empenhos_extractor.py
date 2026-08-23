@@ -43,8 +43,17 @@ class PortalDespesasEmpenhosApiExtractor(PortalTransparenciaBaseExtractor):
             DataFrame bruto com _source_url injetado ou vazio se a API não retornar dados.
         """
         params: dict[str, Any] = {"fase": 1}
-        if dataEmissao:
-            params["dataEmissao"] = dataEmissao
+        dt_emissao = dataEmissao or kwargs.get("end_date") or kwargs.get("start_date")
+        if dt_emissao:
+            if "-" in str(dt_emissao):
+                parts = str(dt_emissao).split("-")
+                dt_emissao = f"{parts[2]}/{parts[1]}/{parts[0]}" if len(parts) == 3 else dt_emissao
+            params["dataEmissao"] = dt_emissao
+        else:
+            from datetime import datetime
+            now = datetime.now()
+            params["dataEmissao"] = f"{now.day:02d}/{now.month:02d}/{now.year}"
+
         if unidadeGestora:
             params["unidadeGestora"] = unidadeGestora
         if gestao:
