@@ -749,6 +749,19 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         None,
         uk=("idContrato", "numero"),
     ),
+    # ── Portal da Transparência (CGU) — Fatia 3 (Convênios e Repasses) ────────
+    # Snapshot via API v3 /api-de-dados/convenios
+    DomainType.CG_CONVENIOS: _spec(
+        DomainType.CG_CONVENIOS,
+        None,
+        uk=("id",),
+    ),
+    # Snapshot via API v3 /api-de-dados/convenios
+    DomainType.CG_CONVENIOS_ADITIVOS: _spec(
+        DomainType.CG_CONVENIOS_ADITIVOS,
+        None,
+        uk=("idConvenio", "numero"),
+    ),
 }
 
 

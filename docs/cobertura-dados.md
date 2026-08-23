@@ -153,3 +153,5 @@ API: https://portaldatransparencia.gov.br
 | `cg_licitacoes` | 1826-04-29 | — |
 | `cg_contratos` | 1826-04-29 | — |
 | `cg_contratos_aditivos` | 1826-04-29 | — |
+| `cg_convenios` | 1826-04-29 | — |
+| `cg_convenios_aditivos` | 1826-04-29 | — |

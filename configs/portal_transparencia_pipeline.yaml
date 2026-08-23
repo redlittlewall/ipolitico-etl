@@ -151,4 +151,15 @@ domain_configs:
     extractor: "ipolitico.extractors.portal_transparencia.api.contratos_aditivos_extractor.PortalContratosAditivosApiExtractor"
     transformer: "ipolitico.transformers.portal_transparencia.contratos_aditivos_transformer.PortalContratosAditivosTransformer"
 
+  # ── Fatia 3 — CG_CONVENIOS (convênios e transferências, API v3) ────────────
+  cg_convenios:
+    extractor: "ipolitico.extractors.portal_transparencia.api.convenios_extractor.PortalConveniosApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.convenios_transformer.PortalConveniosTransformer"
+
+  # ── Fatia 3 — CG_CONVENIOS_ADITIVOS (termos aditivos de convênios, API v3) ──
+  cg_convenios_aditivos:
+    extractor: "ipolitico.extractors.portal_transparencia.api.convenios_aditivos_extractor.PortalConveniosAditivosApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.convenios_aditivos_transformer.PortalConveniosAditivosTransformer"
+
+
 

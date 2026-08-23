@@ -217,6 +217,10 @@ class DomainType(str, Enum):
     CG_LICITACOES = "cg_licitacoes"
     CG_CONTRATOS = "cg_contratos"
     CG_CONTRATOS_ADITIVOS = "cg_contratos_aditivos"
+    # ── Portal da Transparência (CGU) — Fatia 3 (Convênios e Repasses) ────────
+    CG_CONVENIOS = "cg_convenios"
+    CG_CONVENIOS_ADITIVOS = "cg_convenios_aditivos"
+
 
 
 
@@ -332,6 +336,10 @@ class EarliestDates:
     CG_LICITACOES = "1826-04-29"
     CG_CONTRATOS = "1826-04-29"
     CG_CONTRATOS_ADITIVOS = "1826-04-29"
+    # ── Fatia 3 (Convênios e Repasses — snapshot de transferências) ───────────
+    CG_CONVENIOS = "1826-04-29"
+    CG_CONVENIOS_ADITIVOS = "1826-04-29"
+
 
 
 
@@ -468,6 +476,9 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.CG_LICITACOES: EarliestDates.CG_LICITACOES,
     DomainType.CG_CONTRATOS: EarliestDates.CG_CONTRATOS,
     DomainType.CG_CONTRATOS_ADITIVOS: EarliestDates.CG_CONTRATOS_ADITIVOS,
+    # ── Portal da Transparência (CGU) — Fatia 3 (Convênios e Repasses) ────────
+    DomainType.CG_CONVENIOS: EarliestDates.CG_CONVENIOS,
+    DomainType.CG_CONVENIOS_ADITIVOS: EarliestDates.CG_CONVENIOS_ADITIVOS,
 }
 
 
@@ -623,6 +634,8 @@ DOMAIN_SOURCE_SYSTEM: Dict[str, SourceSystem] = {
     "cg_licitacoes": SourceSystem.PORTAL_TRANSPARENCIA,
     "cg_contratos": SourceSystem.PORTAL_TRANSPARENCIA,
     "cg_contratos_aditivos": SourceSystem.PORTAL_TRANSPARENCIA,
+    "cg_convenios": SourceSystem.PORTAL_TRANSPARENCIA,
+    "cg_convenios_aditivos": SourceSystem.PORTAL_TRANSPARENCIA,
     # ── Domínios documentados no registry, ainda sem DomainType ─────────────
     "folha_pagamento": SourceSystem.CAMARA,
     "remuneracoes": SourceSystem.SENADO,
@@ -769,4 +782,7 @@ DOMAIN_LABELS: dict[DomainType, str] = {
     DomainType.CG_LICITACOES: "Licitações do Poder Executivo Federal (API v3)",
     DomainType.CG_CONTRATOS: "Contratos do Poder Executivo Federal (API v3)",
     DomainType.CG_CONTRATOS_ADITIVOS: "Termos Aditivos de Contratos (API v3)",
+    # ── Portal da Transparência (CGU) — Fatia 3 (Convênios e Repasses) ────────
+    DomainType.CG_CONVENIOS: "Convênios do Poder Executivo Federal (API v3)",
+    DomainType.CG_CONVENIOS_ADITIVOS: "Termos Aditivos de Convênios (API v3)",
 }
