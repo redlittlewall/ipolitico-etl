@@ -68,6 +68,8 @@ class PortalTransparenciaBaseExtractor(BaseExtractor):
         page = 1
         page_size: int | None = None
 
+        logger.info("[%s] Iniciando extração paginada (params=%s)...", endpoint, params)
+
         while True:
             page_params = dict(params or {})
             page_params["pagina"] = page
@@ -85,9 +87,24 @@ class PortalTransparenciaBaseExtractor(BaseExtractor):
 
             all_data.extend(data)
 
+            if page == 1 or page % 10 == 0:
+                logger.info(
+                    "[%s] Página %d consultada (+%d itens, total acumulado: %d registros)...",
+                    endpoint,
+                    page,
+                    len(data),
+                    len(all_data),
+                )
+
             if len(data) < page_size:
                 break
 
             page += 1
 
+        logger.info(
+            "[%s] Extração concluída com sucesso: %d páginas, %d registros totais.",
+            endpoint,
+            page,
+            len(all_data),
+        )
         return all_data
