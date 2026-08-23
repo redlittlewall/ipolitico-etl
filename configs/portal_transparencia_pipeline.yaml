@@ -110,3 +110,29 @@ domain_configs:
   cg_emendas:
     extractor: "ipolitico.extractors.portal_transparencia.api.emendas_extractor.PortalEmendasApiExtractor"
     transformer: "ipolitico.transformers.portal_transparencia.emendas_transformer.PortalEmendasTransformer"
+
+  # ── Fatia 1 — CG_CEIS (empresas inidôneas e suspensas, API v3) ─────────────
+  cg_ceis:
+    extractor: "ipolitico.extractors.portal_transparencia.api.ceis_extractor.PortalCeisApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.ceis_transformer.PortalCeisTransformer"
+
+  # ── Fatia 1 — CG_CNEP (empresas punidas - anticorrupção, API v3) ───────────
+  cg_cnep:
+    extractor: "ipolitico.extractors.portal_transparencia.api.cnep_extractor.PortalCnepApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.cnep_transformer.PortalCnepTransformer"
+
+  # ── Fatia 1 — CG_CEPIM (entidades impedidas sem fins lucrativos, API v3) ────
+  cg_cepim:
+    extractor: "ipolitico.extractors.portal_transparencia.api.cepim_extractor.PortalCepimApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.cepim_transformer.PortalCepimTransformer"
+
+  # ── Fatia 1 — CG_CEAF (expulsões da administração federal, API v3) ─────────
+  cg_ceaf:
+    extractor: "ipolitico.extractors.portal_transparencia.api.ceaf_extractor.PortalCeafApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.ceaf_transformer.PortalCeafTransformer"
+
+  # ── Fatia 1 — CG_ACORDOS_LENIENCIA (acordos de leniência, API v3) ──────────
+  cg_acordos_leniencia:
+    extractor: "ipolitico.extractors.portal_transparencia.api.acordos_leniencia_extractor.PortalAcordosLenienciaApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.acordos_leniencia_transformer.PortalAcordosLenienciaTransformer"
+

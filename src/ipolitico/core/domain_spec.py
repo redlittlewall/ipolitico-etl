@@ -699,6 +699,37 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         None,
         uk=("codigoEmenda",),
     ),
+    # ── Portal da Transparência (CGU) — Fatia 1 (Sanções e Integridade) ────────
+    # Snapshot via API v3 /api-de-dados/ceis (walk livre com pagina)
+    DomainType.CG_CEIS: _spec(
+        DomainType.CG_CEIS,
+        None,
+        uk=("id",),
+    ),
+    # Snapshot via API v3 /api-de-dados/cnep (walk livre com pagina)
+    DomainType.CG_CNEP: _spec(
+        DomainType.CG_CNEP,
+        None,
+        uk=("id",),
+    ),
+    # Snapshot via API v3 /api-de-dados/cepim (walk livre com pagina)
+    DomainType.CG_CEPIM: _spec(
+        DomainType.CG_CEPIM,
+        None,
+        uk=("id",),
+    ),
+    # Snapshot via API v3 /api-de-dados/ceaf (walk livre com pagina)
+    DomainType.CG_CEAF: _spec(
+        DomainType.CG_CEAF,
+        None,
+        uk=("id",),
+    ),
+    # Snapshot via API v3 /api-de-dados/acordos-leniencia (walk livre com pagina)
+    DomainType.CG_ACORDOS_LENIENCIA: _spec(
+        DomainType.CG_ACORDOS_LENIENCIA,
+        None,
+        uk=("id", "cnpjEmpresa"),
+    ),
 }
 
 

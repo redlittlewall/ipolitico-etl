@@ -145,3 +145,8 @@ API: https://portaldatransparencia.gov.br
 | `cg_cartoes` | 2014-01-01 | — |
 | `cg_imoveis_funcionais` | 1826-04-29 | — |
 | `cg_emendas` | 2012-01-01 | — |
+| `cg_ceis` | 1826-04-29 | — |
+| `cg_cnep` | 1826-04-29 | — |
+| `cg_cepim` | 1826-04-29 | — |
+| `cg_ceaf` | 1826-04-29 | — |
+| `cg_acordos_leniencia` | 1826-04-29 | — |

@@ -207,6 +207,12 @@ class DomainType(str, Enum):
     CG_CARTOES = "cg_cartoes"
     CG_IMOVEIS_FUNCIONAIS = "cg_imoveis_funcionais"
     CG_EMENDAS = "cg_emendas"
+    # ── Portal da Transparência (CGU) — Fatia 1 (Sanções e Integridade) ────────
+    CG_CEIS = "cg_ceis"
+    CG_CNEP = "cg_cnep"
+    CG_CEPIM = "cg_cepim"
+    CG_CEAF = "cg_ceaf"
+    CG_ACORDOS_LENIENCIA = "cg_acordos_leniencia"
 
 
 class MedallionLayer(str, Enum):
@@ -311,6 +317,12 @@ class EarliestDates:
     # pelo ano mais antigo na validação real (emendas parlamentares no portal
     # desde ~2012).
     CG_EMENDAS = "2012-01-01"
+    # ── Fatia 1 (Sanções e Integridade — snapshot de cadastros) ──────────────
+    CG_CEIS = "1826-04-29"
+    CG_CNEP = "1826-04-29"
+    CG_CEPIM = "1826-04-29"
+    CG_CEAF = "1826-04-29"
+    CG_ACORDOS_LENIENCIA = "1826-04-29"
 
 
 # Facilita o acesso dinâmico: EarliestDateMap[DomainType.DESPESAS]
@@ -436,6 +448,12 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.CG_CARTOES: EarliestDates.CG_CARTOES,
     DomainType.CG_IMOVEIS_FUNCIONAIS: EarliestDates.CG_IMOVEIS_FUNCIONAIS,
     DomainType.CG_EMENDAS: EarliestDates.CG_EMENDAS,
+    # ── Portal da Transparência (CGU) — Fatia 1 (Sanções e Integridade) ────────
+    DomainType.CG_CEIS: EarliestDates.CG_CEIS,
+    DomainType.CG_CNEP: EarliestDates.CG_CNEP,
+    DomainType.CG_CEPIM: EarliestDates.CG_CEPIM,
+    DomainType.CG_CEAF: EarliestDates.CG_CEAF,
+    DomainType.CG_ACORDOS_LENIENCIA: EarliestDates.CG_ACORDOS_LENIENCIA,
 }
 
 
@@ -583,6 +601,11 @@ DOMAIN_SOURCE_SYSTEM: Dict[str, SourceSystem] = {
     "cg_cartoes": SourceSystem.PORTAL_TRANSPARENCIA,
     "cg_imoveis_funcionais": SourceSystem.PORTAL_TRANSPARENCIA,
     "cg_emendas": SourceSystem.PORTAL_TRANSPARENCIA,
+    "cg_ceis": SourceSystem.PORTAL_TRANSPARENCIA,
+    "cg_cnep": SourceSystem.PORTAL_TRANSPARENCIA,
+    "cg_cepim": SourceSystem.PORTAL_TRANSPARENCIA,
+    "cg_ceaf": SourceSystem.PORTAL_TRANSPARENCIA,
+    "cg_acordos_leniencia": SourceSystem.PORTAL_TRANSPARENCIA,
     # ── Domínios documentados no registry, ainda sem DomainType ─────────────
     "folha_pagamento": SourceSystem.CAMARA,
     "remuneracoes": SourceSystem.SENADO,
@@ -719,4 +742,10 @@ DOMAIN_LABELS: dict[DomainType, str] = {
     "bulk mensal + API ≤12 meses)",
     DomainType.CG_IMOVEIS_FUNCIONAIS: "Imóveis funcionais da União (API v3, snapshot)",
     DomainType.CG_EMENDAS: "Emendas parlamentares (API v3, por ano)",
+    # ── Portal da Transparência (CGU) — Fatia 1 (Sanções e Integridade) ────────
+    DomainType.CG_CEIS: "Cadastro de Empresas Inidôneas e Suspensas (CEIS, API v3)",
+    DomainType.CG_CNEP: "Cadastro Nacional de Empresas Punidas (CNEP, API v3)",
+    DomainType.CG_CEPIM: "Entidades Privadas Sem Fins Lucrativos Impedidas (CEPIM, API v3)",
+    DomainType.CG_CEAF: "Cadastro de Expulsões da Administração Federal (CEAF, API v3)",
+    DomainType.CG_ACORDOS_LENIENCIA: "Acordos de Leniência da CGU (API v3)",
 }

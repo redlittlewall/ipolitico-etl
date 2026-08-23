@@ -1871,6 +1871,12 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     # ("respeita a janela da API por ano"). Sem rota bulk (dump único
     # re-publica o histórico — conflita com append-only).
     DomainType.CG_EMENDAS: AnnualWindowStrategy(),
+    # ── Portal da Transparência (CGU) — Fatia 1 (Sanções e Integridade) ────────
+    DomainType.CG_CEIS: SnapshotWindowStrategy(),
+    DomainType.CG_CNEP: SnapshotWindowStrategy(),
+    DomainType.CG_CEPIM: SnapshotWindowStrategy(),
+    DomainType.CG_CEAF: SnapshotWindowStrategy(),
+    DomainType.CG_ACORDOS_LENIENCIA: SnapshotWindowStrategy(),
 }
 
 
