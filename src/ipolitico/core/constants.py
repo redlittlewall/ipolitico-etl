@@ -220,6 +220,10 @@ class DomainType(str, Enum):
     # ── Portal da Transparência (CGU) — Fatia 3 (Convênios e Repasses) ────────
     CG_CONVENIOS = "cg_convenios"
     CG_CONVENIOS_ADITIVOS = "cg_convenios_aditivos"
+    # ── Portal da Transparência (CGU) — Fatia 4 (Despesas Públicas) ───────────
+    CG_DESPESAS_EMPENHOS = "cg_despesas_empenhos"
+    CG_DESPESAS_PAGAMENTOS = "cg_despesas_pagamentos"
+
 
 
 
@@ -339,6 +343,10 @@ class EarliestDates:
     # ── Fatia 3 (Convênios e Repasses — snapshot de transferências) ───────────
     CG_CONVENIOS = "1826-04-29"
     CG_CONVENIOS_ADITIVOS = "1826-04-29"
+    # ── Fatia 4 (Despesas Públicas — snapshot de empenhos e pagamentos) ───────
+    CG_DESPESAS_EMPENHOS = "1826-04-29"
+    CG_DESPESAS_PAGAMENTOS = "1826-04-29"
+
 
 
 
@@ -479,6 +487,9 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     # ── Portal da Transparência (CGU) — Fatia 3 (Convênios e Repasses) ────────
     DomainType.CG_CONVENIOS: EarliestDates.CG_CONVENIOS,
     DomainType.CG_CONVENIOS_ADITIVOS: EarliestDates.CG_CONVENIOS_ADITIVOS,
+    # ── Portal da Transparência (CGU) — Fatia 4 (Despesas Públicas) ───────────
+    DomainType.CG_DESPESAS_EMPENHOS: EarliestDates.CG_DESPESAS_EMPENHOS,
+    DomainType.CG_DESPESAS_PAGAMENTOS: EarliestDates.CG_DESPESAS_PAGAMENTOS,
 }
 
 
@@ -636,6 +647,8 @@ DOMAIN_SOURCE_SYSTEM: Dict[str, SourceSystem] = {
     "cg_contratos_aditivos": SourceSystem.PORTAL_TRANSPARENCIA,
     "cg_convenios": SourceSystem.PORTAL_TRANSPARENCIA,
     "cg_convenios_aditivos": SourceSystem.PORTAL_TRANSPARENCIA,
+    "cg_despesas_empenhos": SourceSystem.PORTAL_TRANSPARENCIA,
+    "cg_despesas_pagamentos": SourceSystem.PORTAL_TRANSPARENCIA,
     # ── Domínios documentados no registry, ainda sem DomainType ─────────────
     "folha_pagamento": SourceSystem.CAMARA,
     "remuneracoes": SourceSystem.SENADO,
@@ -785,4 +798,7 @@ DOMAIN_LABELS: dict[DomainType, str] = {
     # ── Portal da Transparência (CGU) — Fatia 3 (Convênios e Repasses) ────────
     DomainType.CG_CONVENIOS: "Convênios do Poder Executivo Federal (API v3)",
     DomainType.CG_CONVENIOS_ADITIVOS: "Termos Aditivos de Convênios (API v3)",
+    # ── Portal da Transparência (CGU) — Fatia 4 (Despesas Públicas) ───────────
+    DomainType.CG_DESPESAS_EMPENHOS: "Empenhos de Despesas do Poder Executivo Federal (API v3)",
+    DomainType.CG_DESPESAS_PAGAMENTOS: "Pagamentos de Despesas do Poder Executivo Federal (API v3)",
 }

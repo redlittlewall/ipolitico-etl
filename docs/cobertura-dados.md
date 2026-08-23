@@ -155,3 +155,5 @@ API: https://portaldatransparencia.gov.br
 | `cg_contratos_aditivos` | 1826-04-29 | — |
 | `cg_convenios` | 1826-04-29 | — |
 | `cg_convenios_aditivos` | 1826-04-29 | — |
+| `cg_despesas_empenhos` | 1826-04-29 | — |
+| `cg_despesas_pagamentos` | 1826-04-29 | — |

@@ -161,5 +161,16 @@ domain_configs:
     extractor: "ipolitico.extractors.portal_transparencia.api.convenios_aditivos_extractor.PortalConveniosAditivosApiExtractor"
     transformer: "ipolitico.transformers.portal_transparencia.convenios_aditivos_transformer.PortalConveniosAditivosTransformer"
 
+  # ── Fatia 4 — CG_DESPESAS_EMPENHOS (documentos de empenho, API v3) ─────────
+  cg_despesas_empenhos:
+    extractor: "ipolitico.extractors.portal_transparencia.api.despesas_empenhos_extractor.PortalDespesasEmpenhosApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.despesas_empenhos_transformer.PortalDespesasEmpenhosTransformer"
+
+  # ── Fatia 4 — CG_DESPESAS_PAGAMENTOS (documentos de pagamento, API v3) ──────
+  cg_despesas_pagamentos:
+    extractor: "ipolitico.extractors.portal_transparencia.api.despesas_pagamentos_extractor.PortalDespesasPagamentosApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.despesas_pagamentos_transformer.PortalDespesasPagamentosTransformer"
+
+
 
 

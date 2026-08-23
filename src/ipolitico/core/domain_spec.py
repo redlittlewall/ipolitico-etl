@@ -762,6 +762,19 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         None,
         uk=("idConvenio", "numero"),
     ),
+    # ── Portal da Transparência (CGU) — Fatia 4 (Despesas Públicas) ───────────
+    # Snapshot via API v3 /api-de-dados/despesas/documentos (fase 1 - Empenho)
+    DomainType.CG_DESPESAS_EMPENHOS: _spec(
+        DomainType.CG_DESPESAS_EMPENHOS,
+        None,
+        uk=("documento",),
+    ),
+    # Snapshot via API v3 /api-de-dados/despesas/documentos (fase 3 - Pagamento)
+    DomainType.CG_DESPESAS_PAGAMENTOS: _spec(
+        DomainType.CG_DESPESAS_PAGAMENTOS,
+        None,
+        uk=("documento",),
+    ),
 }
 
 

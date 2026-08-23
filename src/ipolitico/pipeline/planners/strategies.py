@@ -1884,6 +1884,9 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     # ── Portal da Transparência (CGU) — Fatia 3 (Convênios e Repasses) ────────
     DomainType.CG_CONVENIOS: SnapshotWindowStrategy(),
     DomainType.CG_CONVENIOS_ADITIVOS: SnapshotWindowStrategy(),
+    # ── Portal da Transparência (CGU) — Fatia 4 (Despesas Públicas) ───────────
+    DomainType.CG_DESPESAS_EMPENHOS: SnapshotWindowStrategy(),
+    DomainType.CG_DESPESAS_PAGAMENTOS: SnapshotWindowStrategy(),
 }
 
 

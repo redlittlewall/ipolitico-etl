@@ -127,6 +127,8 @@ FULL_PIPELINE: tuple[DomainType, ...] = (
     DomainType.CG_CONTRATOS_ADITIVOS,
     DomainType.CG_CONVENIOS,
     DomainType.CG_CONVENIOS_ADITIVOS,
+    DomainType.CG_DESPESAS_EMPENHOS,
+    DomainType.CG_DESPESAS_PAGAMENTOS,
 )
 
 # Dependências obrigatórias (silver/gold já populado antes do domínio)
