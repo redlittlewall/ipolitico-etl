@@ -136,3 +136,19 @@ domain_configs:
     extractor: "ipolitico.extractors.portal_transparencia.api.acordos_leniencia_extractor.PortalAcordosLenienciaApiExtractor"
     transformer: "ipolitico.transformers.portal_transparencia.acordos_leniencia_transformer.PortalAcordosLenienciaTransformer"
 
+  # ── Fatia 2 — CG_LICITACOES (licitações do Executivo, API v3) ───────────────
+  cg_licitacoes:
+    extractor: "ipolitico.extractors.portal_transparencia.api.licitacoes_extractor.PortalLicitacoesApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.licitacoes_transformer.PortalLicitacoesTransformer"
+
+  # ── Fatia 2 — CG_CONTRATOS (contratos do Executivo, API v3) ─────────────────
+  cg_contratos:
+    extractor: "ipolitico.extractors.portal_transparencia.api.contratos_extractor.PortalContratosApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.contratos_transformer.PortalContratosTransformer"
+
+  # ── Fatia 2 — CG_CONTRATOS_ADITIVOS (termos aditivos de contratos, API v3) ──
+  cg_contratos_aditivos:
+    extractor: "ipolitico.extractors.portal_transparencia.api.contratos_aditivos_extractor.PortalContratosAditivosApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.contratos_aditivos_transformer.PortalContratosAditivosTransformer"
+
+

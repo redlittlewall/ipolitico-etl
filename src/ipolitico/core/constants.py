@@ -213,6 +213,11 @@ class DomainType(str, Enum):
     CG_CEPIM = "cg_cepim"
     CG_CEAF = "cg_ceaf"
     CG_ACORDOS_LENIENCIA = "cg_acordos_leniencia"
+    # ── Portal da Transparência (CGU) — Fatia 2 (Compras Públicas) ────────────
+    CG_LICITACOES = "cg_licitacoes"
+    CG_CONTRATOS = "cg_contratos"
+    CG_CONTRATOS_ADITIVOS = "cg_contratos_aditivos"
+
 
 
 class MedallionLayer(str, Enum):
@@ -323,6 +328,11 @@ class EarliestDates:
     CG_CEPIM = "1826-04-29"
     CG_CEAF = "1826-04-29"
     CG_ACORDOS_LENIENCIA = "1826-04-29"
+    # ── Fatia 2 (Compras Públicas — snapshot de licitações e contratos) ──────
+    CG_LICITACOES = "1826-04-29"
+    CG_CONTRATOS = "1826-04-29"
+    CG_CONTRATOS_ADITIVOS = "1826-04-29"
+
 
 
 # Facilita o acesso dinâmico: EarliestDateMap[DomainType.DESPESAS]
@@ -454,6 +464,10 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.CG_CEPIM: EarliestDates.CG_CEPIM,
     DomainType.CG_CEAF: EarliestDates.CG_CEAF,
     DomainType.CG_ACORDOS_LENIENCIA: EarliestDates.CG_ACORDOS_LENIENCIA,
+    # ── Portal da Transparência (CGU) — Fatia 2 (Compras Públicas) ────────────
+    DomainType.CG_LICITACOES: EarliestDates.CG_LICITACOES,
+    DomainType.CG_CONTRATOS: EarliestDates.CG_CONTRATOS,
+    DomainType.CG_CONTRATOS_ADITIVOS: EarliestDates.CG_CONTRATOS_ADITIVOS,
 }
 
 
@@ -606,6 +620,9 @@ DOMAIN_SOURCE_SYSTEM: Dict[str, SourceSystem] = {
     "cg_cepim": SourceSystem.PORTAL_TRANSPARENCIA,
     "cg_ceaf": SourceSystem.PORTAL_TRANSPARENCIA,
     "cg_acordos_leniencia": SourceSystem.PORTAL_TRANSPARENCIA,
+    "cg_licitacoes": SourceSystem.PORTAL_TRANSPARENCIA,
+    "cg_contratos": SourceSystem.PORTAL_TRANSPARENCIA,
+    "cg_contratos_aditivos": SourceSystem.PORTAL_TRANSPARENCIA,
     # ── Domínios documentados no registry, ainda sem DomainType ─────────────
     "folha_pagamento": SourceSystem.CAMARA,
     "remuneracoes": SourceSystem.SENADO,
@@ -748,4 +765,8 @@ DOMAIN_LABELS: dict[DomainType, str] = {
     DomainType.CG_CEPIM: "Entidades Privadas Sem Fins Lucrativos Impedidas (CEPIM, API v3)",
     DomainType.CG_CEAF: "Cadastro de Expulsões da Administração Federal (CEAF, API v3)",
     DomainType.CG_ACORDOS_LENIENCIA: "Acordos de Leniência da CGU (API v3)",
+    # ── Portal da Transparência (CGU) — Fatia 2 (Compras Públicas) ────────────
+    DomainType.CG_LICITACOES: "Licitações do Poder Executivo Federal (API v3)",
+    DomainType.CG_CONTRATOS: "Contratos do Poder Executivo Federal (API v3)",
+    DomainType.CG_CONTRATOS_ADITIVOS: "Termos Aditivos de Contratos (API v3)",
 }

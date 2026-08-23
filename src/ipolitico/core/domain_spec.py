@@ -730,6 +730,25 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         None,
         uk=("id", "cnpjEmpresa"),
     ),
+    # ── Portal da Transparência (CGU) — Fatia 2 (Compras Públicas) ────────────
+    # Snapshot via API v3 /api-de-dados/licitacoes
+    DomainType.CG_LICITACOES: _spec(
+        DomainType.CG_LICITACOES,
+        None,
+        uk=("id",),
+    ),
+    # Snapshot via API v3 /api-de-dados/contratos
+    DomainType.CG_CONTRATOS: _spec(
+        DomainType.CG_CONTRATOS,
+        None,
+        uk=("id",),
+    ),
+    # Snapshot via API v3 /api-de-dados/contratos/termo-aditivo
+    DomainType.CG_CONTRATOS_ADITIVOS: _spec(
+        DomainType.CG_CONTRATOS_ADITIVOS,
+        None,
+        uk=("idContrato", "numero"),
+    ),
 }
 
 

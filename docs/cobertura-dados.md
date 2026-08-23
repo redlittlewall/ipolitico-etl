@@ -150,3 +150,6 @@ API: https://portaldatransparencia.gov.br
 | `cg_cepim` | 1826-04-29 | — |
 | `cg_ceaf` | 1826-04-29 | — |
 | `cg_acordos_leniencia` | 1826-04-29 | — |
+| `cg_licitacoes` | 1826-04-29 | — |
+| `cg_contratos` | 1826-04-29 | — |
+| `cg_contratos_aditivos` | 1826-04-29 | — |

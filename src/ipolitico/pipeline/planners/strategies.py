@@ -1877,6 +1877,10 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     DomainType.CG_CEPIM: SnapshotWindowStrategy(),
     DomainType.CG_CEAF: SnapshotWindowStrategy(),
     DomainType.CG_ACORDOS_LENIENCIA: SnapshotWindowStrategy(),
+    # ── Portal da Transparência (CGU) — Fatia 2 (Compras Públicas) ────────────
+    DomainType.CG_LICITACOES: SnapshotWindowStrategy(),
+    DomainType.CG_CONTRATOS: SnapshotWindowStrategy(),
+    DomainType.CG_CONTRATOS_ADITIVOS: SnapshotWindowStrategy(),
 }
 
 
