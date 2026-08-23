@@ -45,16 +45,16 @@ class PortalContratosApiExtractor(PortalTransparenciaBaseExtractor):
         # A API v3 exige codigoOrgao (ex: 26000 - MEC, 36000 - MS).
         params["codigoOrgao"] = codigoOrgao or "26000"
 
-        # Converte ISO YYYY-MM-DD para DD/MM/AAAA se necessário
-        dt_ini = dataInicial or kwargs.get("start_date")
+        # Apenas envia período se informado explicitamente (evita 400 por janela > 1 mês na consulta histórica)
+        dt_ini = dataInicial or (kwargs.get("start_date") if kwargs.get("start_date") != "1826-04-29" else None)
         if dt_ini:
             if "-" in str(dt_ini):
                 parts = str(dt_ini).split("-")
                 dt_ini = f"{parts[2]}/{parts[1]}/{parts[0]}" if len(parts) == 3 else dt_ini
             params["dataInicial"] = dt_ini
 
-        dt_fim = dataFinal or kwargs.get("end_date")
-        if dt_fim:
+        dt_fim = dataFinal or (kwargs.get("end_date") if kwargs.get("start_date") != "1826-04-29" else None)
+        if dt_fim and dt_ini:
             if "-" in str(dt_fim):
                 parts = str(dt_fim).split("-")
                 dt_fim = f"{parts[2]}/{parts[1]}/{parts[0]}" if len(parts) == 3 else dt_fim
