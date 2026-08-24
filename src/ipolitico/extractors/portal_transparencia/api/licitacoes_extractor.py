@@ -45,7 +45,7 @@ class PortalLicitacoesApiExtractor(PortalTransparenciaBaseExtractor):
         # A API v3 exige codigoOrgao (ex: 26000 - MEC, 36000 - MS).
         params["codigoOrgao"] = codigoOrgao or "26000"
 
-        # Apenas envia período se informado explicitamente (evita 400 por janela > 1 mês na consulta histórica)
+        # A API v3 de licitações exige OBRIGATORIAMENTE período de até 1 mês e codigoOrgao.
         dt_ini = dataInicial or (kwargs.get("start_date") if kwargs.get("start_date") != "1826-04-29" else None)
         if dt_ini:
             if "-" in str(dt_ini):
@@ -59,6 +59,13 @@ class PortalLicitacoesApiExtractor(PortalTransparenciaBaseExtractor):
                 parts = str(dt_fim).split("-")
                 dt_fim = f"{parts[2]}/{parts[1]}/{parts[0]}" if len(parts) == 3 else dt_fim
             params["dataFinal"] = dt_fim
+
+        # Se período não foi fornecido, usa o mês corrente como default seguro (≤ 1 mês).
+        if "dataInicial" not in params:
+            from datetime import datetime
+            now = datetime.now()
+            params["dataInicial"] = f"01/{now.month:02d}/{now.year}"
+            params["dataFinal"] = f"{now.day:02d}/{now.month:02d}/{now.year}"
 
         data = await self.fetch_paginated(self.ENDPOINT, params=params)
         df = pl.DataFrame(data, infer_schema_length=None) if data else pl.DataFrame()
