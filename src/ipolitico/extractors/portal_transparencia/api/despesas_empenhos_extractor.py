@@ -43,12 +43,12 @@ class PortalDespesasEmpenhosApiExtractor(PortalTransparenciaBaseExtractor):
             DataFrame bruto com _source_url injetado ou vazio se a API não retornar dados.
         """
         params: dict[str, Any] = {"fase": 1}
-        dt_emissao = dataEmissao or kwargs.get("end_date") or kwargs.get("start_date")
-        if dt_emissao:
-            if "-" in str(dt_emissao):
-                parts = str(dt_emissao).split("-")
-                dt_emissao = f"{parts[2]}/{parts[1]}/{parts[0]}" if len(parts) == 3 else dt_emissao
-            params["dataEmissao"] = dt_emissao
+        raw_dt = dataEmissao or kwargs.get("end_date") or kwargs.get("start_date")
+        if raw_dt and "1826" not in str(raw_dt):
+            if "-" in str(raw_dt):
+                parts = str(raw_dt).split("-")
+                raw_dt = f"{parts[2]}/{parts[1]}/{parts[0]}" if len(parts) == 3 else raw_dt
+            params["dataEmissao"] = raw_dt
         else:
             from datetime import datetime
             now = datetime.now()
@@ -56,8 +56,12 @@ class PortalDespesasEmpenhosApiExtractor(PortalTransparenciaBaseExtractor):
 
         if unidadeGestora:
             params["unidadeGestora"] = unidadeGestora
-        if gestao:
+        elif gestao:
             params["gestao"] = gestao
+        else:
+            # A API v3 exige ao menos unidadeGestora ou gestao.
+            # Usa 153061 (UnB/MEC) como UG default para chamadas abertas de snapshot.
+            params["unidadeGestora"] = "153061"
 
         data = await self.fetch_paginated(self.ENDPOINT, params=params)
         df = pl.DataFrame(data, infer_schema_length=None) if data else pl.DataFrame()

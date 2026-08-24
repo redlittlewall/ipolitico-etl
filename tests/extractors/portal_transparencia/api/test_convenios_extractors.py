@@ -46,7 +46,7 @@ class TestPortalConveniosApiExtractor:
 
         assert result.height == 20
         assert result["id"].to_list() == list(range(1, 21))
-        assert "dataInicial=" in result["_source_url"][0]
+        assert "codigoOrgao=26000" in result["_source_url"][0]
         assert "pagina=1" in result["_source_url"][0]
         assert "pagina=2" in result["_source_url"][15]
 
