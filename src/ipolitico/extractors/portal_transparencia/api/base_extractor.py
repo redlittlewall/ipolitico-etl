@@ -87,7 +87,7 @@ class PortalTransparenciaBaseExtractor(BaseExtractor):
 
             all_data.extend(data)
 
-            if page == 1 or page % 10 == 0:
+            if page == 1 or page % 50 == 0:
                 logger.info(
                     "[%s] Página %d consultada (+%d itens, total acumulado: %d registros)...",
                     endpoint,
