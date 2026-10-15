@@ -775,6 +775,50 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         None,
         uk=("documento",),
     ),
+    # ── Tribunal Superior Eleitoral (TSE) — Eixo Canônico Eleitoral ───────────
+    DomainType.TSE_CANDIDATOS: _spec(
+        DomainType.TSE_CANDIDATOS,
+        None,
+        uk=("ano_eleicao", "cd_eleicao", "sq_candidato"),
+    ),
+    DomainType.TSE_BENS: _spec(
+        DomainType.TSE_BENS,
+        None,
+        uk=("ano_eleicao", "cd_eleicao", "sq_candidato", "nr_ordem_bem"),
+    ),
+    DomainType.TSE_VOTACAO_MUNZONA: _spec(
+        DomainType.TSE_VOTACAO_MUNZONA,
+        None,
+        uk=("ano_eleicao", "cd_eleicao", "nr_turno", "cd_municipio", "nr_zona", "sq_candidato"),
+    ),
+    DomainType.TSE_RECEITAS_CAMPANHA: _spec(
+        DomainType.TSE_RECEITAS_CAMPANHA,
+        None,
+        uk=("ano_eleicao", "cd_eleicao", "sq_candidato", "nr_recibo_eleitoral"),
+    ),
+    DomainType.TSE_DESPESAS_CAMPANHA: _spec(
+        DomainType.TSE_DESPESAS_CAMPANHA,
+        None,
+        uk=(
+            "ano_eleicao",
+            "cd_eleicao",
+            "sq_candidato",
+            "cd_cpf_cnpj_fornecedor",
+            "dt_despesa",
+            "vr_despesa",
+        ),
+    ),
+    # ── Dimensões Canônicas de Identidade e Mandato (Gold / Star Schema) ──────
+    DomainType.DIM_POLITICO: _spec(
+        DomainType.DIM_POLITICO,
+        None,
+        uk=("politico_id",),
+    ),
+    DomainType.DIM_MANDATO: _spec(
+        DomainType.DIM_MANDATO,
+        None,
+        uk=("mandato_id",),
+    ),
 }
 
 

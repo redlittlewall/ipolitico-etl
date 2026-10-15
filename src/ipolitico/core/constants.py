@@ -34,6 +34,8 @@ class SourceSystem(str, Enum):
     # Poder Executivo Federal via Portal da Transparência (CGU) — ticket 02
     # (tracer bullet cg_orgaos). Consumo total decidido no survey de 18/08.
     PORTAL_TRANSPARENCIA = "portal_transparencia"
+    # Tribunal Superior Eleitoral (TSE) — Eixo canônico eleitoral e patrimonial
+    TSE = "tse"
 
 
 class ApiRoutes(str, Enum):
@@ -223,9 +225,15 @@ class DomainType(str, Enum):
     # ── Portal da Transparência (CGU) — Fatia 4 (Despesas Públicas) ───────────
     CG_DESPESAS_EMPENHOS = "cg_despesas_empenhos"
     CG_DESPESAS_PAGAMENTOS = "cg_despesas_pagamentos"
-
-
-
+    # ── Tribunal Superior Eleitoral (TSE) — Eixo Canônico Eleitoral ───────────
+    TSE_CANDIDATOS = "tse_candidatos"
+    TSE_BENS = "tse_bens"
+    TSE_VOTACAO_MUNZONA = "tse_votacao_munzona"
+    TSE_RECEITAS_CAMPANHA = "tse_receitas_campanha"
+    TSE_DESPESAS_CAMPANHA = "tse_despesas_campanha"
+    # ── Dimensões Canônicas de Identidade e Mandato (Gold / Star Schema) ──────
+    DIM_POLITICO = "dim_politico"
+    DIM_MANDATO = "dim_mandato"
 
 
 class MedallionLayer(str, Enum):
@@ -346,9 +354,14 @@ class EarliestDates:
     # ── Fatia 4 (Despesas Públicas — snapshot de empenhos e pagamentos) ───────
     CG_DESPESAS_EMPENHOS = "1826-04-29"
     CG_DESPESAS_PAGAMENTOS = "1826-04-29"
-
-
-
+    # ── Tribunal Superior Eleitoral (TSE) e Dimensões Canônicas ───────────────
+    TSE_CANDIDATOS = "1994-01-01"
+    TSE_BENS = "2006-01-01"
+    TSE_VOTACAO_MUNZONA = "1994-01-01"
+    TSE_RECEITAS_CAMPANHA = "2002-01-01"
+    TSE_DESPESAS_CAMPANHA = "2002-01-01"
+    DIM_POLITICO = "1949-01-01"
+    DIM_MANDATO = "1949-01-01"
 
 
 # Facilita o acesso dinâmico: EarliestDateMap[DomainType.DESPESAS]
@@ -490,6 +503,14 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     # ── Portal da Transparência (CGU) — Fatia 4 (Despesas Públicas) ───────────
     DomainType.CG_DESPESAS_EMPENHOS: EarliestDates.CG_DESPESAS_EMPENHOS,
     DomainType.CG_DESPESAS_PAGAMENTOS: EarliestDates.CG_DESPESAS_PAGAMENTOS,
+    # ── Tribunal Superior Eleitoral (TSE) e Dimensões Canônicas ───────────────
+    DomainType.TSE_CANDIDATOS: EarliestDates.TSE_CANDIDATOS,
+    DomainType.TSE_BENS: EarliestDates.TSE_BENS,
+    DomainType.TSE_VOTACAO_MUNZONA: EarliestDates.TSE_VOTACAO_MUNZONA,
+    DomainType.TSE_RECEITAS_CAMPANHA: EarliestDates.TSE_RECEITAS_CAMPANHA,
+    DomainType.TSE_DESPESAS_CAMPANHA: EarliestDates.TSE_DESPESAS_CAMPANHA,
+    DomainType.DIM_POLITICO: EarliestDates.DIM_POLITICO,
+    DomainType.DIM_MANDATO: EarliestDates.DIM_MANDATO,
 }
 
 
@@ -649,6 +670,14 @@ DOMAIN_SOURCE_SYSTEM: Dict[str, SourceSystem] = {
     "cg_convenios_aditivos": SourceSystem.PORTAL_TRANSPARENCIA,
     "cg_despesas_empenhos": SourceSystem.PORTAL_TRANSPARENCIA,
     "cg_despesas_pagamentos": SourceSystem.PORTAL_TRANSPARENCIA,
+    # ── Tribunal Superior Eleitoral (TSE) e Dimensões Canônicas ───────────────
+    "tse_candidatos": SourceSystem.TSE,
+    "tse_bens": SourceSystem.TSE,
+    "tse_votacao_munzona": SourceSystem.TSE,
+    "tse_receitas_campanha": SourceSystem.TSE,
+    "tse_despesas_campanha": SourceSystem.TSE,
+    "dim_politico": SourceSystem.TSE,
+    "dim_mandato": SourceSystem.TSE,
     # ── Domínios documentados no registry, ainda sem DomainType ─────────────
     "folha_pagamento": SourceSystem.CAMARA,
     "remuneracoes": SourceSystem.SENADO,
@@ -801,4 +830,14 @@ DOMAIN_LABELS: dict[DomainType, str] = {
     # ── Portal da Transparência (CGU) — Fatia 4 (Despesas Públicas) ───────────
     DomainType.CG_DESPESAS_EMPENHOS: "Empenhos de Despesas do Poder Executivo Federal (API v3)",
     DomainType.CG_DESPESAS_PAGAMENTOS: "Pagamentos de Despesas do Poder Executivo Federal (API v3)",
+    # ── Tribunal Superior Eleitoral (TSE) e Dimensões Canônicas ───────────────
+    DomainType.TSE_CANDIDATOS: "Candidaturas eleitorais oficiais (TSE)",
+    DomainType.TSE_BENS: "Bens e patrimônio declarados por candidatos (TSE)",
+    DomainType.TSE_VOTACAO_MUNZONA: "Votação nominal de candidatos por município e zona (TSE)",
+    DomainType.TSE_RECEITAS_CAMPANHA: "Receitas e doações de campanha eleitoral (TSE)",
+    DomainType.TSE_DESPESAS_CAMPANHA: "Despesas e prestação de contas de campanha eleitoral (TSE)",
+    DomainType.DIM_POLITICO: "Dimensão canônica mestre de políticos (Gold Star Schema)",
+    DomainType.DIM_MANDATO: (
+        "Dimensão temporal de mandatos e desempenho eleitoral (Gold Star Schema)"
+    ),
 }
