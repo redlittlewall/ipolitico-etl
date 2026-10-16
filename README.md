@@ -234,6 +234,27 @@ ipolitico --strategy incremental --optimize --export-gold sqlite
 └─────────────────────────────────┘
 ```
 
+### Comportamento conhecido das APIs
+
+As APIs governamentais (principalmente a da **Câmara**) têm instabilidade
+conhecida. O ETL responde assim:
+
+- **Backoff com teto** — o `CamaraClient` espera `2^tentativa` (2s, 4s, 8s…)
+  **limitado a 30s**; a tentativa 10 nunca dorme ~17min. Senado, Senado-adm e
+  Portal já usavam esse teto.
+- **Quarentena por recurso** — se um recurso (ex: `/deputados/{id}/discursos`)
+  responde **500/502/503/504 por 3 vezes seguidas**, entra em quarentena e é
+  **pulado instantaneamente** até o fim da execução. Isso evita que "maçãs
+  podres" (alguns deputados com endpoint quebrado) travem um domínio inteiro
+  por horas. A quarentena é **em memória**: a cada execução os recursos são
+  re-testados e os dados voltam a ser coletados se a API se recuperar.
+- **429 (rate-limit) não entra em quarentena** — é global e cede com backoff.
+
+Este padrão de 500s persistentes foi observado **apenas na API da Câmara** —
+é o único client com retry profundo (10 tentativas) e foi onde o problema
+apareceu (domínio `discursos`, ago/2026). Os demais usam retry limitado
+(5 tentativas, backoff máx. 30s).
+
 ### Stack
 
 | Pra quê | O que usa | Por quê |
@@ -275,7 +296,7 @@ Consulte [CONTRIBUTING.md](CONTRIBUTING.md) para detalhes sobre arquitetura, con
 ## Proximos Passos
 
 - [x] API do Senado Federal
-- [ ] Portal da Transparencia
+- [ ] Portal da Transparencia (CGU — Poder Executivo Federal; consumo total dos modulos, PRD dedicado)
 - [x] Export automatico para SQLite e DuckDB
 - [ ] Dados do TSE (eleicoes)
 

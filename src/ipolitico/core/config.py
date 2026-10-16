@@ -21,6 +21,17 @@ CAMARA_API_BASE_URL = os.getenv("CAMARA_API_BASE_URL", "https://dadosabertos.cam
 CAMARA_PAGE_SIZE = int(os.getenv("CAMARA_PAGE_SIZE", 1000))
 LEGISLATURA_ATUAL = int(os.getenv("LEGISLATURA_ATUAL", 57))
 
+# Teto do backoff exponencial do CamaraClient (2^attempt) em segundos.
+# Sem teto, a tentativa 10 dormiria 1024s (~17min). 30s é o mesmo teto já
+# usado por Senado/Senado-adm/Portal (wait_exponential max=30).
+CAMARA_MAX_BACKOFF_S = int(os.getenv("CAMARA_MAX_BACKOFF_S", "30"))
+
+# Nº de falhas CONSECUTIVAS de servidor (500/502/503/504) em um mesmo recurso
+# que coloca o recurso em quarentena: dali em diante ele é pulado instantâneo
+# até o fim da execução (quarentena é em memória, por processo). 429 NÃO conta
+# — é rate-limit global, não recurso podre.
+CAMARA_QUARANTINE_THRESHOLD = int(os.getenv("CAMARA_QUARANTINE_THRESHOLD", "3"))
+
 # --- Configurações do Senado ---
 SENADO_API_BASE_URL = os.getenv("SENADO_API_BASE_URL", "https://legis.senado.leg.br/dadosabertos")
 SENADO_HTTP_CONCURRENCY = int(os.getenv("SENADO_HTTP_CONCURRENCY", "10"))
@@ -33,6 +44,24 @@ SENADO_ADM_API_BASE_URL = os.getenv(
     "SENADO_ADM_API_BASE_URL", "https://adm.senado.gov.br/adm-dadosabertos/api/v1"
 )
 SENADO_ADM_HTTP_CONCURRENCY = int(os.getenv("SENADO_ADM_HTTP_CONCURRENCY", "10"))
+
+# --- Configurações do Portal da Transparência (CGU — Poder Executivo Federal) ---
+# Autenticação por chave gratuita do usuário (header ``chave-api-dados`` na API v3).
+# A chave real vive SÓ no .env local (gitignored) — nunca versionada. Cada usuário
+# gera a própria no portal; sem chave, o cliente loga um aviso e as chamadas falham
+# com 401 (PortalTransparenciaAuthError).
+PORTAL_API_BASE_URL = os.getenv("PORTAL_API_BASE_URL", "https://api.portaldatransparencia.gov.br")
+PORTAL_API_KEY = os.getenv("PORTAL_API_KEY", "")
+PORTAL_HTTP_CONCURRENCY = int(os.getenv("PORTAL_HTTP_CONCURRENCY", "10"))
+
+# Bulk /download-de-dados: base dos dumps ZIP/CSV (host público, sem chave) e
+# diretório persistente onde os dumps são guardados. Persistir (em vez de temp
+# descartável) permite ao ``PortalTransparenciaClient.download_file`` retomar
+# downloads interrompidos via Range header sem recomeçar do zero.
+PORTAL_BULK_BASE_URL = os.getenv(
+    "PORTAL_BULK_BASE_URL", "https://portaldatransparencia.gov.br/download-de-dados"
+)
+PORTAL_BULK_DIR = Path(os.getenv("PORTAL_BULK_DIR", str(DATA_DIR / "portal_dumps")))
 
 # --- Tuning de Performance ---
 MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", 10))

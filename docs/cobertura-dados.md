@@ -15,6 +15,7 @@ conhecidas no meio da série (a fonte responde vazio/404 para o período).
 |---|---|
 | Câmara dos Deputados | https://dadosabertos.camara.leg.br |
 | Senado Federal | https://legis.senado.leg.br |
+| Portal da Transparência (CGU) | https://portaldatransparencia.gov.br |
 
 ## Câmara dos Deputados
 
@@ -59,6 +60,7 @@ API: https://dadosabertos.camara.leg.br
 | `deputados_orgaos` | 1826-04-29 | — |
 | `deputados_eventos` | 1826-04-29 | — |
 | `mandatos_externos` | 1826-04-29 | — |
+| `camara_gabinete_assessores` | 1826-04-29 | — |
 | `profissoes` | 1826-04-29 | — |
 | `ocupacoes` | 1826-04-29 | — |
 | `votacoes` | 1991-01-01 | — |
@@ -129,3 +131,30 @@ API: https://legis.senado.leg.br
 | `servidores` | 1826-04-29 | — |
 | `remuneracoes` | 2013-01-01 | 404 para 2012 e anteriores (início da série 2013-01) — ausência permanente; mês corrente não publicado = HTTP 200 com lista vazia (ausência temporária) |
 | `despesas_ceaps` | 2008-01-01 | 404 para 2007 e anteriores (início da série 2008) — ausência permanente |
+
+## Portal da Transparência (CGU)
+
+API: https://portaldatransparencia.gov.br
+
+| Domínio | Início dos dados | Lacunas no meio da série |
+|---|---|---|
+| `cg_orgaos` | 1826-04-29 | — |
+| `cg_servidores` | 1826-04-29 | — |
+| `cg_remuneracoes` | 2017-01-01 | — |
+| `cg_pep` | 2013-01-01 | — |
+| `cg_viagens` | 2013-01-01 | — |
+| `cg_cartoes` | 2014-01-01 | — |
+| `cg_imoveis_funcionais` | 1826-04-29 | — |
+| `cg_emendas` | 2012-01-01 | — |
+| `cg_ceis` | 1826-04-29 | — |
+| `cg_cnep` | 1826-04-29 | — |
+| `cg_cepim` | 1826-04-29 | — |
+| `cg_ceaf` | 1826-04-29 | — |
+| `cg_acordos_leniencia` | 1826-04-29 | — |
+| `cg_licitacoes` | 1826-04-29 | — |
+| `cg_contratos` | 1826-04-29 | — |
+| `cg_contratos_aditivos` | 1826-04-29 | — |
+| `cg_convenios` | 1826-04-29 | — |
+| `cg_convenios_aditivos` | 1826-04-29 | — |
+| `cg_despesas_empenhos` | 1826-04-29 | — |
+| `cg_despesas_pagamentos` | 1826-04-29 | — |

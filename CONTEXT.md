@@ -271,14 +271,32 @@ O `PipelineRunner` implementa o padrão Producer-Consumer:
 
 `CamaraClient` implementa:
 
-- **Exponential Backoff**: `2^attempt` segundos (2s, 4s, 8s...) em erros 429, 500,
-  502, 503, 504 e erros de rede.
+- **Exponential Backoff com teto**: `2^attempt` segundos (2s, 4s, 8s...) em
+  erros 500/502/503/504, 429 e erros de rede, **limitado a
+  `CAMARA_MAX_BACKOFF_S` (padrão 30s)**. Sem o teto, a tentativa 10 dormiria
+  1024s (~17min).
+- **Quarentena por recurso (anti "maçã podre")**: falhas 5xx **consecutivas**
+  em um mesmo recurso (path + parâmetros estáveis, sem paginação) são contadas;
+  ao atingir `CAMARA_QUARANTINE_THRESHOLD` (padrão 3), o recurso entra em
+  quarentena e passa a ser **pulado instantaneamente** até o fim da execução —
+  novas chamadas ao mesmo recurso sobem `ResourceQuarantinedError` sem contato
+  com a API. 429 (rate-limit global) e erros de transporte NÃO contam. A
+  quarentena é **em memória** (por processo): recursos são re-testados a cada
+  execução, então dados voltam a ser coletados se a API se recuperar.
 - **Retry**: até 10 tentativas (`max_retries`).
-- **Semaphore**: limita concorrência a `CAMARA_HTTP_CONCURRENCY` (padrão: 5).
+- **Semaphore**: limita concorrência a `CAMARA_HTTP_CONCURRENCY` (padrão: 10).
 - **Falsos 404**: tratados como lista vazia (a API da Câmara retorna 404 para
   recursos sem dados, não para erros reais).
 - **Resume de download**: suporte a `Range` header para retomar downloads
   interrompidos de arquivos bulk.
+
+> **⚠️ Conhecido — 500s persistentes na Câmara (ago/2026):** alguns deputados
+> têm `/deputados/{id}/discursos` respondendo HTTP 500 de forma persistente.
+> Antes da quarentena, cada um custava ~3h de retries (10 tentativas do client ×
+> 5 externas do runner, com backoff sem teto); agora ~6s (3 tentativas com
+> backoff limitado) e o domínio segue. O mecanismo vale para qualquer recurso
+> 5xx persistente. É **específico da Câmara**: Senado/Senado-adm/Portal já usam
+> retry limitado (tenacity, máx. 30s) e não apresentaram o problema.
 
 ### 5.3 Retry de Extração (Tenacity)
 
@@ -605,5 +623,6 @@ ipolitico-etl/
 | **Backpressure** | Mecanismo que trava workers se o sink não consegue acompanhar |
 | **CEAP** | Cota para Exercício da Atividade Parlamentar ("cotão") |
 | **Federation** | Orquestração de múltiplas fontes (Câmara + Senado futuro) |
+| **Portal da Transparência (CGU)** | Fonte do **Poder Executivo Federal** (não cobre Câmara/Senado — estes têm payroll próprio). Módulos: servidores/remuneração, PEP, viagens, cartões, imóveis funcionais, emendas parlamentares etc. Não confundir com os portais de transparência da Câmara e do Senado. |
 | **Swagger / OpenAPI** | Especificação padronizada dos endpoints da API Câmara |
 | **Smoke test** | Teste rápido de validação de imports e CLI (sem rede) |

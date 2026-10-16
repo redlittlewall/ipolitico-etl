@@ -854,6 +854,18 @@ class ParentBatchedStrategy(DomainJobStrategy):
 class DetailStrategy(DomainJobStrategy):
     """Estratégia para domínios de detalhe (*_detalhe), com batch entity_ids."""
 
+    # Coluna do pai na tabela filha (Silver/Gold) usada no filtro de
+    # materialização. Câmara grava ``id``; Senado grava ``codigo`` — e
+    # ``comissoes_membros`` grava ``codigo_comissao``. Sem o mapeamento
+    # correto, o dedup de filhos quebrava (com ``id``/``codigo`` ausentes,
+    # todas as entidades eram re-buscadas a cada run).
+    _CHILD_PARENT_COL: dict[str, str] = {
+        DomainType.SENADORES_DETALHE.value: "codigo",
+        DomainType.VETOS_DETALHE.value: "codigo",
+        DomainType.COMISSOES_DETALHE.value: "codigo",
+        DomainType.COMISSOES_MEMBROS.value: "codigo_comissao",
+    }
+
     def build(
         self,
         domain: DomainType,
@@ -879,7 +891,8 @@ class DetailStrategy(DomainJobStrategy):
             return [], lambda x: {}
 
         if lake is not None:
-            covered = lake.list_entity_ids_with_child_materialized(domain_val, "id")
+            parent_col = self._CHILD_PARENT_COL.get(domain_val, "id")
+            covered = lake.list_entity_ids_with_child_materialized(domain_val, parent_col)
             entity_ids = filter_entity_ids_pending_child(
                 entity_ids, covered, domain_val, "entidades"
             )
@@ -1225,8 +1238,13 @@ class AnnualWindowStrategy(DomainJobStrategy):
 
     Domínios anuais (orçamento, vetos) usam endpoints com filtro ``ano``
     em vez de janela mensal. Esta estratégia gera 1 job por ano civil
-    dentro da janela temporal, cada um com o parâmetro ``ano``.
+    dentro da janela temporal, cada um com o parâmetro ``ano``. A chave do
+    job é um atributo de classe (``_job_key``) para que subclasses que
+    alimentam extratores bulk (ex: ``PortalAnnualBulkStrategy``) troquem a
+    chave que o extrator espera (``year``) sem reescrever o grid.
     """
+
+    _job_key = "ano"
 
     def build(
         self,
@@ -1242,8 +1260,9 @@ class AnnualWindowStrategy(DomainJobStrategy):
     ) -> tuple[list[dict[str, Any]], Callable[[dict[str, Any]], dict[str, Any]]]:
         start_year = int(start.split("-")[0])
         end_year = int(end.split("-")[0])
+        key = self._job_key
 
-        jobs = [{"ano": y} for y in range(start_year, end_year + 1)]
+        jobs = [{key: y} for y in range(start_year, end_year + 1)]
 
         logger.info(
             "[%s] Jobs anuais: %s (%s-%s).",
@@ -1254,9 +1273,23 @@ class AnnualWindowStrategy(DomainJobStrategy):
         )
 
         def annual_mapper(job: dict) -> dict:
-            return {"ano": job["ano"]}
+            return {key: job[key]}
 
         return jobs, annual_mapper
+
+
+class PortalAnnualBulkStrategy(AnnualWindowStrategy):
+    """Estratégia para dumps bulk ANUAIS do Portal da Transparência.
+
+    Mesmo grid do ``AnnualWindowStrategy`` (1 job por ano civil), mas o mapper
+    devolve ``{"year": y}`` em vez de ``{"ano": y}``: o
+    ``PortalTransparenciaBulkExtractor.extract(year, month)`` espera ``year``
+    (a URL é montada por convenção de segmento ``/download-de-dados/{módulo}/{YYYY}``),
+    enquanto ``{"ano"}`` alimenta endpoints de API com o param ``ano`` (ex:
+    ``/api-de-dados/emendas?ano=...``). Usada por cg_pep e cg_viagens (ticket 04).
+    """
+
+    _job_key = "year"
 
 
 class MonthlyBulkStrategy(DomainJobStrategy):
@@ -1557,6 +1590,7 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     DomainType.OCUPACOES: DeputyChildStrategy(include_date_range=False),
     DomainType.DEPUTADOS_FRENTES: DeputyChildStrategy(include_date_range=False),
     DomainType.DEPUTADOS_HISTORICO: DeputyChildStrategy(include_date_range=False),
+    DomainType.CAMARA_GABINETE_ASSESSORES: DeputyChildStrategy(include_date_range=False),
     # Filhos temporais de deputado (janelas reais de legislatura)
     # NOTA: DeputyLegislatureStrategy lê deputados_historico + legislaturas do
     # lake para gerar 1 job exato por (deputado, legislatura), eliminando ~81%
@@ -1808,6 +1842,52 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     # granularidade efetiva mês). Série contínua 2008 → presente (sem anos de
     # lacuna) — ver COVERAGE_GAPS.
     DomainType.DESPESAS_CEAPS: AnnualWindowStrategy(),
+    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 02) ──────────
+    # Snapshot: 1 job vazio — órgãos SIAPE via API v3 /orgaos-siape (sem janela).
+    DomainType.CG_ORGAOS: SnapshotWindowStrategy(),
+    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 03) ──────────
+    # Snapshot: 1 job vazio — agregado por-orgao via API v3 (sem janela).
+    DomainType.CG_SERVIDORES: SnapshotWindowStrategy(),
+    # Bulk mensal: 1 job por (ano, mês) — path {YYYYMM} do portal. Ingestão
+    # BLOQUEADA pelo WAF/CAPTCHA na validação real (ticket 03) — os jobs ficam
+    # prontos e WAF-graciosos (o extrator devolve vazio, o job não cai).
+    DomainType.CG_REMUNERACOES: MonthlyBulkStrategy(),
+    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 04) ──────────
+    # Bulk anual: 1 job por ano — path {YYYY} do portal (/download-de-dados/
+    # {módulo}/{YYYY}); o mapper devolve {"year"} (a API de PEP nem é
+    # enumerável e o dump está indisponível hoje → job vazio gracioso).
+    DomainType.CG_PEP: PortalAnnualBulkStrategy(),
+    # Bulk anual: 1 job por ano — path {YYYY} do portal. Validação real
+    # confirmou que NÃO há dumps mensais de viagens (premissa do ticket
+    # "1 mês" corrigida).
+    DomainType.CG_VIAGENS: PortalAnnualBulkStrategy(),
+    # Bulk mensal + consulta pontual API v3: 1 job por (ano, mês). Os mesmos
+    # jobs {"year","month"} servem as duas rotas — bulk /download-de-dados/
+    # {cpgf|cpcc|cpdc}/{YYYYMM} (FULL_LOAD) e API /api-de-dados/cartoes com
+    # mesExtratoInicio/Fim do mês (INCREMENTAL, janela ≤12 meses).
+    DomainType.CG_CARTOES: MonthlyBulkStrategy(),
+    # Snapshot: 1 job vazio — imóveis via API v3 /imoveis (walk livre).
+    DomainType.CG_IMOVEIS_FUNCIONAIS: SnapshotWindowStrategy(),
+    # Anual: 1 job por ano — endpoint /api-de-dados/emendas com param `ano`
+    # ("respeita a janela da API por ano"). Sem rota bulk (dump único
+    # re-publica o histórico — conflita com append-only).
+    DomainType.CG_EMENDAS: AnnualWindowStrategy(),
+    # ── Portal da Transparência (CGU) — Fatia 1 (Sanções e Integridade) ────────
+    DomainType.CG_CEIS: SnapshotWindowStrategy(),
+    DomainType.CG_CNEP: SnapshotWindowStrategy(),
+    DomainType.CG_CEPIM: SnapshotWindowStrategy(),
+    DomainType.CG_CEAF: SnapshotWindowStrategy(),
+    DomainType.CG_ACORDOS_LENIENCIA: SnapshotWindowStrategy(),
+    # ── Portal da Transparência (CGU) — Fatia 2 (Compras Públicas) ────────────
+    DomainType.CG_LICITACOES: SnapshotWindowStrategy(),
+    DomainType.CG_CONTRATOS: SnapshotWindowStrategy(),
+    DomainType.CG_CONTRATOS_ADITIVOS: SnapshotWindowStrategy(),
+    # ── Portal da Transparência (CGU) — Fatia 3 (Convênios e Repasses) ────────
+    DomainType.CG_CONVENIOS: SnapshotWindowStrategy(),
+    DomainType.CG_CONVENIOS_ADITIVOS: SnapshotWindowStrategy(),
+    # ── Portal da Transparência (CGU) — Fatia 4 (Despesas Públicas) ───────────
+    DomainType.CG_DESPESAS_EMPENHOS: SnapshotWindowStrategy(),
+    DomainType.CG_DESPESAS_PAGAMENTOS: SnapshotWindowStrategy(),
 }
 
 

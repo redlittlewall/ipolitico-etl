@@ -30,6 +30,12 @@ _BULK_YEARLY_DOMAINS = frozenset(
     }
 )
 
+# Bulk mensal do Portal da Transparência com rota dupla (ticket 04): o domínio
+# tem bulk (dumps mensais cpgf/cpcc/cpdc) E consulta pontual da API v3 (blocos
+# mensais ≤12 meses). FULL_LOAD → Bulk (histórico barato); INCREMENTAL → API
+# (janela curta, sem baixar ZIPs inteiros).
+_PORTAL_MONTHLY_BULK_DOMAINS = frozenset({DomainType.CG_CARTOES})
+
 
 class SourceRouter:
     """
@@ -87,6 +93,20 @@ class SourceRouter:
                 return ExtractionPlan(
                     SourceType.BULK,
                     bulk_temporal_column=col if isinstance(col, str) else None,
+                    bulk_eff_start_iso=effective_start_iso,
+                    bulk_eff_end_iso=effective_end_iso,
+                )
+            return ExtractionPlan(SourceType.API)
+
+        # Portal da Transparência — bulk mensal com rota dupla (ticket 04):
+        # FULL_LOAD → Bulk (dumps {YYYYMM} cpgf/cpcc/cpdc, sem coluna de filtro
+        # temporal — o plano de janela recorta o mês); INCREMENTAL → API v3
+        # (consulta pontual por bloco mensal ≤12 meses, exigência do ticket).
+        if domain in _PORTAL_MONTHLY_BULK_DOMAINS:
+            if strategy == LoadStrategy.FULL_LOAD:
+                return ExtractionPlan(
+                    SourceType.BULK,
+                    bulk_temporal_column=None,
                     bulk_eff_start_iso=effective_start_iso,
                     bulk_eff_end_iso=effective_end_iso,
                 )

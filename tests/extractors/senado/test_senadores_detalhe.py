@@ -98,6 +98,82 @@ async def test_extract_multiple_senadores():
 
 
 @pytest.mark.asyncio
+async def test_extract_heterogeneous_structs_unifies_schema():
+    """
+    Senadores com structs aninhados de shapes diferentes não quebram o batch.
+
+    O detalhe de um senador em exercício tem campos que o de um histórico não
+    tem (ex: SexoParlamentar, EmailParlamentar). O extrator deve unificar o
+    schema (união de campos, preenchendo com null) em vez de falhar no vstack.
+    """
+    client = SenadoClient()
+    extractor = SenadoSenadoresDetalheExtractor(client)
+
+    with respx.mock:
+        # Senador ativo: IdentificacaoParlamentar mais rico
+        respx.get("https://legis.senado.leg.br/dadosabertos/senador/1.json").respond(
+            status_code=200,
+            json={
+                "DetalheParlamentar": {
+                    "Parlamentar": {
+                        "IdentificacaoParlamentar": {
+                            "CodigoParlamentar": "1",
+                            "NomeParlamentar": "Senador Um",
+                            "SexoParlamentar": "Masculino",
+                            "EmailParlamentar": "um@senado.leg.br",
+                        },
+                        "DadosBasicosParlamentar": {"DataNascimento": "1970-01-01"},
+                    }
+                }
+            },
+        )
+        # Senador histórico: IdentificacaoParlamentar enxuto, DadosBasicos mais rico
+        respx.get("https://legis.senado.leg.br/dadosabertos/senador/2.json").respond(
+            status_code=200,
+            json={
+                "DetalheParlamentar": {
+                    "Parlamentar": {
+                        "IdentificacaoParlamentar": {
+                            "CodigoParlamentar": "2",
+                            "NomeParlamentar": "Senador Dois",
+                        },
+                        "DadosBasicosParlamentar": {
+                            "DataNascimento": "1980-01-01",
+                            "Naturalidade": "Brasília",
+                            "UfNaturalidade": "DF",
+                        },
+                    }
+                }
+            },
+        )
+
+        df = await extractor.extract(entity_ids=[1, 2])
+
+    assert df.height == 2
+
+    # Schema união: campos dos dois senadores presentes no mesmo struct
+    id_fields = {f.name for f in df.schema["IdentificacaoParlamentar"].fields}
+    assert {
+        "CodigoParlamentar",
+        "NomeParlamentar",
+        "SexoParlamentar",
+        "EmailParlamentar",
+    } <= id_fields
+    basicos_fields = {f.name for f in df.schema["DadosBasicosParlamentar"].fields}
+    assert {"DataNascimento", "Naturalidade", "UfNaturalidade"} <= basicos_fields
+
+    # Campos ausentes viram null (não erro)
+    assert df["IdentificacaoParlamentar"].struct.field("EmailParlamentar").to_list() == [
+        "um@senado.leg.br",
+        None,
+    ]
+    assert df["DadosBasicosParlamentar"].struct.field("Naturalidade").to_list() == [
+        None,
+        "Brasília",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_extract_empty_ids():
     """entity_ids vazio retorna DataFrame vazio."""
     client = SenadoClient()

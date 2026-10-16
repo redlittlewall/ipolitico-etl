@@ -1,0 +1,176 @@
+# Mapeamento dinâmico de dependências para o Portal da Transparência (CGU) —
+# Poder Executivo Federal. Consumo total decidido no survey de 18/08 (spec em
+# .scratch/portal-transparencia/SPEC.md); as fatias verticais chegam uma a uma,
+# cada uma registrando aqui seu domínio.
+#
+# Ticket 02 (tracer bullet): cg_orgaos. CORREÇÃO DE FONTE da validação real:
+# não existe módulo bulk de órgãos no portal (/download-de-dados/orgaos →
+# HTTP 500). O domínio é consumido pela API v3 `/api-de-dados/orgaos-siape` via
+# `PortalOrgaosApiExtractor` (sem `extractor_kwargs` — o endpoint é fixo).
+#
+# Módulos bulk reais (ex: servidores, viagens) chegam em tickets futuros usando
+# `extractor_bulk` + `extractor_kwargs: {module: <segmento>}` — o builder injeta
+# `domain_name` do runner e mergea os kwargs do YAML (padrão ticket 02).
+#
+# A chave da API v3 (`PORTAL_API_KEY`) vive apenas no .env (gitignored) — cada
+# usuário gera a própria; os dumps bulk (/download-de-dados) não exigem chave.
+domain_configs:
+  # ── Ticket 02 — CG_ORGAOS (snapshot de órgãos do SIAPE, API v3) ────────────
+  # Snapshot: 1 job sem parâmetros; página todas as páginas de orgaos-siape
+  # (page_size fixo 15). `_source_url` = URL da página (auditoria replayável).
+  # Chave Silver/Gold: `codigo`. Contrato real da API confirmado na validação
+  # real do ticket 02 (640 registros, codigo/descricao).
+  cg_orgaos:
+    extractor: "ipolitico.extractors.portal_transparencia.api.orgaos_extractor.PortalOrgaosApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.orgaos_transformer.PortalOrgaosTransformer"
+
+  # ── Ticket 03 — CG_SERVIDORES (agregado por órgão, API v3) ─────────────────
+  # CORREÇÃO DE FONTE da validação real do ticket 03: o roster completo
+  # `/servidores` exige filtro de órgão (HTTP 400 sem codOrgao) e a remuneração
+  # individual exige CPF por servidor — inviável enumerar. O snapshot real é o
+  # agregado `/api-de-dados/servidores/por-orgao` (página a página, 13 campos).
+  # Snapshot: 1 job sem parâmetros. Sem `extractor_bulk` — a fonte é a API v3,
+  # não um módulo de download-de-dados (SourceRouter retorna API).
+  cg_servidores:
+    extractor: "ipolitico.extractors.portal_transparencia.api.servidores_por_orgao_extractor.PortalServidoresPorOrgaoApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.servidores_por_orgao_transformer.PortalServidoresPorOrgaoTransformer"
+
+  # ── Ticket 03 — CG_REMUNERACOES (dump mensal do módulo servidores, bulk) ──
+  # Fonte real: `/download-de-dados/servidores/{YYYYMM}` — ZIP multi-CSV (um por
+  # órgão). INGESTÃO BLOQUEADA pelo AWS WAF/CAPTCHA (403 + desafio JS no host de
+  # dumps, verificado real no ticket 03): o extrator devolve vazio sem cair (job
+  # WAF-gracioso) e a validação real reabre quando o host liberar. Contrato Silver
+  # provisório (25 campos: identidade + 15 rubricas monetárias BR).
+  # `extractor_kwargs.module` = segmento do módulo no URL (não `url_template` —
+  # o `PortalTransparenciaBulkExtractor` constrói por convenção de segmento).
+  cg_remuneracoes:
+    extractor_bulk: "ipolitico.extractors.portal_transparencia.bulk.bulk_extractor.PortalTransparenciaBulkExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.remuneracoes_bulk_transformer.PortalRemuneracoesBulkTransformer"
+    extractor_kwargs:
+      module: "servidores"
+
+  # ── Ticket 04 — CG_PEP (dump anual do módulo pep, bulk-only) ──────────────
+  # Pessoas Expostas Politicamente (ocupantes de cargo público — NÃO patrimônio).
+  # Fonte: `/download-de-dados/pep/{YYYY}` — arquivo INDISPONÍVEL hoje (403
+  # AccessDenied do S3) → job vazio gracioso (o cliente trata 403-AccessDenied
+  # como ausência, como 404). Contrato Silver provisório derivado do JSON da API
+  # v3 /peps (a API exige ≥1 filtro → sem rota de consulta pontual); a renomeação
+  # real das colunas do CSV trava quando o dump publicar (ticket 04 reabre).
+  cg_pep:
+    extractor_bulk: "ipolitico.extractors.portal_transparencia.bulk.bulk_extractor.PortalTransparenciaBulkExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.pep_transformer.PortalPepTransformer"
+    extractor_kwargs:
+      module: "pep"
+
+  # ── Ticket 04 — CG_VIAGENS (dump ANUAL do módulo viagens, bulk-only) ──────
+  # CORREÇÃO DE FONTE da validação real: não há dumps mensais de viagens —
+  # `{YYYYMM}` responde 404; a cobertura é o dump anual `/download-de-dados/
+  # viagens/{YYYY}` (2025 ≈ 155 MB). O ZIP anual tem 4 CSVs heterogêneos
+  # (Pagamento/Passagem/Trecho/Viagem): o `PortalViagensBulkExtractor` seleciona
+  # só o `*_Viagem.csv` (entidade-pai, 22 colunas latin-1 capturadas do dump
+  # real de 2016) — o base concatenaria os 4 e quebraria a unicidade da UK.
+  # Contrato Silver real do CSV capturado; rename_map no BULK_REGISTRY. A API
+  # exige 6 parâmetros (4 datas + codigoOrgao + pagina) → sem rota pontual.
+  cg_viagens:
+    extractor_bulk: "ipolitico.extractors.portal_transparencia.bulk.viagens_bulk_extractor.PortalViagensBulkExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.viagens_transformer.PortalViagensTransformer"
+    extractor_kwargs:
+      module: "viagens"
+
+  # ── Ticket 04 — CG_CARTOES (ROTA DUPLA: bulk mensal + consulta pontual API) ─
+  # Exigência explícita do ticket: bulk para o histórico (FULL_LOAD) e caminho de
+  # consulta pontual da API v3 para janela ≤12 meses (INCREMENTAL). O builder
+  # escolhe a fonte pelo SourceRouter: `extractor_bulk` (dumps mensais
+  # `{YYYYMM}` dos módulos cpgf/cpcc/cpdc, CSVs latin-1 — módulos faltantes
+  # pulados graciosamente) em FULL_LOAD; `extractor` (API /cartoes por bloco
+  # mensal `mesExtratoInicio/Fim`) em INCREMENTAL. `extractor_kwargs.modules` é
+  # aceito por ambos (o extrator API ignora).
+  cg_cartoes:
+    extractor_bulk: "ipolitico.extractors.portal_transparencia.bulk.cartoes_bulk_extractor.PortalCartoesBulkExtractor"
+    extractor: "ipolitico.extractors.portal_transparencia.api.cartoes_extractor.PortalCartoesApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.cartoes_transformer.PortalCartoesTransformer"
+    extractor_kwargs:
+      modules: ["cpgf", "cpcc", "cpdc"]
+
+  # ── Ticket 04 — CG_IMOVEIS_FUNCIONAIS (snapshot, API v3) ───────────────────
+  # CORREÇÃO DE FONTE da validação real: o dump `/download-de-dados/
+  # imoveis-funcionais` está INDISPONÍVEL (403 AccessDenied do S3). Fonte única:
+  # API v3 `/api-de-dados/imoveis` (walk livre com pagina — contrato confirmado,
+  # sem exigência de filtro). Sem `extractor_bulk` (mesmo padrão de cg_orgaos).
+  cg_imoveis_funcionais:
+    extractor: "ipolitico.extractors.portal_transparencia.api.imoveis_extractor.PortalImoveisFuncionaisApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.imoveis_funcionais_transformer.PortalImoveisFuncionaisTransformer"
+
+  # ── Ticket 04 — CG_EMENDAS (por ano, API v3) ───────────────────────────────
+  # "Respeita a janela da API por ano": `/api-de-dados/emendas?ano={YYYY}` (walk
+  # livre com filtro — contrato confirmado). Sem rota bulk: o dump
+  # `/download-de-dados/emendas-parlamentares` é um único ZIP que re-publica o
+  # HISTÓRICO inteiro a cada versão (32 MB) — conflita com append-only (mesmo
+  # padrão de cg_servidores).
+  cg_emendas:
+    extractor: "ipolitico.extractors.portal_transparencia.api.emendas_extractor.PortalEmendasApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.emendas_transformer.PortalEmendasTransformer"
+
+  # ── Fatia 1 — CG_CEIS (empresas inidôneas e suspensas, API v3) ─────────────
+  cg_ceis:
+    extractor: "ipolitico.extractors.portal_transparencia.api.ceis_extractor.PortalCeisApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.ceis_transformer.PortalCeisTransformer"
+
+  # ── Fatia 1 — CG_CNEP (empresas punidas - anticorrupção, API v3) ───────────
+  cg_cnep:
+    extractor: "ipolitico.extractors.portal_transparencia.api.cnep_extractor.PortalCnepApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.cnep_transformer.PortalCnepTransformer"
+
+  # ── Fatia 1 — CG_CEPIM (entidades impedidas sem fins lucrativos, API v3) ────
+  cg_cepim:
+    extractor: "ipolitico.extractors.portal_transparencia.api.cepim_extractor.PortalCepimApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.cepim_transformer.PortalCepimTransformer"
+
+  # ── Fatia 1 — CG_CEAF (expulsões da administração federal, API v3) ─────────
+  cg_ceaf:
+    extractor: "ipolitico.extractors.portal_transparencia.api.ceaf_extractor.PortalCeafApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.ceaf_transformer.PortalCeafTransformer"
+
+  # ── Fatia 1 — CG_ACORDOS_LENIENCIA (acordos de leniência, API v3) ──────────
+  cg_acordos_leniencia:
+    extractor: "ipolitico.extractors.portal_transparencia.api.acordos_leniencia_extractor.PortalAcordosLenienciaApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.acordos_leniencia_transformer.PortalAcordosLenienciaTransformer"
+
+  # ── Fatia 2 — CG_LICITACOES (licitações do Executivo, API v3) ───────────────
+  cg_licitacoes:
+    extractor: "ipolitico.extractors.portal_transparencia.api.licitacoes_extractor.PortalLicitacoesApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.licitacoes_transformer.PortalLicitacoesTransformer"
+
+  # ── Fatia 2 — CG_CONTRATOS (contratos do Executivo, API v3) ─────────────────
+  cg_contratos:
+    extractor: "ipolitico.extractors.portal_transparencia.api.contratos_extractor.PortalContratosApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.contratos_transformer.PortalContratosTransformer"
+
+  # ── Fatia 2 — CG_CONTRATOS_ADITIVOS (termos aditivos de contratos, API v3) ──
+  cg_contratos_aditivos:
+    extractor: "ipolitico.extractors.portal_transparencia.api.contratos_aditivos_extractor.PortalContratosAditivosApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.contratos_aditivos_transformer.PortalContratosAditivosTransformer"
+
+  # ── Fatia 3 — CG_CONVENIOS (convênios e transferências, API v3) ────────────
+  cg_convenios:
+    extractor: "ipolitico.extractors.portal_transparencia.api.convenios_extractor.PortalConveniosApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.convenios_transformer.PortalConveniosTransformer"
+
+  # ── Fatia 3 — CG_CONVENIOS_ADITIVOS (termos aditivos de convênios, API v3) ──
+  cg_convenios_aditivos:
+    extractor: "ipolitico.extractors.portal_transparencia.api.convenios_aditivos_extractor.PortalConveniosAditivosApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.convenios_aditivos_transformer.PortalConveniosAditivosTransformer"
+
+  # ── Fatia 4 — CG_DESPESAS_EMPENHOS (documentos de empenho, API v3) ─────────
+  cg_despesas_empenhos:
+    extractor: "ipolitico.extractors.portal_transparencia.api.despesas_empenhos_extractor.PortalDespesasEmpenhosApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.despesas_empenhos_transformer.PortalDespesasEmpenhosTransformer"
+
+  # ── Fatia 4 — CG_DESPESAS_PAGAMENTOS (documentos de pagamento, API v3) ──────
+  cg_despesas_pagamentos:
+    extractor: "ipolitico.extractors.portal_transparencia.api.despesas_pagamentos_extractor.PortalDespesasPagamentosApiExtractor"
+    transformer: "ipolitico.transformers.portal_transparencia.despesas_pagamentos_transformer.PortalDespesasPagamentosTransformer"
+
+
+
+

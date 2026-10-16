@@ -3,7 +3,13 @@ from pathlib import Path
 
 import duckdb
 
-from ipolitico.core.constants import MedallionLayer
+from ipolitico.core.constants import (
+    DOMAIN_SOURCE_SYSTEM,
+    DomainType,
+    MedallionLayer,
+    SourceSystem,
+)
+from ipolitico.core.domain_spec import spec_for
 from ipolitico.core.schemas import despesas_optimizer_partition_sql
 
 logger = logging.getLogger(__name__)
@@ -72,12 +78,56 @@ class DataLakeOptimizer:
         finally:
             conn.close()
 
+    @staticmethod
+    def resolve_pk_cols_for(domain: DomainType) -> str | None:
+        """UK declarada no spec para domínios do Portal da Transparência.
+
+        A introspecção (``_resolve_pk_cols``) resolve por regra genérica
+        (``id`` não-nulo → PARTITION BY id), mas falha para cg_cartoes na rota
+        dupla: as linhas bulk têm ``id`` nulo e as da API não-nulo → a
+        introspecção faria PARTITION BY id e colapsaria TODO o bulk numa única
+        partição. A UK declarada no spec (composta + ``id``) é a chave
+        verificada na validação real. Domínios Câmara mantêm a introspecção
+        (domínios com ``id`` fantasma — deputados_orgaos etc. — não podem usar
+        a UK declarada cegamente).
+
+        Args:
+            domain: Domínio a resolver.
+
+        Returns:
+            Cláusula ``PARTITION BY`` declarada (ex.: ``"tipoCartao_codigo, ...
+            , id"``) para domínios do Portal; ``None`` para os demais
+            (introspecção genérica).
+        """
+        spec = spec_for(domain)
+        if spec is None:
+            return None
+        if DOMAIN_SOURCE_SYSTEM.get(domain.value) != SourceSystem.PORTAL_TRANSPARENCIA:
+            return None
+        return ", ".join(spec.unique_keys)
+
     def compact_and_deduplicate(
         self,
         table_name: str,
         source_layer: str = MedallionLayer.SILVER,
         target_layer: str = MedallionLayer.GOLD,
-    ):
+        pk_cols: str | None = None,
+    ) -> None:
+        """Consolida e deduplica uma tabela Parquet entre camadas (out-of-core).
+
+        Args:
+            table_name: Nome da tabela/entidade (diretório da camada origem).
+            source_layer: Camada de leitura (``silver``, ``bronze`` ou ``gold``).
+            target_layer: Camada de escrita do arquivo deduplicado.
+            pk_cols: Cláusula ``PARTITION BY`` explícita (ex.: ``"politico_id"``
+                ou ``"fonte, id_natural"``). Quando fornecida, ignora a introspecção
+                de chave. Quando ``None``, resolve por introspecção
+                (``_resolve_pk_cols`` / caso especial ``despesas``).
+
+        Returns:
+            None. Escreve ``{target_layer}/{table_name}/{table_name}.parquet``
+            deduplicado, ou loga aviso sem criar nada se a origem estiver vazia.
+        """
         source_dir = self.base_dir / source_layer / table_name
         if not source_dir.exists() or not list(source_dir.glob("*.parquet")):
             logger.warning(
@@ -96,10 +146,12 @@ class DataLakeOptimizer:
         logger.info(f"[{table_name.upper()}] Iniciando compactação e deduplicação Out-of-Core...")
 
         try:
-            if table_name == "despesas":
-                pk_cols = despesas_optimizer_partition_sql()
+            if pk_cols is not None:
+                partition_cols = pk_cols
+            elif table_name == "despesas":
+                partition_cols = despesas_optimizer_partition_sql()
             else:
-                pk_cols = self._resolve_pk_cols(source_path)
+                partition_cols = self._resolve_pk_cols(source_path)
 
             query = f"""
             COPY (
@@ -107,7 +159,7 @@ class DataLakeOptimizer:
                     SELECT
                         *,
                         ROW_NUMBER() OVER (
-                            PARTITION BY {pk_cols}
+                            PARTITION BY {partition_cols}
                             ORDER BY captured_at DESC
                         ) as rn
                     FROM read_parquet('{source_path}')

@@ -7,7 +7,26 @@ from pathlib import Path
 import yaml
 
 from ipolitico.core.camara_client import CamaraClient
-from ipolitico.core.constants import DOMAIN_LABELS, DomainType, LoadStrategy, SinkType
+from ipolitico.core.constants import (
+    DOMAIN_LABELS,
+    DomainType,
+    LoadStrategy,
+    MedallionLayer,
+    SinkType,
+)
+from ipolitico.gold.custo_erario import (
+    CUSTO_PK,
+    OBS_PK,
+    CoberturaCustoErario,
+    CustoErarioBuilder,
+)
+from ipolitico.gold.entidade_canonica import (
+    ALIASES_PK,
+    POLITICOS_PK,
+    RESOLUCOES_PK,
+    CoberturaEntidadeCanonica,
+    EntidadeCanonicaBuilder,
+)
 from ipolitico.pipeline.builder import PipelineBuilder
 from ipolitico.pipeline.domain_order import (
     FULL_PIPELINE,
@@ -17,6 +36,8 @@ from ipolitico.pipeline.federation import FederationOrchestrator
 from ipolitico.pipeline.manager import PipelineManager
 from ipolitico.pipeline.optimizer import DataLakeOptimizer
 from ipolitico.pipeline.runner import PipelineRunner
+from ipolitico.platinum.builder import PlatinumBuilder
+from ipolitico.platinum.models import CoberturaPlatinum
 from ipolitico.sinks.datalake_sink import DataLakeSink
 from ipolitico.storage.gold_exporter import ExportFormat, GoldExporter
 
@@ -202,9 +223,12 @@ async def main():
     parser.add_argument(
         "--source",
         type=str,
-        choices=["camara", "senado", "senado-adm", "all"],
+        choices=["camara", "senado", "senado-adm", "portaldatransparencia", "all"],
         default="all",
-        help="Fonte de dados: camara, senado, senado-adm, ou all (todas em paralelo).",
+        help=(
+            "Fonte de dados: camara, senado, senado-adm, portaldatransparencia, "
+            "ou all (todas em paralelo)."
+        ),
     )
     parser.add_argument(
         "--list-domains",
@@ -263,6 +287,37 @@ async def main():
         default=None,
         help="Exporta a camada Gold para banco SQL (sqlite ou duckdb) após a ingestão.",
     )
+    parser.add_argument(
+        "--build-entidade-canonica",
+        action="store_true",
+        help=(
+            "Constrói as tabelas Gold de identidade (politicos, politicos_aliases, "
+            "resolucoes) a partir dos Silver ingeridos e deduplica (issue 01)."
+        ),
+    )
+    parser.add_argument(
+        "--build-custo-erario",
+        action="store_true",
+        help=(
+            "Constrói as Gold de custo ao erário (custo_erario, observacoes_metricas) "
+            "a partir dos Silver + aliases e deduplica (issue 02)."
+        ),
+    )
+    parser.add_argument(
+        "--build-platinum",
+        action="store_true",
+        help=(
+            "Constrói os Data Marts OBT da camada Platinum (obt_politico_custo_mensal, "
+            "obt_politico_resumo_carreira) via DuckDB (issue 07)."
+        ),
+    )
+    parser.add_argument(
+        "--export-platinum",
+        type=str,
+        choices=["sqlite", "duckdb"],
+        default=None,
+        help="Exporta a camada Platinum para banco SQL (sqlite ou duckdb) (issue 07).",
+    )
 
     args = parser.parse_args()
 
@@ -282,6 +337,22 @@ async def main():
         print(f"Documento de cobertura gerado em: {output}")
         return
 
+    # Modo somente-build: sem ingestão, só Gold/Platinum (issues 01, 02, 07).
+    # Com ``--domains`` o build roda após a ingestão (ver fluxo principal).
+    if (
+        args.build_entidade_canonica
+        or args.build_custo_erario
+        or args.build_platinum
+        or args.export_platinum
+    ) and args.domains is None:
+        if args.build_entidade_canonica or args.build_custo_erario:
+            _run_gold_builds(args)
+        if args.build_platinum:
+            _run_platinum_build(args)
+        if args.export_platinum:
+            _run_platinum_export(args)
+        return
+
     if args.domains is None:
         args.domains = list(DomainType)
     else:
@@ -298,8 +369,10 @@ async def main():
         providers_configs = ["senado"]
     elif source_name == "senado-adm":
         providers_configs = ["senado-adm"]
+    elif source_name == "portaldatransparencia":
+        providers_configs = ["portaldatransparencia"]
     else:  # all
-        providers_configs = ["camara", "senado", "senado-adm"]
+        providers_configs = ["camara", "senado", "senado-adm", "portaldatransparencia"]
     logger.info("=" * 60)
     logger.info(
         f" iPolitico ETL (Ingestão) | Destino: DATALAKE  |"
@@ -312,6 +385,7 @@ async def main():
     camara_config = load_config(base_dir / "camara_pipeline.yaml")
     senado_config = load_config(base_dir / "senado_pipeline.yaml")
     senado_adm_config = load_config(base_dir / "senado_adm_pipeline.yaml")
+    portal_config = load_config(base_dir / "portal_transparencia_pipeline.yaml")
 
     runner = PipelineRunner()
     state_store = DataLakeSink()
@@ -356,6 +430,26 @@ async def main():
         )
         providers.append(SenadoAdmSourceProvider(senado_adm_manager))
 
+    if "portaldatransparencia" in providers_configs:
+        from ipolitico.core.config import PORTAL_API_KEY
+        from ipolitico.core.portal_transparencia_client import PortalTransparenciaClient
+        from ipolitico.services.portal_transparencia_metadata import (
+            PortalTransparenciaMetadataService,
+        )
+        from ipolitico.sources.portal_transparencia_provider import (
+            PortalTransparenciaSourceProvider,
+        )
+
+        # A chave da API v3 é por usuário (PORTAL_API_KEY no .env, nunca
+        # versionada); o bulk /download-de-dados não a exige.
+        portal_client = PortalTransparenciaClient(api_key=PORTAL_API_KEY)
+        portal_builder = PipelineBuilder(portal_client)
+        portal_metadata = PortalTransparenciaMetadataService()
+        portal_manager = PipelineManager(
+            portal_builder, runner, portal_config, state_store, portal_metadata
+        )
+        providers.append(PortalTransparenciaSourceProvider(portal_manager))
+
     federation = FederationOrchestrator(providers)
 
     try:
@@ -369,9 +463,22 @@ async def main():
         )
 
         if args.optimize:
+            optimizer = DataLakeOptimizer()
             for domain in args.domains:
                 logger.info(f"=== Otimizando Camada Gold para {domain.value.upper()} ===")
-                DataLakeOptimizer().compact_and_deduplicate(domain.value)
+                # Domínios do Portal usam a UK declarada no spec (cg_cartoes na
+                # rota dupla: bulk id nulo + API id → a introspecção por `id`
+                # colapsaria o bulk numa única partição). Câmara: introspecção.
+                optimizer.compact_and_deduplicate(
+                    domain.value,
+                    pk_cols=DataLakeOptimizer.resolve_pk_cols_for(domain),
+                )
+
+        if args.build_entidade_canonica or args.build_custo_erario:
+            _run_gold_builds(args)
+
+        if args.build_platinum:
+            _run_platinum_build(args)
 
         if args.export_gold:
             fmt = ExportFormat(args.export_gold)
@@ -379,6 +486,9 @@ async def main():
             output = Path(f"data/gold_export.{ext}")
             logger.info("=== Exportando Gold para %s ===", output)
             GoldExporter().export_all(str(output), format=fmt)
+
+        if args.export_platinum:
+            _run_platinum_export(args)
     except Exception as e:
         logger.error(f"Falha catastrófica no ETL: {e}")
     finally:
@@ -392,6 +502,110 @@ async def main():
                 if hasattr(maybe_client, "close"):
                     await maybe_client.close()
         logger.info(f"Tempo total de execução: {time.perf_counter() - start_time:.2f}s")
+
+
+def _run_gold_builds(args: argparse.Namespace) -> None:
+    """Executa os builders Gold (issues 01/02) e a dedup das tabelas novas.
+
+    Roda os builders contra os Silver/Gold já persistidos (não faz ingestão),
+    imprime o relatório de cobertura e deduplica as tabelas Gold produzidas com
+    ``pk_cols`` explícito (a dedup é responsabilidade da camada Gold).
+
+    Args:
+        args: Namespace do argparse com as flags ``--build-*``.
+    """
+    optimizer = DataLakeOptimizer()
+    if args.build_entidade_canonica:
+        logger.info("=== Construindo entidade canônica (Gold, issue 01) ===")
+        builder = EntidadeCanonicaBuilder()
+        builder.build()
+        _imprimir_cov_entidade(builder.cobertura())
+        for tabela, pk in (
+            ("politicos", POLITICOS_PK),
+            ("politicos_aliases", ALIASES_PK),
+            ("resolucoes", RESOLUCOES_PK),
+        ):
+            logger.info("=== Deduplicando Gold %s ===", tabela.upper())
+            optimizer.compact_and_deduplicate(
+                tabela,
+                source_layer=MedallionLayer.GOLD,
+                target_layer=MedallionLayer.GOLD,
+                pk_cols=", ".join(pk),
+            )
+    if args.build_custo_erario:
+        logger.info("=== Construindo custo ao erário (Gold, issue 02) ===")
+        builder = CustoErarioBuilder()
+        builder.build()
+        _imprimir_cov_custo(builder.cobertura())
+        for tabela, pk in (
+            ("custo_erario", CUSTO_PK),
+            ("observacoes_metricas", OBS_PK),
+        ):
+            logger.info("=== Deduplicando Gold %s ===", tabela.upper())
+            optimizer.compact_and_deduplicate(
+                tabela,
+                source_layer=MedallionLayer.GOLD,
+                target_layer=MedallionLayer.GOLD,
+                pk_cols=", ".join(pk),
+            )
+
+
+def _imprimir_cov_entidade(cov: CoberturaEntidadeCanonica) -> None:
+    """Imprime o relatório de cobertura da entidade canônica (issue 01).
+
+    Args:
+        cov: Relatório de cobertura do ``EntidadeCanonicaBuilder``.
+    """
+    print(f"  políticos únicos: {cov.total_politicos}")
+    print(f"  aliases: {cov.total_aliases} por fonte: {cov.aliases_por_fonte}")
+    print(f"  âncoras camara: {cov.ancoras_camara} | senado: {cov.ancoras_senado}")
+    print(
+        f"  resoluções confirmadas: {cov.resolucoes_confirmadas} | "
+        f"candidatas a revisão: {cov.resolucoes_candidatas_revisao}"
+    )
+
+
+def _imprimir_cov_custo(cov: CoberturaCustoErario) -> None:
+    """Imprime o relatório de cobertura do custo ao erário (issue 02).
+
+    Args:
+        cov: Relatório de cobertura do ``CustoErarioBuilder``.
+    """
+    print(f"  linhas custo_erario: {cov.total_linhas} por componente: {cov.total_por_componente}")
+    print(f"  por casa: {cov.total_por_casa}")
+    print(f"  observações registradas: {cov.total_observacoes}")
+
+
+def _run_platinum_build(args: argparse.Namespace) -> None:
+    """Executa a construção dos Data Marts da Camada Platinum (issue 07)."""
+    logger.info("=== Construindo Camada Platinum (Data Marts OBT, issue 07) ===")
+    builder = PlatinumBuilder()
+    cov = builder.build()
+    _imprimir_cov_platinum(cov)
+
+
+def _run_platinum_export(args: argparse.Namespace) -> None:
+    """Exporta as tabelas da Camada Platinum para banco SQL (issue 07)."""
+    fmt = args.export_platinum or "sqlite"
+    ext = "db" if fmt == "sqlite" else "duckdb"
+    output = Path(f"data/platinum_export.{ext}")
+    logger.info("=== Exportando Camada Platinum para %s ===", output)
+    builder = PlatinumBuilder()
+    tables = builder.export_all(str(output), format=fmt)
+    print(f"  Tabelas Platinum exportadas para {output}: {', '.join(tables)}")
+
+
+def _imprimir_cov_platinum(cov: CoberturaPlatinum) -> None:
+    """Imprime o relatório analítico da camada Platinum (issue 07)."""
+    print(f"  políticos consolidados: {cov.total_politicos}")
+    print(f"  registros mensais (obt_politico_custo_mensal): {cov.total_linhas_custo_mensal}")
+    print(f"  custo total acumulado histórico: R$ {cov.custo_total_acumulado:,.2f}")
+    print(
+        f"  proposições: {cov.total_proposicoes_apresentadas} "
+        f"(aprovadas: {cov.total_proposicoes_aprovadas})"
+    )
+    print(f"  votos nominais registrados: {cov.total_votos_registrados}")
+    print(f"  tabelas geradas: {', '.join(cov.tabelas_geradas)}")
 
 
 def main_cli():

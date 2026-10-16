@@ -155,18 +155,16 @@ class DiscursosTextoExtractor(SenadoBaseExtractor):
         if not entity_ids:
             return pl.DataFrame()
 
-        all_dfs: list[pl.DataFrame] = []
+        batches: list[tuple[str, list[dict[str, Any]], dict[str, Any] | None]] = []
         for codigo in entity_ids:
             raw = await self.fetch_flat(f"discurso/texto-integral/{codigo}")
             if isinstance(raw, dict):
-                df = pl.DataFrame([raw], infer_schema_length=None)
-                df = self._inject_source_url(df, f"discurso/texto-integral/{codigo}")
-                all_dfs.append(df)
+                batches.append((f"discurso/texto-integral/{codigo}", [raw], None))
 
-        if not all_dfs:
-            return pl.DataFrame()
-
-        return pl.concat(all_dfs)
+        # DataFrame único com todos os discursos do lote: discursos com campos
+        # diferentes são unificados (o concat por-discurso falhava com
+        # SchemaError de largura).
+        return self._build_batch_dataframe(batches)
 
 
 class NotasTaquigrafiaSessaoExtractor(SenadoBaseExtractor):
@@ -194,18 +192,16 @@ class NotasTaquigrafiaSessaoExtractor(SenadoBaseExtractor):
         if not entity_ids:
             return pl.DataFrame()
 
-        all_dfs: list[pl.DataFrame] = []
+        batches: list[tuple[str, list[dict[str, Any]], dict[str, Any] | None]] = []
         for sessao_id in entity_ids:
             raw = await self.fetch_flat(f"taquigrafia/notas/sessao/{sessao_id}")
             if isinstance(raw, dict):
-                df = pl.DataFrame([raw], infer_schema_length=None)
-                df = self._inject_source_url(df, f"taquigrafia/notas/sessao/{sessao_id}")
-                all_dfs.append(df)
+                batches.append((f"taquigrafia/notas/sessao/{sessao_id}", [raw], None))
 
-        if not all_dfs:
-            return pl.DataFrame()
-
-        return pl.concat(all_dfs)
+        # DataFrame único com todas as sessões do lote: sessões com campos
+        # diferentes são unificadas (o concat por-sessão falhava com
+        # SchemaError de largura).
+        return self._build_batch_dataframe(batches)
 
 
 class NotasTaquigrafiaReuniaoExtractor(SenadoBaseExtractor):
@@ -233,15 +229,13 @@ class NotasTaquigrafiaReuniaoExtractor(SenadoBaseExtractor):
         if not entity_ids:
             return pl.DataFrame()
 
-        all_dfs: list[pl.DataFrame] = []
+        batches: list[tuple[str, list[dict[str, Any]], dict[str, Any] | None]] = []
         for reuniao_id in entity_ids:
             raw = await self.fetch_flat(f"taquigrafia/notas/reuniao/{reuniao_id}")
             if isinstance(raw, dict):
-                df = pl.DataFrame([raw], infer_schema_length=None)
-                df = self._inject_source_url(df, f"taquigrafia/notas/reuniao/{reuniao_id}")
-                all_dfs.append(df)
+                batches.append((f"taquigrafia/notas/reuniao/{reuniao_id}", [raw], None))
 
-        if not all_dfs:
-            return pl.DataFrame()
-
-        return pl.concat(all_dfs)
+        # DataFrame único com todas as reuniões do lote: reuniões com campos
+        # diferentes são unificadas (o concat por-reunião falhava com
+        # SchemaError de largura).
+        return self._build_batch_dataframe(batches)

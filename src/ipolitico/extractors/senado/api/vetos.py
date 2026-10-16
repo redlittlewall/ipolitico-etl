@@ -173,17 +173,15 @@ class VetosDetalheExtractor(SenadoBaseExtractor):
         if not entity_ids:
             return pl.DataFrame()
 
-        all_dfs: list[pl.DataFrame] = []
+        batches: list[tuple[str, list[dict[str, Any]], dict[str, Any] | None]] = []
         for codigo in entity_ids:
             raw = await self.fetch_flat(f"plenario/resultado/veto/{codigo}")
             records = self.flatten_response(raw, _DATA_PATH_DETALHE)
             if records:
                 flat_records = [_flatten_record(r) for r in records]
-                df = pl.DataFrame(flat_records, infer_schema_length=None)
-                df = self._inject_source_url(df, f"plenario/resultado/veto/{codigo}")
-                all_dfs.append(df)
+                batches.append((f"plenario/resultado/veto/{codigo}", flat_records, None))
 
-        if not all_dfs:
-            return pl.DataFrame()
-
-        return pl.concat(all_dfs)
+        # DataFrame único com todos os vetos do lote: vetos com objetos
+        # aninhados diferentes (ex: um sem ``Mensagem``) são unificados
+        # (o concat por-veto falhava com SchemaError de largura).
+        return self._build_batch_dataframe(batches)

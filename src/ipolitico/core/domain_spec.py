@@ -37,6 +37,7 @@ _SOURCE_URL_FORMATS: dict[DomainType, str] = {
     DomainType.BLOCOS_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/blocos/{resource_id}",
     DomainType.VOTOS: "https://dadosabertos.camara.leg.br/api/v2/votacoes/{resource_id}/votos",
     DomainType.ORIENTACOES: "https://dadosabertos.camara.leg.br/api/v2/votacoes/{resource_id}/orientacoes",
+    DomainType.CAMARA_GABINETE_ASSESSORES: "https://www.camara.leg.br/deputados/{resource_id}/pessoal-gabinete",
     # ── Senado — Entidades raiz ───────────────────────────────────────────────────
     DomainType.SENADORES: "https://legis.senado.leg.br/dadosabertos/senador/{resource_id}",
     DomainType.SENADORES_DETALHE: "https://legis.senado.leg.br/dadosabertos/senador/{resource_id}",
@@ -223,6 +224,13 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         frozenset({DomainType.DEPUTADOS}),
         uk=("id_deputado", "anoInicio", "cargo", "siglaPartidoEleicao"),
         sub="mandatos_externos",
+    ),
+    DomainType.CAMARA_GABINETE_ASSESSORES: _spec(
+        DomainType.CAMARA_GABINETE_ASSESSORES,
+        None,
+        frozenset({DomainType.DEPUTADOS}),
+        uk=("deputado_id", "nome_assessor", "cargo"),
+        source_url_format="https://www.camara.leg.br/deputados/{resource_id}/pessoal-gabinete",
     ),
     DomainType.EVENTOS_DEPUTADOS: _spec(
         DomainType.EVENTOS_DEPUTADOS,
@@ -590,6 +598,234 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         DomainType.DESPESAS_CEAPS,
         None,
         uk=("_source_url", "id"),
+    ),
+    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 02) ─────────────
+    # Snapshot de órgãos SIAPE via API v3 ``/api-de-dados/orgaos-siape`` (a
+    # validação real corrigiu a fonte: não existe bulk de órgãos no portal).
+    # Chave por ``codigo`` (único na fonte). NÃO estável (mesmo padrão de
+    # SERVIDORES): a estrutura do Executivo muda (novos órgãos), então o
+    # incremental re-extrai o snapshot — o Gold deduplica.
+    DomainType.CG_ORGAOS: _spec(
+        DomainType.CG_ORGAOS,
+        None,
+        uk=("codigo",),
+    ),
+    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 03) ─────────────
+    # Snapshot do agregado ``/servidores/por-orgao`` (API v3 — validado real no
+    # ticket 03). Chave por (órgão, situação, tipo de servidor, tipo de vínculo,
+    # licença): o agregado tem UMA linha por combinação dessas dimensões
+    # (contagens ``qntPessoas``/``qntVinculos``). NÃO estável (mesmo padrão de
+    # CG_ORGAOS): as contagens mudam a cada snapshot — o Gold deduplica.
+    DomainType.CG_SERVIDORES: _spec(
+        DomainType.CG_SERVIDORES,
+        None,
+        uk=("codOrgaoExercicioSiape", "skSituacao", "skTipoServidor", "skTipoVinculo", "licenca"),
+    ),
+    # Bulk mensal ``/download-de-dados/servidores/{YYYYMM}`` — ingestão
+    # REGISTRADA mas BLOQUEADA pelo WAF/CAPTCHA (validação real do ticket 03).
+    # Chave por (``_source_url``, ``id_servidor``, ``mes_ano``) — ``_source_url``
+    # escopa o replay para o mês do dump. NÃO estável (mesmo padrão de
+    # FOLHA_PAGAMENTO): o mês corrente cresce e o incremental re-extrai — o Gold
+    # deduplica. Earliest é placeholder (2017-01) a validar na liberação do WAF.
+    DomainType.CG_REMUNERACOES: _spec(
+        DomainType.CG_REMUNERACOES,
+        None,
+        uk=("_source_url", "id_servidor", "mes_ano"),
+    ),
+    # ── Portal da Transparência (CGU) — Poder Executivo (ticket 04) ─────────────
+    # PEPs (Pessoas Expostas Politicamente) — bulk anual `pep`. Validação real:
+    # a API exige ≥1 filtro (impossível enumerar) e o dump está INDISPONÍVEL
+    # hoje (403 AccessDenied) → contrato provisório derivado do JSON da API.
+    # Chave por (cpf, órgão, função, início) — CPF mascarado é estável por
+    # pessoa; `_source_url` escopa o replay anual. NÃO estável (mesmo padrão de
+    # CG_REMUNERACOES).
+    DomainType.CG_PEP: _spec(
+        DomainType.CG_PEP,
+        None,
+        uk=("_source_url", "cpf", "cod_orgao", "sigla_funcao", "dt_inicio_exercicio"),
+    ),
+    # Viagens de servidores — bulk ANUAL `viagens` (validação real: não há
+    # dumps mensais {YYYYMM}; a API exige codigoOrgao+4 datas, inviável
+    # enumerar). O CSV real capturado NÃO tem `id` numérico — a chave é o
+    # ``identificador_processo_viagem`` (único no dump verificado: 855.805
+    # linhas = 855.805 identificadores distintos em 2016), escopada por
+    # ``_source_url`` no replay anual. NÃO estável (mesmo padrão de
+    # CG_REMUNERACOES).
+    DomainType.CG_VIAGENS: _spec(
+        DomainType.CG_VIAGENS,
+        None,
+        uk=("_source_url", "identificador_processo_viagem"),
+    ),
+    # Cartões de pagamento (CPGF/CPCC/CPDC) — rota dupla (ticket 04): bulk
+    # mensal + API v3 em blocos mensais (≤12 meses). O dump bulk NÃO tem `id`.
+    # Chave = identidade composta (tipoCartao, mês, data, valor, CPF portador,
+    # CNPJ/CPF favorecido, UG) + `id` da API.
+    #
+    # CORREÇÃO DA VALIDAÇÃO REAL (19/08): a premissa do ticket "risco de
+    # colisão ≈ zero (7 campos)" estava errada. Na API, ~5% das linhas/mês (645
+    # linhas, 197 grupos em 06/2025) são transações DISTINTAS com documentos
+    # mascarados ("SEM INFORMACAO", "NAO SE APLICA", beneficiários CPDC) — a
+    # composta sozinha as fundiria, perdendo valor monetário no Gold. O `id` da
+    # API é o único discriminador dessas linhas. Com `id` na UK:
+    #   - rota API: nunca funde transações distintas (id único);
+    #   - rota bulk: id nulo → a composta deduplica os duplicados exatos de
+    #     fonte (linhas "Sigiloso" re-publicadas N vezes pelo governo);
+    #   - overlap bulk×API NÃO deduplica (id nulo vs real) — limitação
+    #     documentada: rodar as duas rotas no mesmo mês duplica no Gold; o
+    #     usuário escolhe a estratégia por janela. NÃO estável (CG_SERVIDORES).
+    DomainType.CG_CARTOES: _spec(
+        DomainType.CG_CARTOES,
+        None,
+        uk=(
+            "tipoCartao_codigo",
+            "mesExtrato",
+            "dataTransacao",
+            "valorTransacao",
+            "portador_cpfFormatado",
+            "favorecido_cpfCnpj",
+            "unidadeGestora_codigo",
+            "id",
+        ),
+    ),
+    # Imóveis funcionais da União — snapshot via API v3 (walk livre com pagina;
+    # o dump bulk `imoveis-funcionais` está indisponível hoje — 403). Chave por
+    # `id` (único na fonte). NÃO estável (mesmo padrão de CG_ORGAOS: a situação
+    # do imóvel muda entre snapshots — o Gold deduplica).
+    DomainType.CG_IMOVEIS_FUNCIONAIS: _spec(
+        DomainType.CG_IMOVEIS_FUNCIONAIS,
+        None,
+        uk=("id",),
+    ),
+    # Emendas parlamentares — API v3 POR ANO (param `ano`; "respeita a janela
+    # da API por ano" do ticket). O dump bulk `emendas-parlamentares` é um
+    # arquivo único que re-publica o histórico inteiro a cada geração — conflita
+    # com o append-only → sem rota bulk (padrão CG_SERVIDORES). Chave por
+    # `codigoEmenda` (único na fonte — embute o ano). NÃO estável (mesmo padrão
+    # de CG_ORGAOS: valores executados mudam — o Gold deduplica).
+    DomainType.CG_EMENDAS: _spec(
+        DomainType.CG_EMENDAS,
+        None,
+        uk=("codigoEmenda",),
+    ),
+    # ── Portal da Transparência (CGU) — Fatia 1 (Sanções e Integridade) ────────
+    # Snapshot via API v3 /api-de-dados/ceis (walk livre com pagina)
+    DomainType.CG_CEIS: _spec(
+        DomainType.CG_CEIS,
+        None,
+        uk=("id",),
+    ),
+    # Snapshot via API v3 /api-de-dados/cnep (walk livre com pagina)
+    DomainType.CG_CNEP: _spec(
+        DomainType.CG_CNEP,
+        None,
+        uk=("id",),
+    ),
+    # Snapshot via API v3 /api-de-dados/cepim (walk livre com pagina)
+    DomainType.CG_CEPIM: _spec(
+        DomainType.CG_CEPIM,
+        None,
+        uk=("id",),
+    ),
+    # Snapshot via API v3 /api-de-dados/ceaf (walk livre com pagina)
+    DomainType.CG_CEAF: _spec(
+        DomainType.CG_CEAF,
+        None,
+        uk=("id",),
+    ),
+    # Snapshot via API v3 /api-de-dados/acordos-leniencia (walk livre com pagina)
+    DomainType.CG_ACORDOS_LENIENCIA: _spec(
+        DomainType.CG_ACORDOS_LENIENCIA,
+        None,
+        uk=("id", "cnpjEmpresa"),
+    ),
+    # ── Portal da Transparência (CGU) — Fatia 2 (Compras Públicas) ────────────
+    # Snapshot via API v3 /api-de-dados/licitacoes
+    DomainType.CG_LICITACOES: _spec(
+        DomainType.CG_LICITACOES,
+        None,
+        uk=("id",),
+    ),
+    # Snapshot via API v3 /api-de-dados/contratos
+    DomainType.CG_CONTRATOS: _spec(
+        DomainType.CG_CONTRATOS,
+        None,
+        uk=("id",),
+    ),
+    # Snapshot via API v3 /api-de-dados/contratos/termo-aditivo
+    DomainType.CG_CONTRATOS_ADITIVOS: _spec(
+        DomainType.CG_CONTRATOS_ADITIVOS,
+        None,
+        uk=("idContrato", "numero"),
+    ),
+    # ── Portal da Transparência (CGU) — Fatia 3 (Convênios e Repasses) ────────
+    # Snapshot via API v3 /api-de-dados/convenios
+    DomainType.CG_CONVENIOS: _spec(
+        DomainType.CG_CONVENIOS,
+        None,
+        uk=("id",),
+    ),
+    # Snapshot via API v3 /api-de-dados/convenios
+    DomainType.CG_CONVENIOS_ADITIVOS: _spec(
+        DomainType.CG_CONVENIOS_ADITIVOS,
+        None,
+        uk=("idConvenio", "numero"),
+    ),
+    # ── Portal da Transparência (CGU) — Fatia 4 (Despesas Públicas) ───────────
+    # Snapshot via API v3 /api-de-dados/despesas/documentos (fase 1 - Empenho)
+    DomainType.CG_DESPESAS_EMPENHOS: _spec(
+        DomainType.CG_DESPESAS_EMPENHOS,
+        None,
+        uk=("documento",),
+    ),
+    # Snapshot via API v3 /api-de-dados/despesas/documentos (fase 3 - Pagamento)
+    DomainType.CG_DESPESAS_PAGAMENTOS: _spec(
+        DomainType.CG_DESPESAS_PAGAMENTOS,
+        None,
+        uk=("documento",),
+    ),
+    # ── Tribunal Superior Eleitoral (TSE) — Eixo Canônico Eleitoral ───────────
+    DomainType.TSE_CANDIDATOS: _spec(
+        DomainType.TSE_CANDIDATOS,
+        None,
+        uk=("ano_eleicao", "cd_eleicao", "sq_candidato"),
+    ),
+    DomainType.TSE_BENS: _spec(
+        DomainType.TSE_BENS,
+        None,
+        uk=("ano_eleicao", "cd_eleicao", "sq_candidato", "nr_ordem_bem"),
+    ),
+    DomainType.TSE_VOTACAO_MUNZONA: _spec(
+        DomainType.TSE_VOTACAO_MUNZONA,
+        None,
+        uk=("ano_eleicao", "cd_eleicao", "nr_turno", "cd_municipio", "nr_zona", "sq_candidato"),
+    ),
+    DomainType.TSE_RECEITAS_CAMPANHA: _spec(
+        DomainType.TSE_RECEITAS_CAMPANHA,
+        None,
+        uk=("ano_eleicao", "cd_eleicao", "sq_candidato", "nr_recibo_eleitoral"),
+    ),
+    DomainType.TSE_DESPESAS_CAMPANHA: _spec(
+        DomainType.TSE_DESPESAS_CAMPANHA,
+        None,
+        uk=(
+            "ano_eleicao",
+            "cd_eleicao",
+            "sq_candidato",
+            "cd_cpf_cnpj_fornecedor",
+            "dt_despesa",
+            "vr_despesa",
+        ),
+    ),
+    # ── Dimensões Canônicas de Identidade e Mandato (Gold / Star Schema) ──────
+    DomainType.DIM_POLITICO: _spec(
+        DomainType.DIM_POLITICO,
+        None,
+        uk=("politico_id",),
+    ),
+    DomainType.DIM_MANDATO: _spec(
+        DomainType.DIM_MANDATO,
+        None,
+        uk=("mandato_id",),
     ),
 }
 

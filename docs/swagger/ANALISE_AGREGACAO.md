@@ -70,23 +70,26 @@
 | **Despesas Públicas** | 14 | Documentos de despesas, empenhos, favorecidos, plano orçamentário | 🔥 **ALTA** — gasto público federal |
 | **Contratos do Poder Executivo** | 8 | Contratos, apostilamentos, itens, fornecedores | 🔥 **ALTA** — fiscalização |
 | **Licitações** | 10 | Licitações, participantes, modalidades, UGs | 🔥 **ALTA** — transparência |
-| **Servidores** | 5 | Servidores federais, remunerações, cargos | 🔥 **ALTA** — gasto com pessoal |
+| **Servidores** | 6 | Servidores federais, remunerações, cargos | 🔥 **ALTA** — gasto com pessoal |
 | **Convênios** | 5 | Convênios, instrumentos | 🔥 **ALTA** — transferências |
 | **Órgãos** | 2 | Órgãos SIAFI e SIAPE | 🟡 Média — tabela auxiliar |
 | **Sanções** | 10 | CEIS, CNEP, CEPIM, CEAF, acordos de leniência | 🟡 Média — integridade |
 | **Viagens** | 3 | Viagens a serviço | 🟡 Média |
-| **Benefícios** | 22 | Bolsa Família, Auxílio Brasil, BPC, seguro-defeso | 🟡 Média — social |
+| **Benefícios** | 26 | Bolsa Família, Auxílio Brasil, BPC, seguro-defeso | 🟡 Média — social |
 | **Cartões** | 1 | Gastos com cartão de pagamento | 🟡 Média |
 | **Renúncias Fiscais** | 3 | Benefícios fiscais, empresas isentas | 🟡 Média |
 | **Notas Fiscais** | 2 | NFe do Executivo Federal | 🟢 Baixa |
 | **Pessoas** | 2 | PF e PJ cadastradas | 🟢 Baixa — auxiliar |
 | **Imóveis** | 3 | Imóveis funcionais e permissionários | 🟢 Baixa |
+| **Coronavírus** | 2 | Transferências e despesas COVID (2020–21) | 🟢 Baixa — especial |
+
+> *Re-verificado em 18/08/2026 (spec `portal_transparencia_swagger.json` local + índice `/download-de-dados`): contagens de Servidores (6) e Benefícios (26) corrigidas; tag **Coronavírus** adicionada; o Portal **tem** bulk download (corrige §3.2, item 3).*
 
 ### 3.2 Observações Críticas
 
 1. **Requer API Key** — É necessário se cadastrar em https://www.portaldatransparencia.gov.br/api-de-dados/cadastrar-email para obter uma chave.
 2. **Paginação obrigatória** — O parâmetro `pagina` é obrigatório em praticamente todos os endpoints. Sem página, a requisição falha.
-3. **Sem bulk download** — Diferente da Câmara, o Portal da Transparência não oferece dumps ZIP. Tudo via API REST paginada.
+3. **Bulk download disponível** — O Portal **oferece** dumps ZIP/CSV por módulo em `/download-de-dados` (ex.: servidores, despesas, contratos, viagens, emendas, benefícios). Para carga cheia, o bulk é a via correta; a API v3 serve à **consulta pontual** e tem **janelas temporais duras** (1 dia em `despesas/documentos`, 1 mês em `viagens`, ≤12 meses em `cartoes`). *(Corrigido em 18/08/2026 — o doc original afirmava "sem bulk".)*
 4. **Dados federais, não legislativos** — Enquanto Câmara e Senado tratam do processo legislativo, o Portal cobre o **Poder Executivo Federal** (execução orçamentária, contratos, servidores).
 5. **Endpoints de alta cardinalidade** — Endpoints como `despesas/documentos` e `contratos` exigem janelas temporais ou filtros específicos para não serem proibitivos.
 
