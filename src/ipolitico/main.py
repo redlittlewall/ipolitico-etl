@@ -36,6 +36,8 @@ from ipolitico.pipeline.federation import FederationOrchestrator
 from ipolitico.pipeline.manager import PipelineManager
 from ipolitico.pipeline.optimizer import DataLakeOptimizer
 from ipolitico.pipeline.runner import PipelineRunner
+from ipolitico.platinum.builder import PlatinumBuilder
+from ipolitico.platinum.models import CoberturaPlatinum
 from ipolitico.sinks.datalake_sink import DataLakeSink
 from ipolitico.storage.gold_exporter import ExportFormat, GoldExporter
 
@@ -301,6 +303,21 @@ async def main():
             "a partir dos Silver + aliases e deduplica (issue 02)."
         ),
     )
+    parser.add_argument(
+        "--build-platinum",
+        action="store_true",
+        help=(
+            "Constrói os Data Marts OBT da camada Platinum (obt_politico_custo_mensal, "
+            "obt_politico_resumo_carreira) via DuckDB (issue 07)."
+        ),
+    )
+    parser.add_argument(
+        "--export-platinum",
+        type=str,
+        choices=["sqlite", "duckdb"],
+        default=None,
+        help="Exporta a camada Platinum para banco SQL (sqlite ou duckdb) (issue 07).",
+    )
 
     args = parser.parse_args()
 
@@ -320,10 +337,20 @@ async def main():
         print(f"Documento de cobertura gerado em: {output}")
         return
 
-    # Modo somente-build: sem ingestão, só Gold (issues 01/02). Com ``--domains``
-    # o build roda após a ingestão (ver fluxo principal).
-    if (args.build_entidade_canonica or args.build_custo_erario) and args.domains is None:
-        _run_gold_builds(args)
+    # Modo somente-build: sem ingestão, só Gold/Platinum (issues 01, 02, 07).
+    # Com ``--domains`` o build roda após a ingestão (ver fluxo principal).
+    if (
+        args.build_entidade_canonica
+        or args.build_custo_erario
+        or args.build_platinum
+        or args.export_platinum
+    ) and args.domains is None:
+        if args.build_entidade_canonica or args.build_custo_erario:
+            _run_gold_builds(args)
+        if args.build_platinum:
+            _run_platinum_build(args)
+        if args.export_platinum:
+            _run_platinum_export(args)
         return
 
     if args.domains is None:
@@ -450,12 +477,18 @@ async def main():
         if args.build_entidade_canonica or args.build_custo_erario:
             _run_gold_builds(args)
 
+        if args.build_platinum:
+            _run_platinum_build(args)
+
         if args.export_gold:
             fmt = ExportFormat(args.export_gold)
             ext = "db" if fmt == ExportFormat.SQLITE else "duckdb"
             output = Path(f"data/gold_export.{ext}")
             logger.info("=== Exportando Gold para %s ===", output)
             GoldExporter().export_all(str(output), format=fmt)
+
+        if args.export_platinum:
+            _run_platinum_export(args)
     except Exception as e:
         logger.error(f"Falha catastrófica no ETL: {e}")
     finally:
@@ -541,6 +574,38 @@ def _imprimir_cov_custo(cov: CoberturaCustoErario) -> None:
     print(f"  linhas custo_erario: {cov.total_linhas} por componente: {cov.total_por_componente}")
     print(f"  por casa: {cov.total_por_casa}")
     print(f"  observações registradas: {cov.total_observacoes}")
+
+
+def _run_platinum_build(args: argparse.Namespace) -> None:
+    """Executa a construção dos Data Marts da Camada Platinum (issue 07)."""
+    logger.info("=== Construindo Camada Platinum (Data Marts OBT, issue 07) ===")
+    builder = PlatinumBuilder()
+    cov = builder.build()
+    _imprimir_cov_platinum(cov)
+
+
+def _run_platinum_export(args: argparse.Namespace) -> None:
+    """Exporta as tabelas da Camada Platinum para banco SQL (issue 07)."""
+    fmt = args.export_platinum or "sqlite"
+    ext = "db" if fmt == "sqlite" else "duckdb"
+    output = Path(f"data/platinum_export.{ext}")
+    logger.info("=== Exportando Camada Platinum para %s ===", output)
+    builder = PlatinumBuilder()
+    tables = builder.export_all(str(output), format=fmt)
+    print(f"  Tabelas Platinum exportadas para {output}: {', '.join(tables)}")
+
+
+def _imprimir_cov_platinum(cov: CoberturaPlatinum) -> None:
+    """Imprime o relatório analítico da camada Platinum (issue 07)."""
+    print(f"  políticos consolidados: {cov.total_politicos}")
+    print(f"  registros mensais (obt_politico_custo_mensal): {cov.total_linhas_custo_mensal}")
+    print(f"  custo total acumulado histórico: R$ {cov.custo_total_acumulado:,.2f}")
+    print(
+        f"  proposições: {cov.total_proposicoes_apresentadas} "
+        f"(aprovadas: {cov.total_proposicoes_aprovadas})"
+    )
+    print(f"  votos nominais registrados: {cov.total_votos_registrados}")
+    print(f"  tabelas geradas: {', '.join(cov.tabelas_geradas)}")
 
 
 def main_cli():

@@ -1590,6 +1590,7 @@ STRATEGY_REGISTRY: dict[DomainType, DomainJobStrategy] = {
     DomainType.OCUPACOES: DeputyChildStrategy(include_date_range=False),
     DomainType.DEPUTADOS_FRENTES: DeputyChildStrategy(include_date_range=False),
     DomainType.DEPUTADOS_HISTORICO: DeputyChildStrategy(include_date_range=False),
+    DomainType.CAMARA_GABINETE_ASSESSORES: DeputyChildStrategy(include_date_range=False),
     # Filhos temporais de deputado (janelas reais de legislatura)
     # NOTA: DeputyLegislatureStrategy lê deputados_historico + legislaturas do
     # lake para gerar 1 job exato por (deputado, legislatura), eliminando ~81%

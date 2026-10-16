@@ -37,6 +37,7 @@ _SOURCE_URL_FORMATS: dict[DomainType, str] = {
     DomainType.BLOCOS_DETALHE: "https://dadosabertos.camara.leg.br/api/v2/blocos/{resource_id}",
     DomainType.VOTOS: "https://dadosabertos.camara.leg.br/api/v2/votacoes/{resource_id}/votos",
     DomainType.ORIENTACOES: "https://dadosabertos.camara.leg.br/api/v2/votacoes/{resource_id}/orientacoes",
+    DomainType.CAMARA_GABINETE_ASSESSORES: "https://www.camara.leg.br/deputados/{resource_id}/pessoal-gabinete",
     # ── Senado — Entidades raiz ───────────────────────────────────────────────────
     DomainType.SENADORES: "https://legis.senado.leg.br/dadosabertos/senador/{resource_id}",
     DomainType.SENADORES_DETALHE: "https://legis.senado.leg.br/dadosabertos/senador/{resource_id}",
@@ -223,6 +224,13 @@ DOMAIN_SPECS: dict[DomainType, DomainSpec] = {
         frozenset({DomainType.DEPUTADOS}),
         uk=("id_deputado", "anoInicio", "cargo", "siglaPartidoEleicao"),
         sub="mandatos_externos",
+    ),
+    DomainType.CAMARA_GABINETE_ASSESSORES: _spec(
+        DomainType.CAMARA_GABINETE_ASSESSORES,
+        None,
+        frozenset({DomainType.DEPUTADOS}),
+        uk=("deputado_id", "nome_assessor", "cargo"),
+        source_url_format="https://www.camara.leg.br/deputados/{resource_id}/pessoal-gabinete",
     ),
     DomainType.EVENTOS_DEPUTADOS: _spec(
         DomainType.EVENTOS_DEPUTADOS,

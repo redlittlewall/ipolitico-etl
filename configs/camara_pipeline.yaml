@@ -32,6 +32,9 @@ domain_configs:
     # (/deputados/{id}/ocupacoes) é a fonte correta.
     extractor: "ipolitico.extractors.camara.api.deputado_child.OcupacoesExtractor"
     transformer: "ipolitico.transformers.camara.deputado_child_transformer.CamaraDeputadoChildTransformer"
+  camara_gabinete_assessores:
+    extractor: "ipolitico.extractors.camara.scraper.pessoal_gabinete.CamaraPessoalGabineteExtractor"
+    transformer: "ipolitico.transformers.camara.pessoal_gabinete_transformer.CamaraPessoalGabineteTransformer"
   orgaos:
     extractor: "ipolitico.extractors.camara.api.orgaos.OrgaosExtractor"
     transformer: "ipolitico.transformers.camara.orgaos_transformer.CamaraOrgaosTransformer"

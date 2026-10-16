@@ -60,6 +60,7 @@ API: https://dadosabertos.camara.leg.br
 | `deputados_orgaos` | 1826-04-29 | — |
 | `deputados_eventos` | 1826-04-29 | — |
 | `mandatos_externos` | 1826-04-29 | — |
+| `camara_gabinete_assessores` | 1826-04-29 | — |
 | `profissoes` | 1826-04-29 | — |
 | `ocupacoes` | 1826-04-29 | — |
 | `votacoes` | 1991-01-01 | — |

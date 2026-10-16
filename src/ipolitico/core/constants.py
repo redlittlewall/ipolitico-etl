@@ -151,6 +151,8 @@ class DomainType(str, Enum):
     LICITACOES_PROPOSTAS = "licitacoes_propostas"
     # Domínio bulk-only mensal (folha de pagamento consolidada por ano/mês)
     FOLHA_PAGAMENTO = "folha_pagamento"
+    # Domínio de pessoal de gabinete (extraído via scraper HTML)
+    CAMARA_GABINETE_ASSESSORES = "camara_gabinete_assessores"
 
     # ── Domínios do Senado ───────────────────────────────────────────────
     SENADORES = "senadores"
@@ -237,11 +239,12 @@ class DomainType(str, Enum):
 
 
 class MedallionLayer(str, Enum):
-    """Camadas da Arquitetura Medallion[cite: 2]."""
+    """Camadas da Arquitetura Medallion."""
 
     BRONZE = "bronze"
     SILVER = "silver"
     GOLD = "gold"
+    PLATINUM = "platinum"
 
 
 class EarliestDates:
@@ -266,6 +269,7 @@ class EarliestDates:
     VOTACOES_OBJETOS = "1991-01-01"
     VOTACOES_PROPOSICOES = "1991-01-01"
     LICITACOES = "1999-01-01"
+    CAMARA_GABINETE_ASSESSORES = "1826-04-29"
     # ── Domínios confirmados (PRD Consumo Absoluto) ───────────────────────
     # Datas reais de disponibilidade levantadas na pesquisa. Ainda sem
     # DomainType/EARLIEST_DATE_MAP (o extrator chega na issue própria); quando
@@ -440,6 +444,7 @@ EARLIEST_DATE_MAP: Dict[DomainType, str] = {
     DomainType.LICITACOES_PEDIDOS: EarliestDates.LICITACOES,
     DomainType.LICITACOES_PROPOSTAS: EarliestDates.LICITACOES,
     DomainType.FOLHA_PAGAMENTO: EarliestDates.FOLHA_PAGAMENTO,
+    DomainType.CAMARA_GABINETE_ASSESSORES: EarliestDates.CAMARA_GABINETE_ASSESSORES,
     # ── Domínios do Senado ──────────────────────────────────────────────
     DomainType.SENADORES: EarliestDates.SENADORES,
     DomainType.SENADORES_DETALHE: EarliestDates.SENADORES_DETALHE,
@@ -678,6 +683,7 @@ DOMAIN_SOURCE_SYSTEM: Dict[str, SourceSystem] = {
     "tse_despesas_campanha": SourceSystem.TSE,
     "dim_politico": SourceSystem.TSE,
     "dim_mandato": SourceSystem.TSE,
+    "camara_gabinete_assessores": SourceSystem.CAMARA,
     # ── Domínios documentados no registry, ainda sem DomainType ─────────────
     "folha_pagamento": SourceSystem.CAMARA,
     "remuneracoes": SourceSystem.SENADO,
@@ -689,6 +695,7 @@ DOMAIN_SOURCE_SYSTEM: Dict[str, SourceSystem] = {
 DOMAIN_LABELS: dict[DomainType, str] = {
     # ── Entidades principais ───────────────────────────────────────────────────
     DomainType.DEPUTADOS: "Deputados federais (mandato ativo e historico)",
+    DomainType.CAMARA_GABINETE_ASSESSORES: "Assessores de gabinete dos deputados",
     DomainType.PROPOSICOES: "Proposicoes legislativas",
     DomainType.VOTACOES: "Votacoes em plenario",
     DomainType.ORGAOS: "Orgaos e comissoes da Camara",

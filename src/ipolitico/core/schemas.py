@@ -94,6 +94,15 @@ SILVER_SCHEMAS = {
         "anoInicio": pl.Int64,
         "anoFim": pl.Int64,
     },
+    DomainType.CAMARA_GABINETE_ASSESSORES.value: {
+        "_source_url": pl.String,
+        "deputado_id": pl.Int64,
+        "nome_assessor": pl.String,
+        "cargo": pl.String,
+        "grupo_funcional": pl.String,
+        "data_exercicio": pl.Date,
+        "captured_at": pl.String,
+    },
     DomainType.ORGAOS.value: {
         "_source_url": pl.String,
         "id": pl.Int64,
